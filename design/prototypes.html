@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>交互原型 - 安全驾驶日记</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+            background: #F8FAFC;
+            color: #0F172A;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        /* Header */
+        .header {
+            background: #FFFFFF;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header .container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 64px;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 20px;
+            font-weight: 700;
+            color: #22C55E;
+            text-decoration: none;
+        }
+
+        .nav {
+            display: flex;
+            gap: 32px;
+        }
+
+        .nav a {
+            text-decoration: none;
+            color: #64748B;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+
+        .nav a:hover,
+        .nav a.active {
+            color: #22C55E;
+        }
+
+        /* Main Content */
+        .main {
+            padding: 40px 0;
+        }
+
+        .section {
+            background: #FFFFFF;
+            border-radius: 16px;
+            padding: 32px;
+            margin-bottom: 32px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .section h2 {
+            font-size: 28px;
+            font-weight: 600;
+            margin-bottom: 24px;
+            color: #0F172A;
+        }
+
+        .section h3 {
+            font-size: 20px;
+            font-weight: 600;
+            margin: 24px 0 16px 0;
+            color: #334155;
+        }
+
+        .section p {
+            color: #64748B;
+            margin-bottom: 16px;
+        }
+
+        /* Flow Diagram */
+        .flow-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+
+        .flow-card {
+            background: #F8FAFC;
+            border-radius: 12px;
+            padding: 24px;
+            border: 1px solid #E2E8F0;
+        }
+
+        .flow-title {
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: #334155;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .flow-steps {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .flow-step {
+            background: #FFFFFF;
+            border-radius: 8px;
+            padding: 12px;
+            border: 1px solid #E2E8F0;
+            position: relative;
+        }
+
+        .flow-step::after {
+            content: '↓';
+            position: absolute;
+            bottom: -16px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #22C55E;
+            font-weight: 700;
+        }
+
+        .flow-step:last-child::after {
+            display: none;
+        }
+
+        .step-title {
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 4px;
+        }
+
+        .step-desc {
+            font-size: 12px;
+            color: #64748B;
+        }
+
+        /* Interactive Elements */
+        .interactive-demo {
+            background: #F8FAFC;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+
+        .demo-title {
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: #334155;
+        }
+
+        .demo-content {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 16px;
+        }
+
+        .demo-item {
+            background: #FFFFFF;
+            border-radius: 8px;
+            padding: 16px;
+            border: 1px solid #E2E8F0;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .demo-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .demo-item.btn-demo {
+            background: #22C55E;
+            color: #FFFFFF;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        .demo-item.btn-demo:hover {
+            background: #16A34A;
+        }
+
+        .demo-item.card-demo {
+            border-left: 4px solid #22C55E;
+        }
+
+        .demo-item.input-demo input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #CBD5E1;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .demo-item.input-demo input:focus {
+            border-color: #22C55E;
+            box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.1);
+            outline: none;
+        }
+
+        /* Animation Examples */
+        .animation-showcase {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+        }
+
+        .animation-item {
+            background: #FFFFFF;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            border: 1px solid #E2E8F0;
+            cursor: pointer;
+        }
+
+        .animation-icon {
+            width: 48px;
+            height: 48px;
+            background: #22C55E;
+            border-radius: 50%;
+            margin: 0 auto 12px;
+            transition: all 0.3s ease;
+        }
+
+        .animation-item:hover .animation-icon {
+            transform: scale(1.1) rotate(360deg);
+        }
+
+        .bounce-demo {
+            animation: bounce 2s infinite;
+        }
+
+        @keyframes bounce {
+            0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+            40% { transform: translateY(-10px); }
+            60% { transform: translateY(-5px); }
+        }
+
+        .pulse-demo {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .slide-demo {
+            animation: slideIn 0.5s ease-out;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(-100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        /* Micro Interactions */
+        .micro-interaction {
+            background: #FFFFFF;
+            border-radius: 8px;
+            padding: 16px;
+            border: 1px solid #E2E8F0;
+            margin-bottom: 16px;
+        }
+
+        .micro-title {
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #334155;
+        }
+
+        .micro-desc {
+            font-size: 14px;
+            color: #64748B;
+            margin-bottom: 12px;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #F1F5F9;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #22C55E, #16A34A);
+            border-radius: 4px;
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+
+        .progress-bar:hover .progress-fill {
+            width: 75%;
+        }
+
+        .toggle-switch {
+            width: 48px;
+            height: 28px;
+            background: #CBD5E1;
+            border-radius: 14px;
+            position: relative;
+            cursor: pointer;
+            transition: background 0.2s ease;
+        }
+
+        .toggle-switch::after {
+            content: '';
+            width: 24px;
+            height: 24px;
+            background: #FFFFFF;
+            border-radius: 50%;
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            transition: transform 0.2s ease;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .toggle-switch.active {
+            background: #22C55E;
+        }
+
+        .toggle-switch.active::after {
+            transform: translateX(20px);
+        }
+
+        /* User Journey */
+        .journey-flow {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            overflow-x: auto;
+            padding: 20px 0;
+        }
+
+        .journey-step {
+            min-width: 120px;
+            text-align: center;
+            position: relative;
+        }
+
+        .journey-step::after {
+            content: '→';
+            position: absolute;
+            right: -12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #22C55E;
+            font-weight: 700;
+        }
+
+        .journey-step:last-child::after {
+            display: none;
+        }
+
+        .journey-icon {
+            width: 48px;
+            height: 48px;
+            background: #22C55E;
+            color: #FFFFFF;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 8px;
+            font-size: 20px;
+        }
+
+        .journey-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #334155;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header .container {
+                flex-direction: column;
+                height: auto;
+                padding: 16px 0;
+            }
+
+            .nav {
+                gap: 16px;
+                margin-top: 16px;
+            }
+
+            .flow-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .demo-content {
+                grid-template-columns: 1fr;
+            }
+
+            .journey-flow {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .journey-step::after {
+                content: '↓';
+                right: auto;
+                top: auto;
+                bottom: -12px;
+                left: 50%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="container">
+            <a href="index.html" class="logo">
+                🚗 安全驾驶日记
+            </a>
+            <nav class="nav">
+                <a href="index.html">首页</a>
+                <a href="design-system.html">设计系统</a>
+                <a href="wireframes.html">线框图</a>
+                <a href="prototypes.html" class="active">原型图</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="main">
+        <div class="container">
+            <!-- 核心交互流程 -->
+            <section class="section">
+                <h2>🔄 核心交互流程</h2>
+                <p>展示"安全驾驶日记"app的主要用户交互流程和体验设计。</p>
+
+                <div class="flow-grid">
+                    <div class="flow-card">
+                        <div class="flow-title">
+                            <span>🎯</span>
+                            <span>首次使用流程</span>
+                        </div>
+                        <div class="flow-steps">
+                            <div class="flow-step">
+                                <div class="step-title">启动APP</div>
+                                <div class="step-desc">显示品牌logo和价值主张</div>
+                            </div>
+                            <div class="flow-step">
+                                <div class="step-title">功能介绍</div>
+                                <div class="step-desc">4个关键功能滑动展示</div>
+                            </div>
+                            <div class="flow-step">
+                                <div class="step-title">权限申请</div>
+                                <div class="step-desc">位置、麦克风、相机权限</div>
+                            </div>
+                            <div class="flow-step">
+                                <div class="step-title">个人设置</div>
+                                <div class="step-desc">昵称、驾龄、车型设置</div>
+                            </div>
+                            <div class="flow-step">
+                                <div class="step-title">进入首页</div>
+                                <div class="step-desc">开始使用核心功能</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flow-card">
+                        <div class="flow-title">
+                            <span>🚗</span>
+                            <span>日常驾驶流程</span>
+                        </div>
+                        <div class="flow-steps">
+                            <div class="flow-step">
+                                <div class="step-title">开始驾驶</div>
+                                <div class="step-desc">点击按钮，记录起始位置</div>
+                            </div>
+                            <div class="flow-step">
+                                <div class="step-title">行前检查</div>
+                                <div class="step-desc">快速完成8项安全检查</div>
+                            </div>
+                            <div class="flow-step">
+                                <div class="step-title">驾驶模式</div>
+                                <div class="step-desc">最小化界面，后台记录</div>
+                            </div>
+                            <div class="flow-step">
+                                <div class="step-title">结束驾驶</div>
+                                <div class="step-desc">记录终点，计算行程</div>
+                            </div>
+                            <div class="flow-step">
+                                <div class="step-title">复盘记录</div>
+                                <div class="step-desc">语音或文字记录经验</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flow-card">
+                        <div class="flow-title">
+                            <span>📚</span>
+                            <span>学习提升流程</span>
+                        </div>
+                        <div class="flow-steps">
+                            <div class="flow-step">
+                                <div class="step-title">智能推送</div>
+                                <div class="step-desc">每日3张知识卡片</div>
+                            </div>
+                            <div class="flow-step">
+                                <div class="step-title">滑动学习</div>
+                                <div class="step-desc">What-Why-How三维度</div>
+                            </div>
+                            <div class="flow-step">
+                                <div class="step-title">掌握标记</div>
+                                <div class="step-desc">已掌握或需要复习</div>
+                            </div>
+                            <div class="flow-step">
+                                <div class="step-title">复习计划</div>
+                                <div class="step-desc">基于遗忘曲线安排</div>
+                            </div>
+                            <div class="flow-step">
+                                <div class="step-title">进度追踪</div>
+                                <div class="step-desc">可视化学习成果</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flow-card">
+                        <div class="flow-title">
+                            <span>❓</span>
+                            <span>问题解决流程</span>
+                        </div>
+                        <div class="flow-steps">
+                            <div class="flow-step">
+                                <div class="step-title">遇到问题</div>
+                                <div class="step-desc">驾驶中的疑问困惑</div>
+                            </div>
+                            <div class="flow-step">
+                                <div class="step-title">搜索查询</div>
+                                <div class="step-desc">语音或文字快速搜索</div>
+                            </div>
+                            <div class="flow-step">
+                                <div class="step-title">获得答案</div>
+                                <div class="step-desc">结构化答案展示</div>
+                            </div>
+                            <div class="flow-step">
+                                <div class="step-title">收藏应用</div>
+                                <div class="step-desc">保存重要内容</div>
+                            </div>
+                            <div class="flow-step">
+                                <div class="step-title">反馈评价</div>
+                                <div class="step-desc">持续优化内容</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 用户旅程 -->
+            <section class="section">
+                <h2>👤 用户旅程地图</h2>
+                <p>展示用户从新手到老司机的完整成长路径。</p>
+
+                <div class="journey-flow">
+                    <div class="journey-step">
+                        <div class="journey-icon">🎯</div>
+                        <div class="journey-label">首次体验</div>
+                    </div>
+                    <div class="journey-step">
+                        <div class="journey-icon">📝</div>
+                        <div class="journey-label">记录问题</div>
+                    </div>
+                    <div class="journey-step">
+                        <div class="journey-icon">📚</div>
+                        <div class="journey-label">学习知识</div>
+                    </div>
+                    <div class="journey-step">
+                        <div class="journey-icon">✅</div>
+                        <div class="journey-label">养成习惯</div>
+                    </div>
+                    <div class="journey-step">
+                        <div class="journey-icon">📈</div>
+                        <div class="journey-label">持续改进</div>
+                    </div>
+                    <div class="journey-step">
+                        <div class="journey-icon">🏆</div>
+                        <div class="journey-label">成为老司机</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 微交互展示 -->
+            <section class="section">
+                <h2>✨ 微交互设计</h2>
+                <p>精心设计的微交互提升用户体验，让每个操作都有明确的反馈。</p>
+
+                <div class="interactive-demo">
+                    <div class="demo-title">交互组件演示</div>
+                    <div class="demo-content">
+                        <div class="demo-item btn-demo">
+                            开始驾驶 (悬停试试)
+                        </div>
+                        <div class="demo-item card-demo">
+                            <div style="font-weight: 600; margin-bottom: 4px;">状态卡片</div>
+                            <div style="font-size: 14px; color: #64748B;">带有左侧强调色</div>
+                        </div>
+                        <div class="demo-item input-demo">
+                            <div style="font-weight: 600; margin-bottom: 8px;">输入框</div>
+                            <input type="text" placeholder="点击输入内容...">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="micro-interaction">
+                    <div class="micro-title">进度条动画</div>
+                    <div class="micro-desc">悬停查看进度填充效果</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill"></div>
+                    </div>
+                </div>
+
+                <div class="micro-interaction">
+                    <div class="micro-title">开关切换</div>
+                    <div class="micro-desc">点击切换开关状态</div>
+                    <div class="toggle-switch" onclick="this.classList.toggle('active')"></div>
+                </div>
+            </section>
+
+            <!-- 动画展示 -->
+            <section class="section">
+                <h2>🎬 动画效果</h2>
+                <p>流畅的动画让界面更加生动，提供更好的视觉反馈。</p>
+
+                <div class="animation-showcase">
+                    <div class="animation-item">
+                        <div class="animation-icon bounce-demo"></div>
+                        <div style="font-weight: 600; margin-bottom: 4px;">弹跳动画</div>
+                        <div style="font-size: 12px; color: #64748B;">成功操作反馈</div>
+                    </div>
+                    <div class="animation-item">
+                        <div class="animation-icon pulse-demo"></div>
+                        <div style="font-weight: 600; margin-bottom: 4px;">脉冲动画</div>
+                        <div style="font-size: 12px; color: #64748B;">加载状态指示</div>
+                    </div>
+                    <div class="animation-item">
+                        <div class="animation-icon slide-demo"></div>
+                        <div style="font-weight: 600; margin-bottom: 4px;">滑入动画</div>
+                        <div style="font-size: 12px; color: #64748B;">页面切换过渡</div>
+                    </div>
+                    <div class="animation-item">
+                        <div class="animation-icon"></div>
+                        <div style="font-weight: 600; margin-bottom: 4px;">悬停缩放</div>
+                        <div style="font-size: 12px; color: #64748B;">鼠标悬停效果</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 智能化交互 -->
+            <section class="section">
+                <h2>🤖 智能化交互</h2>
+                <p>基于AI和用户行为的智能交互，提供个性化的使用体验。</p>
+
+                <div class="flow-grid">
+                    <div class="flow-card">
+                        <div class="flow-title">
+                            <span>🧠</span>
+                            <span>上下文感知</span>
+                        </div>
+                        <div style="color: #64748B; font-size: 14px; line-height: 1.6;">
+                            <p>• <strong>时间感知</strong>：根据时段调整功能优先级</p>
+                            <p>• <strong>位置感知</strong>：基于GPS提供相关提醒</p>
+                            <p>• <strong>使用习惯</strong>：学习用户行为模式</p>
+                            <p>• <strong>场景适配</strong>：自动调整界面模式</p>
+                        </div>
+                    </div>
+
+                    <div class="flow-card">
+                        <div class="flow-title">
+                            <span>🔮</span>
+                            <span>预测性交互</span>
+                        </div>
+                        <div style="color: #64748B; font-size: 14px; line-height: 1.6;">
+                            <p>• <strong>智能提醒</strong>：基于历史数据预测需求</p>
+                            <p>• <strong>内容推荐</strong>：个性化知识推送</p>
+                            <p>• <strong>操作建议</strong>：智能操作路径推荐</p>
+                            <p>• <strong>异常检测</strong>：主动发现潜在问题</p>
+                        </div>
+                    </div>
+
+                    <div class="flow-card">
+                        <div class="flow-title">
+                            <span>🎯</span>
+                            <span>自适应界面</span>
+                        </div>
+                        <div style="color: #64748B; font-size: 14px; line-height: 1.6;">
+                            <p>• <strong>内容密度</strong>：根据使用频率调整</p>
+                            <p>• <strong>功能排序</strong>：基于使用习惯重排</p>
+                            <p>• <strong>快捷操作</strong>：动态生成快捷入口</p>
+                            <p>• <strong>个性化</strong>：记住用户偏好设置</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 错误处理 -->
+            <section class="section">
+                <h2>⚠️ 错误处理机制</h2>
+                <p>完善的错误处理流程，确保用户在各种情况下都能得到良好的体验。</p>
+
+                <div class="flow-grid">
+                    <div class="flow-card">
+                        <div class="flow-title">
+                            <span>📶</span>
+                            <span>网络异常</span>
+                        </div>
+                        <div class="flow-steps" style="gap: 8px;">
+                            <div class="flow-step">
+                                <div class="step-title">检测网络状态</div>
+                                <div class="step-desc">实时监控网络连接</div>
+                            </div>
+                            <div class="flow-step">
+                                <div class="step-title">显示离线提示</div>
+                                <div class="step-desc">友好的无网络状态提示</div>
+                            </div>
+                            <div class="flow-step">
+                                <div class="step-title">缓存关键功能</div>
+                                <div class="step-desc">核心功能离线可用</div>
+                            </div>
+                            <div class="flow-step">
+                                <div class="step-title">自动同步</div>
+                                <div class="step-desc">网络恢复后自动同步</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flow-card">
+                        <div class="flow-title">
+                            <span>❌</span>
+                            <span>操作失误</span>
+                        </div>
+                        <div class="flow-steps" style="gap: 8px;">
+                            <div class="flow-step">
+                                <div class="step-title">误操作检测</div>
+                                <div class="step-desc">智能识别误操作</div>
+                            </div>
+                            <div class="flow-step">
+                                <div class="step-title">撤销确认</div>
+                                <div class="step-desc">提供撤销或确认选项</div>
+                            </div>
+                            <div class="flow-step">
+                                <div class="step-title">操作回滚</div>
+                                <div class="step-desc">安全回滚到之前状态</div>
+                            </div>
+                            <div class="flow-step">
+                                <div class="step-title">状态恢复</div>
+                                <div class="step-desc">确保数据完整性</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+</body>
+</html> 

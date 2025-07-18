@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>用户体验 - 安全驾驶日记</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+            background: #F8FAFC;
+            color: #0F172A;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        /* Header */
+        .header {
+            background: #FFFFFF;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header .container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 64px;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 20px;
+            font-weight: 700;
+            color: #22C55E;
+            text-decoration: none;
+        }
+
+        .nav {
+            display: flex;
+            gap: 32px;
+        }
+
+        .nav a {
+            text-decoration: none;
+            color: #64748B;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+
+        .nav a:hover,
+        .nav a.active {
+            color: #22C55E;
+        }
+
+        /* Main Content */
+        .main {
+            padding: 40px 0;
+        }
+
+        .section {
+            background: #FFFFFF;
+            border-radius: 16px;
+            padding: 32px;
+            margin-bottom: 32px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .section h2 {
+            font-size: 28px;
+            font-weight: 600;
+            margin-bottom: 24px;
+            color: #0F172A;
+        }
+
+        .section h3 {
+            font-size: 20px;
+            font-weight: 600;
+            margin: 24px 0 16px 0;
+            color: #334155;
+        }
+
+        .section p {
+            color: #64748B;
+            margin-bottom: 16px;
+        }
+
+        /* User Persona */
+        .persona-card {
+            background: #F8FAFC;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+            border-left: 4px solid #22C55E;
+        }
+
+        .persona-header {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .persona-avatar {
+            width: 64px;
+            height: 64px;
+            background: #22C55E;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            color: #FFFFFF;
+        }
+
+        .persona-info h4 {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .persona-details {
+            color: #64748B;
+            font-size: 14px;
+        }
+
+        .persona-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+        }
+
+        .persona-section h5 {
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #334155;
+        }
+
+        .persona-section ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .persona-section li {
+            color: #64748B;
+            font-size: 14px;
+            margin-bottom: 4px;
+            padding-left: 16px;
+            position: relative;
+        }
+
+        .persona-section li::before {
+            content: '•';
+            color: #22C55E;
+            position: absolute;
+            left: 0;
+        }
+
+        /* Journey Timeline */
+        .journey-timeline {
+            position: relative;
+            padding: 20px 0;
+        }
+
+        .journey-timeline::before {
+            content: '';
+            position: absolute;
+            left: 32px;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: #E2E8F0;
+        }
+
+        .journey-step {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 32px;
+            position: relative;
+        }
+
+        .journey-icon {
+            width: 64px;
+            height: 64px;
+            background: #22C55E;
+            color: #FFFFFF;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            position: relative;
+            z-index: 1;
+            flex-shrink: 0;
+        }
+
+        .journey-content {
+            margin-left: 24px;
+            flex: 1;
+        }
+
+        .journey-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .journey-description {
+            color: #64748B;
+            margin-bottom: 12px;
+        }
+
+        .journey-details {
+            background: #F8FAFC;
+            border-radius: 8px;
+            padding: 16px;
+            border: 1px solid #E2E8F0;
+        }
+
+        .journey-details h6 {
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #334155;
+        }
+
+        .journey-details ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .journey-details li {
+            color: #64748B;
+            font-size: 14px;
+            margin-bottom: 4px;
+            padding-left: 16px;
+            position: relative;
+        }
+
+        .journey-details li::before {
+            content: '→';
+            color: #22C55E;
+            position: absolute;
+            left: 0;
+        }
+
+        /* Information Architecture */
+        .architecture-tree {
+            background: #F8FAFC;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+
+        .tree-node {
+            margin-bottom: 16px;
+        }
+
+        .tree-title {
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #334155;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .tree-children {
+            margin-left: 24px;
+            border-left: 2px solid #E2E8F0;
+            padding-left: 16px;
+        }
+
+        .tree-leaf {
+            background: #FFFFFF;
+            border-radius: 6px;
+            padding: 8px 12px;
+            margin-bottom: 8px;
+            border: 1px solid #E2E8F0;
+            font-size: 14px;
+            color: #64748B;
+        }
+
+        /* Feature Grid */
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 24px;
+            margin-bottom: 24px;
+        }
+
+        .feature-card {
+            background: #F8FAFC;
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid #E2E8F0;
+        }
+
+        .feature-icon {
+            width: 48px;
+            height: 48px;
+            background: #22C55E;
+            color: #FFFFFF;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            margin-bottom: 16px;
+        }
+
+        .feature-title {
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #334155;
+        }
+
+        .feature-description {
+            color: #64748B;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        /* Emotion Curve */
+        .emotion-chart {
+            background: #F8FAFC;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+
+        .chart-header {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+
+        .chart-title {
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #334155;
+        }
+
+        .emotion-line {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 120px;
+            position: relative;
+            margin-bottom: 16px;
+        }
+
+        .emotion-point {
+            width: 16px;
+            height: 16px;
+            background: #22C55E;
+            border-radius: 50%;
+            position: relative;
+            z-index: 2;
+        }
+
+        .emotion-point.high {
+            transform: translateY(-40px);
+        }
+
+        .emotion-point.medium {
+            transform: translateY(0px);
+        }
+
+        .emotion-point.low {
+            transform: translateY(40px);
+        }
+
+        .emotion-labels {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: #64748B;
+        }
+
+        /* Touch Points */
+        .touchpoint-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .touchpoint-card {
+            background: #FFFFFF;
+            border-radius: 8px;
+            padding: 16px;
+            border: 1px solid #E2E8F0;
+            border-left: 4px solid #22C55E;
+        }
+
+        .touchpoint-type {
+            font-size: 12px;
+            color: #22C55E;
+            font-weight: 600;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+
+        .touchpoint-title {
+            font-weight: 600;
+            margin-bottom: 4px;
+            color: #334155;
+        }
+
+        .touchpoint-desc {
+            color: #64748B;
+            font-size: 14px;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header .container {
+                flex-direction: column;
+                height: auto;
+                padding: 16px 0;
+            }
+
+            .nav {
+                gap: 16px;
+                margin-top: 16px;
+            }
+
+            .persona-content {
+                grid-template-columns: 1fr;
+            }
+
+            .feature-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .journey-timeline::before {
+                left: 16px;
+            }
+
+            .journey-icon {
+                width: 48px;
+                height: 48px;
+                font-size: 20px;
+            }
+
+            .journey-content {
+                margin-left: 16px;
+            }
+
+            .emotion-labels {
+                flex-direction: column;
+                align-items: center;
+                gap: 8px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="container">
+            <a href="index.html" class="logo">
+                🚗 安全驾驶日记
+            </a>
+            <nav class="nav">
+                <a href="index.html">首页</a>
+                <a href="design-system.html">设计系统</a>
+                <a href="wireframes.html">线框图</a>
+                <a href="prototypes.html">原型图</a>
+                <a href="user-flow.html" class="active">用户体验</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="main">
+        <div class="container">
+            <!-- 用户画像 -->
+            <section class="section">
+                <h2>👤 用户画像</h2>
+                <p>基于目标用户群体的特征分析，设计符合用户需求的产品体验。</p>
+
+                <div class="persona-card">
+                    <div class="persona-header">
+                        <div class="persona-avatar">🚗</div>
+                        <div class="persona-info">
+                            <h4>张小明 - 新手司机</h4>
+                            <div class="persona-details">26岁 • 驾龄1年 • 互联网从业者</div>
+                        </div>
+                    </div>
+                    <div class="persona-content">
+                        <div class="persona-section">
+                            <h5>基本特征</h5>
+                            <ul>
+                                <li>刚拿到驾照1年，技术不够熟练</li>
+                                <li>平时主要上下班代步，偶尔周末自驾</li>
+                                <li>对安全驾驶非常重视，但缺乏经验</li>
+                                <li>习惯使用手机app学习和记录</li>
+                            </ul>
+                        </div>
+                        <div class="persona-section">
+                            <h5>痛点需求</h5>
+                            <ul>
+                                <li>经常犯同样的驾驶错误</li>
+                                <li>不知道如何系统性提升技能</li>
+                                <li>缺乏专业指导和反馈</li>
+                                <li>想要养成良好的驾驶习惯</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="persona-card">
+                    <div class="persona-header">
+                        <div class="persona-avatar">🎯</div>
+                        <div class="persona-info">
+                            <h4>李女士 - 有经验司机</h4>
+                            <div class="persona-details">35岁 • 驾龄8年 • 公司中层管理</div>
+                        </div>
+                    </div>
+                    <div class="persona-content">
+                        <div class="persona-section">
+                            <h5>基本特征</h5>
+                            <ul>
+                                <li>驾驶技术相对成熟，但仍有提升空间</li>
+                                <li>工作繁忙，希望高效学习</li>
+                                <li>注重细节和数据分析</li>
+                                <li>愿意分享经验帮助他人</li>
+                            </ul>
+                        </div>
+                        <div class="persona-section">
+                            <h5>痛点需求</h5>
+                            <ul>
+                                <li>希望进一步提升驾驶技能</li>
+                                <li>需要碎片时间学习方案</li>
+                                <li>想要量化自己的进步</li>
+                                <li>希望获得专业认可</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 用户旅程 -->
+            <section class="section">
+                <h2>🗺️ 用户旅程地图</h2>
+                <p>展示用户从接触产品到成为熟练用户的完整体验旅程。</p>
+
+                <div class="journey-timeline">
+                    <div class="journey-step">
+                        <div class="journey-icon">🎯</div>
+                        <div class="journey-content">
+                            <div class="journey-title">发现阶段</div>
+                            <div class="journey-description">用户通过各种渠道了解到产品</div>
+                            <div class="journey-details">
+                                <h6>关键触点</h6>
+                                <ul>
+                                    <li>应用商店搜索"驾驶安全"</li>
+                                    <li>朋友推荐或社交媒体分享</li>
+                                    <li>驾校或汽车论坛推荐</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="journey-step">
+                        <div class="journey-icon">📱</div>
+                        <div class="journey-content">
+                            <div class="journey-title">首次体验</div>
+                            <div class="journey-description">下载应用，完成注册和初始设置</div>
+                            <div class="journey-details">
+                                <h6>体验流程</h6>
+                                <ul>
+                                    <li>简洁的欢迎页面和价值介绍</li>
+                                    <li>快速的注册流程</li>
+                                    <li>个性化设置和权限申请</li>
+                                    <li>功能引导和演示</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="journey-step">
+                        <div class="journey-icon">🚗</div>
+                        <div class="journey-content">
+                            <div class="journey-title">初次使用</div>
+                            <div class="journey-description">开始使用核心功能，记录第一次驾驶体验</div>
+                            <div class="journey-details">
+                                <h6>使用场景</h6>
+                                <ul>
+                                    <li>完成第一次行前检查</li>
+                                    <li>记录一次驾驶日志</li>
+                                    <li>学习第一张知识卡片</li>
+                                    <li>体验语音记录功能</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="journey-step">
+                        <div class="journey-icon">📈</div>
+                        <div class="journey-content">
+                            <div class="journey-title">习惯养成</div>
+                            <div class="journey-description">持续使用产品，逐渐养成良好的驾驶习惯</div>
+                            <div class="journey-details">
+                                <h6>成长过程</h6>
+                                <ul>
+                                    <li>每日坚持使用检查清单</li>
+                                    <li>定期记录驾驶复盘</li>
+                                    <li>按计划学习知识卡片</li>
+                                    <li>获得第一个成就徽章</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="journey-step">
+                        <div class="journey-icon">🏆</div>
+                        <div class="journey-content">
+                            <div class="journey-title">价值实现</div>
+                            <div class="journey-description">技能得到显著提升，成为安全驾驶专家</div>
+                            <div class="journey-details">
+                                <h6>成就表现</h6>
+                                <ul>
+                                    <li>驾驶技能明显提升</li>
+                                    <li>安全评分持续提高</li>
+                                    <li>获得多个成就徽章</li>
+                                    <li>开始向其他用户分享经验</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 信息架构 -->
+            <section class="section">
+                <h2>🏗️ 信息架构</h2>
+                <p>清晰的信息组织结构，确保用户能够快速找到所需功能。</p>
+
+                <div class="architecture-tree">
+                    <div class="tree-node">
+                        <div class="tree-title">
+                            <span>📱</span>
+                            <span>安全驾驶日记</span>
+                        </div>
+                        <div class="tree-children">
+                            <div class="tree-node">
+                                <div class="tree-title">
+                                    <span>🏠</span>
+                                    <span>首页</span>
+                                </div>
+                                <div class="tree-children">
+                                    <div class="tree-leaf">状态面板</div>
+                                    <div class="tree-leaf">快速操作</div>
+                                    <div class="tree-leaf">今日学习</div>
+                                    <div class="tree-leaf">智能推荐</div>
+                                </div>
+                            </div>
+                            
+                            <div class="tree-node">
+                                <div class="tree-title">
+                                    <span>📝</span>
+                                    <span>驾驶日志</span>
+                                </div>
+                                <div class="tree-children">
+                                    <div class="tree-leaf">日志列表</div>
+                                    <div class="tree-leaf">新建日志</div>
+                                    <div class="tree-leaf">统计分析</div>
+                                    <div class="tree-leaf">语音输入</div>
+                                </div>
+                            </div>
+                            
+                            <div class="tree-node">
+                                <div class="tree-title">
+                                    <span>✅</span>
+                                    <span>检查清单</span>
+                                </div>
+                                <div class="tree-children">
+                                    <div class="tree-leaf">行前检查</div>
+                                    <div class="tree-leaf">行后检查</div>
+                                    <div class="tree-leaf">检查历史</div>
+                                    <div class="tree-leaf">个性化设置</div>
+                                </div>
+                            </div>
+                            
+                            <div class="tree-node">
+                                <div class="tree-title">
+                                    <span>📚</span>
+                                    <span>知识学习</span>
+                                </div>
+                                <div class="tree-children">
+                                    <div class="tree-leaf">今日卡片</div>
+                                    <div class="tree-leaf">学习模式</div>
+                                    <div class="tree-leaf">知识库</div>
+                                    <div class="tree-leaf">学习进度</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 核心功能 -->
+            <section class="section">
+                <h2>⭐ 核心功能特色</h2>
+                <p>精心设计的功能模块，解决用户在安全驾驶学习中的关键问题。</p>
+
+                <div class="feature-grid">
+                    <div class="feature-card">
+                        <div class="feature-icon">📝</div>
+                        <div class="feature-title">智能复盘系统</div>
+                        <div class="feature-description">
+                            失误-反思-改进三段式复盘，结合AI智能分析，帮助用户从每次失误中快速学习和成长。
+                        </div>
+                    </div>
+
+                    <div class="feature-card">
+                        <div class="feature-icon">✅</div>
+                        <div class="feature-title">习惯养成机制</div>
+                        <div class="feature-description">
+                            行前行后检查清单，通过gamification设计和徽章激励，帮助用户养成良好的驾驶习惯。
+                        </div>
+                    </div>
+
+                    <div class="feature-card">
+                        <div class="feature-icon">🧠</div>
+                        <div class="feature-title">科学记忆系统</div>
+                        <div class="feature-description">
+                            基于艾宾浩斯记忆曲线的知识卡片学习，What-Why-How三维度设计，确保知识真正掌握。
+                        </div>
+                    </div>
+
+                    <div class="feature-card">
+                        <div class="feature-icon">🎤</div>
+                        <div class="feature-title">语音交互优化</div>
+                        <div class="feature-description">
+                            针对驾驶场景优化的语音输入，解放双手，确保驾驶安全的同时完成记录和学习。
+                        </div>
+                    </div>
+
+                    <div class="feature-card">
+                        <div class="feature-icon">📊</div>
+                        <div class="feature-title">可视化进步</div>
+                        <div class="feature-description">
+                            详细的数据统计和趋势分析，让用户清晰看到自己的成长轨迹和技能提升过程。
+                        </div>
+                    </div>
+
+                    <div class="feature-card">
+                        <div class="feature-icon">🎯</div>
+                        <div class="feature-title">个性化推荐</div>
+                        <div class="feature-description">
+                            基于用户历史数据和失误分析，智能推荐相关知识内容和改进建议，精准满足学习需求。
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 情感曲线 -->
+            <section class="section">
+                <h2>💝 用户情感体验</h2>
+                <p>关注用户在使用过程中的情感变化，确保积极的体验感受。</p>
+
+                <div class="emotion-chart">
+                    <div class="chart-header">
+                        <div class="chart-title">用户情感变化曲线</div>
+                        <div style="color: #64748B; font-size: 14px;">从首次接触到熟练使用的情感波动</div>
+                    </div>
+                    <div class="emotion-line">
+                        <div class="emotion-point high"></div>
+                        <div class="emotion-point medium"></div>
+                        <div class="emotion-point low"></div>
+                        <div class="emotion-point medium"></div>
+                        <div class="emotion-point high"></div>
+                        <div class="emotion-point high"></div>
+                        <div class="emotion-point high"></div>
+                    </div>
+                    <div class="emotion-labels">
+                        <span>兴奋<br/>首次发现</span>
+                        <span>好奇<br/>开始探索</span>
+                        <span>困惑<br/>功能复杂</span>
+                        <span>理解<br/>逐步掌握</span>
+                        <span>应用<br/>开始使用</span>
+                        <span>成就<br/>看到进步</span>
+                        <span>依赖<br/>习惯养成</span>
+                    </div>
+                </div>
+
+                <h3>关键触点分析</h3>
+                <div class="touchpoint-grid">
+                    <div class="touchpoint-card">
+                        <div class="touchpoint-type">高频触点</div>
+                        <div class="touchpoint-title">首页进入</div>
+                        <div class="touchpoint-desc">简洁导航，快速启动核心功能</div>
+                    </div>
+
+                    <div class="touchpoint-card">
+                        <div class="touchpoint-type">高频触点</div>
+                        <div class="touchpoint-title">检查清单</div>
+                        <div class="touchpoint-desc">一键完成，即时反馈，习惯养成</div>
+                    </div>
+
+                    <div class="touchpoint-card">
+                        <div class="touchpoint-type">高频触点</div>
+                        <div class="touchpoint-title">语音输入</div>
+                        <div class="touchpoint-desc">解放双手，安全操作，降低使用门槛</div>
+                    </div>
+
+                    <div class="touchpoint-card">
+                        <div class="touchpoint-type">关键时刻</div>
+                        <div class="touchpoint-title">首次使用</div>
+                        <div class="touchpoint-desc">引导体验，建立信任，形成第一印象</div>
+                    </div>
+
+                    <div class="touchpoint-card">
+                        <div class="touchpoint-type">关键时刻</div>
+                        <div class="touchpoint-title">技能提升</div>
+                        <div class="touchpoint-desc">成就感获得，正向激励，长期留存</div>
+                    </div>
+
+                    <div class="touchpoint-card">
+                        <div class="touchpoint-type">关键时刻</div>
+                        <div class="touchpoint-title">遇到挫折</div>
+                        <div class="touchpoint-desc">温和督促，正向激励，继续成长</div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+</body>
+</html> 

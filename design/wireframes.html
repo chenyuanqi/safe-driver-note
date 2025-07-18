@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>线框图 - 安全驾驶日记</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+            background: #F8FAFC;
+            color: #0F172A;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        /* Header */
+        .header {
+            background: #FFFFFF;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header .container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 64px;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 20px;
+            font-weight: 700;
+            color: #22C55E;
+            text-decoration: none;
+        }
+
+        .nav {
+            display: flex;
+            gap: 32px;
+        }
+
+        .nav a {
+            text-decoration: none;
+            color: #64748B;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+
+        .nav a:hover,
+        .nav a.active {
+            color: #22C55E;
+        }
+
+        /* Main Content */
+        .main {
+            padding: 40px 0;
+        }
+
+        .wireframe-section {
+            background: #FFFFFF;
+            border-radius: 16px;
+            padding: 32px;
+            margin-bottom: 32px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .wireframe-section h2 {
+            font-size: 28px;
+            font-weight: 600;
+            margin-bottom: 24px;
+            color: #0F172A;
+        }
+
+        .wireframe-section h3 {
+            font-size: 20px;
+            font-weight: 600;
+            margin: 24px 0 16px 0;
+            color: #334155;
+        }
+
+        .wireframe-section p {
+            color: #64748B;
+            margin-bottom: 16px;
+        }
+
+        /* Phone Frame */
+        .phone-frame {
+            width: 375px;
+            height: 812px;
+            background: #FFFFFF;
+            border: 3px solid #E2E8F0;
+            border-radius: 24px;
+            margin: 24px auto;
+            position: relative;
+            box-shadow: 0 10px 50px rgba(0,0,0,0.15);
+            overflow: hidden;
+        }
+
+        .phone-screen {
+            width: 100%;
+            height: 100%;
+            background: #F8FAFC;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Wireframe Elements */
+        .wireframe-header {
+            height: 56px;
+            background: #FFFFFF;
+            border-bottom: 1px solid #E2E8F0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 16px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .wireframe-content {
+            flex: 1;
+            padding: 16px;
+            overflow-y: auto;
+        }
+
+        .wireframe-bottom-nav {
+            height: 80px;
+            background: #FFFFFF;
+            border-top: 1px solid #E2E8F0;
+            display: flex;
+            align-items: center;
+            justify-content: space-around;
+            padding: 8px 0;
+        }
+
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            font-size: 12px;
+            color: #64748B;
+        }
+
+        .nav-item.active {
+            color: #22C55E;
+        }
+
+        .nav-icon {
+            width: 24px;
+            height: 24px;
+            background: currentColor;
+            border-radius: 4px;
+            opacity: 0.8;
+        }
+
+        /* Status Panel */
+        .status-panel {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .status-card {
+            flex: 1;
+            background: #FFFFFF;
+            border-radius: 8px;
+            padding: 12px;
+            text-align: center;
+            border: 1px solid #E2E8F0;
+        }
+
+        .status-number {
+            font-size: 20px;
+            font-weight: 700;
+            color: #22C55E;
+            margin-bottom: 4px;
+        }
+
+        .status-label {
+            font-size: 10px;
+            color: #64748B;
+        }
+
+        /* Quick Actions */
+        .quick-actions {
+            margin-bottom: 16px;
+        }
+
+        .primary-action {
+            width: 100%;
+            height: 48px;
+            background: #22C55E;
+            color: #FFFFFF;
+            border: none;
+            border-radius: 12px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            cursor: pointer;
+        }
+
+        .secondary-actions {
+            display: flex;
+            gap: 12px;
+        }
+
+        .secondary-action {
+            flex: 1;
+            height: 48px;
+            background: #F1F5F9;
+            border: 1px solid #CBD5E1;
+            border-radius: 12px;
+            font-weight: 500;
+            cursor: pointer;
+        }
+
+        /* Learning Cards */
+        .learning-section {
+            margin-bottom: 16px;
+        }
+
+        .section-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .learning-card {
+            background: #FFFFFF;
+            border-radius: 12px;
+            padding: 16px;
+            border: 1px solid #E2E8F0;
+            margin-bottom: 12px;
+        }
+
+        .card-title {
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .card-content {
+            color: #64748B;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+
+        .dots-indicator {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #CBD5E1;
+        }
+
+        .dot.active {
+            background: #22C55E;
+        }
+
+        /* List Items */
+        .list-item {
+            background: #FFFFFF;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 8px;
+            border: 1px solid #E2E8F0;
+        }
+
+        .item-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 4px;
+        }
+
+        .item-icon {
+            width: 16px;
+            height: 16px;
+            background: #22C55E;
+            border-radius: 4px;
+        }
+
+        .item-title {
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .item-subtitle {
+            color: #64748B;
+            font-size: 12px;
+        }
+
+        .item-tags {
+            margin-top: 8px;
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+        }
+
+        .tag {
+            background: #F1F5F9;
+            color: #64748B;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 10px;
+        }
+
+        /* Wireframe Navigation */
+        .wireframe-nav {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .wireframe-nav button {
+            padding: 8px 16px;
+            border: 1px solid #CBD5E1;
+            background: #FFFFFF;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .wireframe-nav button.active {
+            background: #22C55E;
+            color: #FFFFFF;
+            border-color: #22C55E;
+        }
+
+        .wireframe-nav button:hover {
+            border-color: #22C55E;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .phone-frame {
+                width: 320px;
+                height: 568px;
+            }
+            
+            .header .container {
+                flex-direction: column;
+                height: auto;
+                padding: 16px 0;
+            }
+
+            .nav {
+                gap: 16px;
+                margin-top: 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="container">
+            <a href="index.html" class="logo">
+                🚗 安全驾驶日记
+            </a>
+            <nav class="nav">
+                <a href="index.html">首页</a>
+                <a href="design-system.html">设计系统</a>
+                <a href="wireframes.html" class="active">线框图</a>
+                <a href="prototypes.html">原型图</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="main">
+        <div class="container">
+            <section class="wireframe-section">
+                <h2>📱 核心页面线框图</h2>
+                <p>以下是"安全驾驶日记"app的核心页面线框设计，展示了信息架构和交互布局。</p>
+
+                <div class="wireframe-nav">
+                    <button class="active" onclick="showWireframe('home')">首页</button>
+                    <button onclick="showWireframe('log')">驾驶日志</button>
+                    <button onclick="showWireframe('checklist')">检查清单</button>
+                    <button onclick="showWireframe('learning')">知识学习</button>
+                </div>
+
+                <!-- 首页线框图 -->
+                <div id="wireframe-home" class="wireframe-display">
+                    <h3>🏠 首页设计</h3>
+                    <p>首页作为app的核心入口，提供状态总览、快速操作和智能推荐。</p>
+                    
+                    <div class="phone-frame">
+                        <div class="phone-screen">
+                            <div class="wireframe-header">
+                                <span>9:41</span>
+                                <span>安全驾驶日记</span>
+                                <span>🔔</span>
+                            </div>
+                            
+                            <div class="wireframe-content">
+                                <!-- 状态面板 -->
+                                <div class="status-panel">
+                                    <div class="status-card">
+                                        <div class="status-number">88</div>
+                                        <div class="status-label">安全评分</div>
+                                    </div>
+                                    <div class="status-card">
+                                        <div class="status-number">15</div>
+                                        <div class="status-label">连续天数</div>
+                                    </div>
+                                    <div class="status-card">
+                                        <div class="status-number">100%</div>
+                                        <div class="status-label">今日完成</div>
+                                    </div>
+                                </div>
+
+                                <!-- 快速操作 -->
+                                <div class="quick-actions">
+                                    <button class="primary-action">🚗 开始驾驶</button>
+                                    <div class="secondary-actions">
+                                        <button class="secondary-action">✓ 行前检查</button>
+                                        <button class="secondary-action">🎤 语音记录</button>
+                                    </div>
+                                </div>
+
+                                <!-- 今日学习 -->
+                                <div class="learning-section">
+                                    <div class="section-title">
+                                        <span>📚 今日学习</span>
+                                        <span>2/3</span>
+                                    </div>
+                                    <div class="learning-card">
+                                        <div class="card-title">《安全跟车距离》</div>
+                                        <div class="card-content">保持3秒车距原则，确保安全驾驶...</div>
+                                    </div>
+                                    <div class="dots-indicator">
+                                        <div class="dot"></div>
+                                        <div class="dot active"></div>
+                                        <div class="dot"></div>
+                                    </div>
+                                </div>
+
+                                <!-- 智能推荐 -->
+                                <div class="learning-section">
+                                    <div class="section-title">💡 为你推荐</div>
+                                    <div class="list-item">
+                                        <div class="item-header">
+                                            <div class="item-icon"></div>
+                                            <div class="item-title">高速爆胎怎么办？</div>
+                                        </div>
+                                    </div>
+                                    <div class="list-item">
+                                        <div class="item-header">
+                                            <div class="item-icon"></div>
+                                            <div class="item-title">盲区小圆镜推荐</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="wireframe-bottom-nav">
+                                <div class="nav-item active">
+                                    <div class="nav-icon"></div>
+                                    <span>首页</span>
+                                </div>
+                                <div class="nav-item">
+                                    <div class="nav-icon"></div>
+                                    <span>日志</span>
+                                </div>
+                                <div class="nav-item">
+                                    <div class="nav-icon"></div>
+                                    <span>学习</span>
+                                </div>
+                                <div class="nav-item">
+                                    <div class="nav-icon"></div>
+                                    <span>我的</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 驾驶日志线框图 -->
+                <div id="wireframe-log" class="wireframe-display" style="display: none;">
+                    <h3>📝 驾驶日志页面</h3>
+                    <p>支持失误记录、成功经验记录和历史查看，重点是简化录入流程。</p>
+                    
+                    <div class="phone-frame">
+                        <div class="phone-screen">
+                            <div class="wireframe-header">
+                                <span>←</span>
+                                <span>驾驶日志</span>
+                                <span>+ 📊</span>
+                            </div>
+                            
+                            <div class="wireframe-content">
+                                <!-- 标签页 -->
+                                <div style="display: flex; gap: 16px; margin-bottom: 16px; padding: 8px; background: #FFFFFF; border-radius: 8px;">
+                                    <span style="font-weight: 600; color: #22C55E;">●全部</span>
+                                    <span style="color: #64748B;">○失误</span>
+                                    <span style="color: #64748B;">○成功经验</span>
+                                </div>
+
+                                <!-- 筛选栏 -->
+                                <div style="display: flex; gap: 8px; margin-bottom: 16px; font-size: 12px;">
+                                    <span style="padding: 4px 8px; background: #F1F5F9; border-radius: 4px;">📅 本月</span>
+                                    <span style="padding: 4px 8px; background: #F1F5F9; border-radius: 4px;">🏷️ 标签</span>
+                                    <span style="padding: 4px 8px; background: #F1F5F9; border-radius: 4px;">🔍 搜索</span>
+                                </div>
+
+                                <!-- 日志列表 -->
+                                <div class="list-item">
+                                    <div class="item-header">
+                                        <span style="color: #64748B; font-size: 12px;">📍 12月8日 15:30</span>
+                                    </div>
+                                    <div class="item-title">🚗 商场地下车库</div>
+                                    <div class="item-subtitle">⚠️ 右后轮蹭立柱</div>
+                                    <div class="item-tags">
+                                        <span class="tag">#倒车</span>
+                                        <span class="tag">#立柱</span>
+                                        <span class="tag">#后视镜</span>
+                                    </div>
+                                </div>
+
+                                <div class="list-item">
+                                    <div class="item-header">
+                                        <span style="color: #64748B; font-size: 12px;">📍 12月7日 09:15</span>
+                                    </div>
+                                    <div class="item-title">🚗 小区门口</div>
+                                    <div class="item-subtitle">✅ 成功避让电动车</div>
+                                    <div class="item-tags">
+                                        <span class="tag">#避让</span>
+                                        <span class="tag">#电动车</span>
+                                        <span class="tag">#观察</span>
+                                    </div>
+                                </div>
+
+                                <div class="list-item">
+                                    <div class="item-header">
+                                        <span style="color: #64748B; font-size: 12px;">📍 12月6日 19:45</span>
+                                    </div>
+                                    <div class="item-title">🚗 地下车库入口</div>
+                                    <div class="item-subtitle">⚠️ 差点蹭到限高杆</div>
+                                    <div class="item-tags">
+                                        <span class="tag">#限高</span>
+                                        <span class="tag">#注意力</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="wireframe-bottom-nav">
+                                <div class="nav-item">
+                                    <div class="nav-icon"></div>
+                                    <span>首页</span>
+                                </div>
+                                <div class="nav-item active">
+                                    <div class="nav-icon"></div>
+                                    <span>日志</span>
+                                </div>
+                                <div class="nav-item">
+                                    <div class="nav-icon"></div>
+                                    <span>学习</span>
+                                </div>
+                                <div class="nav-item">
+                                    <div class="nav-icon"></div>
+                                    <span>我的</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 检查清单线框图 -->
+                <div id="wireframe-checklist" class="wireframe-display" style="display: none;">
+                    <h3>✅ 检查清单页面</h3>
+                    <p>分为行前检查和行后检查，重点是快速完成、清晰反馈和习惯养成。</p>
+                    
+                    <div class="phone-frame">
+                        <div class="phone-screen">
+                            <div class="wireframe-header">
+                                <span>←</span>
+                                <span>安全检查清单</span>
+                                <span>📊</span>
+                            </div>
+                            
+                            <div class="wireframe-content">
+                                <!-- 模式切换 -->
+                                <div style="display: flex; gap: 12px; margin-bottom: 16px;">
+                                    <div style="flex: 1; background: #22C55E; color: #FFFFFF; padding: 16px; border-radius: 12px; text-align: center;">
+                                        <div style="font-size: 24px;">🚗</div>
+                                        <div style="font-weight: 600; margin: 8px 0;">行前检查</div>
+                                        <div style="font-size: 12px;">●● 8项</div>
+                                    </div>
+                                    <div style="flex: 1; background: #F1F5F9; padding: 16px; border-radius: 12px; text-align: center;">
+                                        <div style="font-size: 24px;">🅿️</div>
+                                        <div style="font-weight: 600; margin: 8px 0;">行后检查</div>
+                                        <div style="font-size: 12px;">●●● 5项</div>
+                                    </div>
+                                </div>
+
+                                <!-- 进度条 -->
+                                <div style="background: #FFFFFF; padding: 12px; border-radius: 8px; margin-bottom: 16px;">
+                                    <div style="font-size: 14px; margin-bottom: 8px;">🚗 行前检查 (8项)</div>
+                                    <div style="background: #F1F5F9; height: 8px; border-radius: 4px; overflow: hidden;">
+                                        <div style="background: #22C55E; height: 100%; width: 75%;"></div>
+                                    </div>
+                                    <div style="font-size: 12px; color: #64748B; margin-top: 4px;">进度 6/8</div>
+                                </div>
+
+                                <!-- 检查项目 -->
+                                <div class="list-item" style="background: #F0FDF4; border-left: 4px solid #22C55E;">
+                                    <div class="item-header">
+                                        <span style="color: #22C55E;">✅</span>
+                                        <div class="item-title">胎压检查</div>
+                                    </div>
+                                    <div class="item-subtitle">检查四轮胎压是否正常</div>
+                                </div>
+
+                                <div class="list-item" style="background: #F0FDF4; border-left: 4px solid #22C55E;">
+                                    <div class="item-header">
+                                        <span style="color: #22C55E;">✅</span>
+                                        <div class="item-title">灯光检查</div>
+                                    </div>
+                                    <div class="item-subtitle">检查远近光灯、转向灯、刹车灯</div>
+                                </div>
+
+                                <div class="list-item">
+                                    <div class="item-header">
+                                        <span style="color: #CBD5E1;">○</span>
+                                        <div class="item-title">导航/路线</div>
+                                    </div>
+                                    <div class="item-subtitle">设置目的地和导航路线</div>
+                                </div>
+
+                                <div class="list-item">
+                                    <div class="item-header">
+                                        <span style="color: #CBD5E1;">○</span>
+                                        <div class="item-title">随车工具</div>
+                                    </div>
+                                    <div class="item-subtitle">确认随车工具、证件齐全</div>
+                                </div>
+                            </div>
+
+                            <div class="wireframe-bottom-nav">
+                                <div class="nav-item">
+                                    <div class="nav-icon"></div>
+                                    <span>首页</span>
+                                </div>
+                                <div class="nav-item">
+                                    <div class="nav-icon"></div>
+                                    <span>日志</span>
+                                </div>
+                                <div class="nav-item">
+                                    <div class="nav-icon"></div>
+                                    <span>学习</span>
+                                </div>
+                                <div class="nav-item active">
+                                    <div class="nav-icon"></div>
+                                    <span>我的</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 知识学习线框图 -->
+                <div id="wireframe-learning" class="wireframe-display" style="display: none;">
+                    <h3>📚 知识卡片学习</h3>
+                    <p>基于艾宾浩斯记忆曲线的滑动式学习体验，每日3张卡片。</p>
+                    
+                    <div class="phone-frame">
+                        <div class="phone-screen">
+                            <div class="wireframe-header">
+                                <span>←</span>
+                                <span>安全知识学习</span>
+                                <span>📊</span>
+                            </div>
+                            
+                            <div class="wireframe-content">
+                                <!-- 学习进度 -->
+                                <div style="background: #FFFFFF; padding: 12px; border-radius: 8px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center;">
+                                    <div>
+                                        <span style="font-weight: 600;">今日学习 2/3</span>
+                                        <div class="dots-indicator" style="justify-content: flex-start; margin-top: 4px;">
+                                            <div class="dot active"></div>
+                                            <div class="dot active"></div>
+                                            <div class="dot"></div>
+                                        </div>
+                                    </div>
+                                    <div style="color: #F59E0B;">🔥 连续15天</div>
+                                </div>
+
+                                <!-- 知识卡片 -->
+                                <div style="background: #FFFFFF; border-radius: 16px; padding: 24px; margin-bottom: 16px; text-align: center; min-height: 400px; display: flex; flex-direction: column; justify-content: space-between;">
+                                    <div>
+                                        <div style="background: #E8F5E8; color: #22C55E; padding: 6px 12px; border-radius: 6px; display: inline-block; margin-bottom: 16px; font-size: 12px; font-weight: 600;">What (概念)</div>
+                                        
+                                        <h3 style="font-size: 20px; font-weight: 600; margin-bottom: 24px;">安全跟车距离</h3>
+                                        
+                                        <div style="text-align: left; color: #64748B; line-height: 1.6;">
+                                            <p>在正常驾驶情况下，应与前车保持3秒以上的车距。这意味着前车经过某个参照物后，你的车经过同一参照物的时间应该超过3秒。</p>
+                                            <br>
+                                            <p>雨天、雪天等恶劣天气下，应适当增加到5-6秒车距。</p>
+                                        </div>
+                                        
+                                        <div style="background: #F0FDF4; color: #22C55E; padding: 12px; border-radius: 8px; margin-top: 24px; font-size: 14px; font-weight: 600;">
+                                            💡 记住：3秒车距 = 安全距离
+                                        </div>
+                                    </div>
+                                    
+                                    <div style="color: #94A3B8; font-size: 12px;">向左滑动查看更多</div>
+                                </div>
+
+                                <!-- 操作按钮 -->
+                                <div style="display: flex; flex-direction: column; gap: 8px;">
+                                    <button style="background: #22C55E; color: #FFFFFF; border: none; padding: 12px; border-radius: 8px; font-weight: 600;">已掌握</button>
+                                    <button style="background: #F1F5F9; color: #334155; border: 1px solid #CBD5E1; padding: 12px; border-radius: 8px; font-weight: 500;">需要复习</button>
+                                </div>
+                            </div>
+
+                            <div class="wireframe-bottom-nav">
+                                <div class="nav-item">
+                                    <div class="nav-icon"></div>
+                                    <span>首页</span>
+                                </div>
+                                <div class="nav-item">
+                                    <div class="nav-icon"></div>
+                                    <span>日志</span>
+                                </div>
+                                <div class="nav-item active">
+                                    <div class="nav-icon"></div>
+                                    <span>学习</span>
+                                </div>
+                                <div class="nav-item">
+                                    <div class="nav-icon"></div>
+                                    <span>我的</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <script>
+        function showWireframe(type) {
+            // 隐藏所有线框图
+            const wireframes = document.querySelectorAll('.wireframe-display');
+            wireframes.forEach(w => w.style.display = 'none');
+            
+            // 显示选中的线框图
+            document.getElementById('wireframe-' + type).style.display = 'block';
+            
+            // 更新导航按钮状态
+            const buttons = document.querySelectorAll('.wireframe-nav button');
+            buttons.forEach(b => b.classList.remove('active'));
+            event.target.classList.add('active');
+        }
+    </script>
+</body>
+</html> 
