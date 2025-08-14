@@ -1,0 +1,20 @@
+{
+  "preDrive": [
+    { "key": "tirePressure", "title": "胎压检查", "desc": "检查四轮胎压是否正常" },
+    { "key": "lights", "title": "灯光检查", "desc": "远近光灯、转向灯、刹车灯" },
+    { "key": "mirrors", "title": "后视镜调整", "desc": "内外后视镜调整到位" },
+    { "key": "wipers", "title": "雨刷功能", "desc": "雨刷器工作正常" },
+    { "key": "fuel", "title": "油量/电量", "desc": "燃油或电量充足" },
+    { "key": "seatSteering", "title": "座椅/方向盘", "desc": "舒适且可控的位置" },
+    { "key": "nav", "title": "导航/路线", "desc": "设置目的地与路线" },
+    { "key": "tools", "title": "随车工具", "desc": "工具与证件齐全" }
+  ],
+  "postDrive": [
+    { "key": "parkBrake", "title": "手刹/P档", "desc": "拉起手刹或挂入P档" },
+    { "key": "windows", "title": "车窗/天窗", "desc": "关闭所有车窗与天窗" },
+    { "key": "lightsOff", "title": "灯光关闭", "desc": "关闭不必要灯光" },
+    { "key": "valuables", "title": "贵重物品", "desc": "随身带走贵重物品" },
+    { "key": "lock", "title": "车门锁止", "desc": "确认车门已上锁" }
+  ]
+}
+

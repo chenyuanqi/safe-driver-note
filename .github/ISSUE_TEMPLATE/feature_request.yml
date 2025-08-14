@@ -1,0 +1,53 @@
+name: Feature request
+description: 功能需求 / 用户故事
+labels: [enhancement]
+body:
+  - type: input
+    id: context
+    attributes:
+      label: 背景 / 目标
+      description: 简述业务背景与目标（可粘贴原型/设计链接）
+      placeholder: 例如：实现行前检查清单与评分
+  - type: textarea
+    id: story
+    attributes:
+      label: 用户故事
+      description: 作为【用户类型】，我想要【目标】，以便【收益/价值】
+      placeholder: 作为新手司机，我想要行前检查，一键打钩并得到评分
+  - type: textarea
+    id: ac
+    attributes:
+      label: 验收标准（AC）
+      value: |-
+        - [ ] 场景1：
+        - [ ] 场景2：
+        - [ ] 空状态/异常：
+  - type: textarea
+    id: tech
+    attributes:
+      label: 技术要点 / 数据
+      description: 数据结构、接口、平台能力、依赖
+  - type: textarea
+    id: tasks
+    attributes:
+      label: 任务拆分（可选）
+      value: |-
+        - [ ] UI 组件
+        - [ ] 视图/路由
+        - [ ] ViewModel/用例
+        - [ ] 数据层/缓存
+        - [ ] 测试（单测/快照/集成）
+  - type: textarea
+    id: risks
+    attributes:
+      label: 依赖与风险
+  - type: checkboxes
+    id: dod
+    attributes:
+      label: DoD（完成定义）
+      options:
+        - label: 代码合并并通过 Review
+        - label: 测试通过（单测/快照/集成）
+        - label: 无障碍/深浅色检查
+        - label: 文档与变更日志更新
+
