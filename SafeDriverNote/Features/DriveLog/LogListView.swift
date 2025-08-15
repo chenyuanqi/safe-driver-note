@@ -57,30 +57,37 @@ struct LogListView: View {
     private var list: some View {
         List {
             if !vm.tagOptions.isEmpty {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        Button(action: { vm.toggleTagFilter(nil) }) {
-                            Text("全部")
-                                .font(.caption)
-                                .padding(.horizontal,10).padding(.vertical,6)
-                                .background(vm.tagFilter == nil ? Color.accentColor.opacity(0.2) : Color.secondary.opacity(0.15))
-                                .clipShape(Capsule())
-                        }.buttonStyle(.plain)
-                        ForEach(vm.tagOptions, id: \.self) { tag in
-                            Button(action: { vm.toggleTagFilter(tag) }) {
-                                HStack(spacing: 4) {
+                VStack(alignment: .leading, spacing: 4) {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(vm.tagOptions, id: \.self) { tag in
+                                Button(action: { vm.toggleMultiTag(tag) }) {
                                     Text("#" + tag)
-                                }
-                                .font(.caption)
-                                .padding(.horizontal,10).padding(.vertical,6)
-                                .background(vm.tagFilter == tag ? Color.accentColor.opacity(0.25) : Color.accentColor.opacity(0.08))
-                                .overlay(
-                                    Capsule().stroke(vm.tagFilter == tag ? Color.accentColor : Color.clear, lineWidth: 1)
-                                )
-                                .clipShape(Capsule())
-                            }.buttonStyle(.plain)
-                        }
-                    }.padding(.vertical, 4)
+                                        .font(.caption)
+                                        .padding(.horizontal,10).padding(.vertical,6)
+                                        .background(vm.selectedTags.contains(tag) ? Color.accentColor.opacity(0.25) : Color.accentColor.opacity(0.08))
+                                        .overlay(Capsule().stroke(vm.selectedTags.contains(tag) ? Color.accentColor : Color.clear, lineWidth: 1))
+                                        .clipShape(Capsule())
+                                }.buttonStyle(.plain)
+                            }
+                            if vm.fullTagCount > vm.tagOptions.count {
+                                Button(action: { vm.toggleShowAllTags() }) {
+                                    Text(vm.showAllTags ? "收起" : "更多")
+                                        .font(.caption)
+                                        .padding(.horizontal,10).padding(.vertical,6)
+                                        .background(Color.secondary.opacity(0.15))
+                                        .clipShape(Capsule())
+                                }.buttonStyle(.plain)
+                            }
+                            if !vm.selectedTags.isEmpty {
+                                Button("清除") { vm.clearAllTagFilters() }
+                                    .font(.caption)
+                                    .padding(.horizontal,10).padding(.vertical,6)
+                                    .background(Color.red.opacity(0.15))
+                                    .clipShape(Capsule())
+                            }
+                        }.padding(.vertical, 4)
+                    }
                 }
                 .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
             }

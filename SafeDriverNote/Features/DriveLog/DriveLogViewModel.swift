@@ -6,10 +6,10 @@ final class DriveLogViewModel: ObservableObject {
     @Published private(set) var logs: [LogEntry] = []
     @Published var filter: LogType? = nil { didSet { applyFilter() } }
     @Published var editing: LogEntry? = nil
-    @Published var tagFilter: String? = nil { didSet { applyFilter() } }
     @Published private(set) var tagOptions: [String] = []
     @Published var selectedTags: Set<String> = [] { didSet { applyFilter() } }
     @Published var showAllTags: Bool = false
+    @Published private(set) var fullTagCount: Int = 0
 
     private let repository: LogRepository
     private var all: [LogEntry] = []
@@ -90,7 +90,6 @@ final class DriveLogViewModel: ObservableObject {
     private func applyFilter() {
     var tmp = all
     if let f = filter { tmp = tmp.filter { $0.type == f } }
-    if let single = tagFilter { tmp = tmp.filter { $0.tags.contains(single) } }
     if !selectedTags.isEmpty { tmp = tmp.filter { Set($0.tags).isSuperset(of: selectedTags) } }
     logs = tmp
     recomputeTags() // 更新候选
@@ -115,18 +114,17 @@ final class DriveLogViewModel: ObservableObject {
         return parts.joined(separator: " ")
     }
 
-    func toggleSingleTagFilter(_ tag: String?) {
-        if tag == nil { tagFilter = nil; return }
-        tagFilter = (tagFilter == tag ? nil : tag)
-    }
-
     func toggleMultiTag(_ tag: String) {
         if selectedTags.contains(tag) { selectedTags.remove(tag) } else { selectedTags.insert(tag) }
     }
 
     func clearAllTagFilters() {
-        tagFilter = nil
         selectedTags.removeAll()
+    }
+
+    func toggleShowAllTags() {
+        showAllTags.toggle()
+        recomputeTags()
     }
 
     private func recomputeTags() {
@@ -145,9 +143,10 @@ final class DriveLogViewModel: ObservableObject {
             if a.1 == b.1 { return a.0 < b.0 }
             return a.1 > b.1
         }
-        let fullList = combined.map { $0.0 }
-        let limit = 30
-        tagOptions = showAllTags ? fullList : Array(fullList.prefix(limit))
+    let fullList = combined.map { $0.0 }
+    fullTagCount = fullList.count
+    let limit = 30
+    tagOptions = showAllTags ? fullList : Array(fullList.prefix(limit))
     }
 }
 
