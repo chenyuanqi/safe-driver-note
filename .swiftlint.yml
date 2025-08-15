@@ -1,0 +1,69 @@
+swiftlint_version: 0.54.0
+
+disabled_rules:
+  - trailing_whitespace
+  - line_length          # 先忽略行长限制，后期再收紧
+
+opt_in_rules:
+  - empty_count
+  - redundant_nil_coalescing
+  - closure_end_indentation
+  - unused_import
+  - convenience_type
+  - file_header
+  - attributes
+  - unowned_variable_capture
+
+included:
+  - SafeDriverNote
+
+excluded:
+  - Carthage
+  - Pods
+  - build
+  - DerivedData
+
+analyzer_rules: # 需使用 --analyze 运行，可在本地或扩展 CI 添加
+  - unused_declaration
+  - unused_import
+
+warning_threshold: 30   # 超过 30 个 warning 直接失败（与严格模式叠加）
+strict: true            # 将 warning 视为失败
+
+type_body_length:
+  warning: 300
+  error: 400
+
+file_length:
+  warning: 800
+  error: 1200
+
+cyclomatic_complexity:
+  ignores_case_statements: true
+
+identifier_name:
+  min_length: 2
+  excluded:
+    - id
+    - x
+    - y
+
+custom_rules:
+  no_print_debug:
+    included: "SafeDriverNote"
+    name: "No Debug print"
+    regex: "\\bprint\\s*\\("
+    message: "禁止直接使用 print，改用 OSLog/Logger。"
+    severity: warning
+  no_todo_left:
+    name: "No TODO"
+    regex: "TODO:"
+    message: "提交前请处理或移除 TODO。"
+    severity: warning
+  force_unwrap_check:
+    name: "Avoid force unwrap"
+    regex: "!\\s*(?:$|[).,;])"
+    message: "避免使用强制解包，改用 guard / if let。"
+    severity: error
+
+reporter: "xcode"
