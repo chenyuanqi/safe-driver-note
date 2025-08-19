@@ -4,7 +4,7 @@ import SwiftData
 // 简化的全局容器引用（MVP 阶段；后续可替换为依赖注入）
 enum GlobalModelContext {
     static var container: ModelContainer?
-    static var context: ModelContext? { container?.mainContext }
+    @MainActor static var context: ModelContext? { container?.mainContext }
 }
 
 enum SeedFlag {

@@ -35,6 +35,8 @@ import SwiftData
 enum LogType: String, Codable, CaseIterable { case mistake, success }
 
 // MARK: - Checklist
+enum ChecklistMode: String, Codable, CaseIterable { case pre, post }
+
 @Model final class ChecklistRecord {
     @Attribute(.unique) var id: UUID
     var date: Date
@@ -54,6 +56,34 @@ enum LogType: String, Codable, CaseIterable { case mistake, success }
 struct ChecklistItemState: Codable, Hashable {
     var key: String
     var checked: Bool
+}
+
+// 自定义清单项
+@Model final class ChecklistItem {
+    @Attribute(.unique) var id: UUID
+    var title: String
+    var mode: ChecklistMode
+
+    init(id: UUID = UUID(), title: String, mode: ChecklistMode) {
+        self.id = id
+        self.title = title
+        self.mode = mode
+    }
+}
+
+// 每次打卡记录
+@Model final class ChecklistPunch {
+    @Attribute(.unique) var id: UUID
+    var createdAt: Date
+    var mode: ChecklistMode
+    var checkedItemIds: [UUID]
+
+    init(id: UUID = UUID(), createdAt: Date = .now, mode: ChecklistMode, checkedItemIds: [UUID]) {
+        self.id = id
+        self.createdAt = createdAt
+        self.mode = mode
+        self.checkedItemIds = checkedItemIds
+    }
 }
 
 // MARK: - Knowledge

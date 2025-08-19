@@ -56,47 +56,12 @@ struct LogListView: View {
 
     private var list: some View {
         List {
-            if !vm.tagOptions.isEmpty {
-                VStack(alignment: .leading, spacing: 4) {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
-                            ForEach(vm.tagOptions, id: \.self) { tag in
-                                Button(action: { vm.toggleMultiTag(tag) }) {
-                                    Text("#" + tag)
-                                        .font(.caption)
-                                        .padding(.horizontal,10).padding(.vertical,6)
-                                        .background(vm.selectedTags.contains(tag) ? Color.accentColor.opacity(0.25) : Color.accentColor.opacity(0.08))
-                                        .overlay(Capsule().stroke(vm.selectedTags.contains(tag) ? Color.accentColor : Color.clear, lineWidth: 1))
-                                        .clipShape(Capsule())
-                                }.buttonStyle(.plain)
-                            }
-                            if vm.fullTagCount > vm.tagOptions.count {
-                                Button(action: { vm.toggleShowAllTags() }) {
-                                    Text(vm.showAllTags ? "收起" : "更多")
-                                        .font(.caption)
-                                        .padding(.horizontal,10).padding(.vertical,6)
-                                        .background(Color.secondary.opacity(0.15))
-                                        .clipShape(Capsule())
-                                }.buttonStyle(.plain)
-                            }
-                            if !vm.selectedTags.isEmpty {
-                                Button("清除") { vm.clearAllTagFilters() }
-                                    .font(.caption)
-                                    .padding(.horizontal,10).padding(.vertical,6)
-                                    .background(Color.red.opacity(0.15))
-                                    .clipShape(Capsule())
-                            }
-                        }.padding(.vertical, 4)
-                    }
-                }
-                .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
-            }
             ForEach(vm.logs, id: \.id) { log in
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(log.createdAt, style: .date) + Text(" ") + Text(log.createdAt, style: .time)
+                    Text(Self.zhCNFormatter.string(from: log.createdAt))
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    Text(prefixIcon(for: log.type) + log.detail)
+                    Text(title(for: log))
                     if !log.locationNote.isEmpty || !log.scene.isEmpty {
                         Text("📍 \(log.locationNote)  ·  \(log.scene)")
                             .font(.caption2)
@@ -110,7 +75,12 @@ struct LogListView: View {
                     if !log.tags.isEmpty {
                         HStack(spacing: 4) {
                             ForEach(log.tags.prefix(6), id: \.self) { tag in
-                                Text("#" + tag).font(.caption2).padding(.horizontal,6).padding(.vertical,2).background(Color.accentColor.opacity(0.1)).clipShape(Capsule())
+                                Text("#" + tag)
+                                    .font(.caption2)
+                                    .padding(.horizontal,6)
+                                    .padding(.vertical,2)
+                                    .background(Color.accentColor.opacity(0.1))
+                                    .clipShape(Capsule())
                             }
                         }
                     }
@@ -136,6 +106,23 @@ struct LogListView: View {
     }
 
     private func prefixIcon(for type: LogType) -> String { type == .mistake ? "⚠️ " : "✅ " }
+
+    private func title(for log: LogEntry) -> String {
+        let icon = prefixIcon(for: log.type)
+        if !log.scene.isEmpty { return icon + log.scene }
+        if !log.locationNote.isEmpty { return icon + log.locationNote }
+        if !log.detail.isEmpty { return icon + String(log.detail.prefix(18)) }
+        return icon + "记录"
+    }
+
+    // MARK: - Date Formatter (Chinese)
+    private static let zhCNFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "zh_CN")
+        f.calendar = Calendar(identifier: .gregorian)
+        f.dateFormat = "yyyy年M月d日 HH:mm" // 示例：2025年8月18日 16:37
+        return f
+    }()
 }
 
 #Preview { LogListView() }

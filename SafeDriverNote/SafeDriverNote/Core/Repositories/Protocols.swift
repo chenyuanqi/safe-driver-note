@@ -11,6 +11,18 @@ protocol LogRepository {
 protocol ChecklistRepository {
     func todayRecord() throws -> ChecklistRecord?
     @discardableResult func upsertToday(update: (inout ChecklistRecord) -> Void) throws -> ChecklistRecord
+
+    // Custom items CRUD
+    func fetchItems(mode: ChecklistMode?) throws -> [ChecklistItem]
+    func addItem(_ item: ChecklistItem) throws
+    func updateItem(_ item: ChecklistItem, mutate: (ChecklistItem) -> Void) throws
+    func deleteItem(_ item: ChecklistItem) throws
+
+    // Punch records
+    func addPunch(mode: ChecklistMode, checkedItemIds: [UUID]) throws
+    func fetchPunches(on date: Date, mode: ChecklistMode?) throws -> [ChecklistPunch]
+    func fetchAllPunches(mode: ChecklistMode?) throws -> [ChecklistPunch]
+    func deletePunch(_ punch: ChecklistPunch) throws
 }
 
 protocol KnowledgeRepository {
