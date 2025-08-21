@@ -66,7 +66,10 @@ final class ChecklistViewModel: ObservableObject {
         itemsPost = (try? repository.fetchItems(mode: .post)) ?? []
     }
     func addItem(title: String, mode: Mode) {
-        let item = ChecklistItem(title: title, mode: mode == .pre ? .pre : .post)
+        // 新增项排在末尾：设置 sortOrder 为当前末尾 + 1
+        let targetList = (mode == .pre ? itemsPre : itemsPost)
+        let nextOrder = (targetList.compactMap { $0.sortOrder }.max() ?? 0) + 1
+        let item = ChecklistItem(title: title, mode: mode == .pre ? .pre : .post, isPinned: false, sortOrder: nextOrder)
         try? repository.addItem(item)
         reloadItems()
     }
@@ -76,6 +79,30 @@ final class ChecklistViewModel: ObservableObject {
     }
     func deleteItem(_ item: ChecklistItem) {
         try? repository.deleteItem(item)
+        reloadItems()
+    }
+
+    // MARK: Pin & Reorder
+    func togglePin(_ item: ChecklistItem) {
+        try? repository.updateItem(item) { it in it.isPinned = !(it.isPinned ?? false) }
+        reloadItems()
+    }
+
+    func moveItemsPre(from source: IndexSet, to destination: Int) {
+        var arr = itemsPre
+        arr.move(fromOffsets: source, toOffset: destination)
+        persistOrder(arr: arr)
+    }
+    func moveItemsPost(from source: IndexSet, to destination: Int) {
+        var arr = itemsPost
+        arr.move(fromOffsets: source, toOffset: destination)
+        persistOrder(arr: arr)
+    }
+
+    private func persistOrder(arr: [ChecklistItem]) {
+        for (idx, item) in arr.enumerated() {
+            try? repository.updateItem(item) { it in it.sortOrder = idx }
+        }
         reloadItems()
     }
 

@@ -67,7 +67,14 @@ struct ChecklistRepositorySwiftData: ChecklistRepository {
         let ctx = try context()
         var items = try ctx.fetch(FetchDescriptor<ChecklistItem>())
         if let m = mode { items = items.filter { $0.mode == m } }
-        return items
+        return items.sorted { lhs, rhs in
+            let lp = lhs.isPinned ?? false
+            let rp = rhs.isPinned ?? false
+            if lp != rp { return lp && !rp }
+            let lo = lhs.sortOrder ?? Int.max
+            let ro = rhs.sortOrder ?? Int.max
+            return lo < ro
+        }
     }
     func addItem(_ item: ChecklistItem) throws {
         let ctx = try context(); ctx.insert(item); try ctx.save()
@@ -145,11 +152,21 @@ enum ChecklistConstants {
         "parkBrake","windows","lightsOff","valuables","lock"
     ].map { ChecklistItemState(key: $0, checked: false) }
 
-    // 用于首次种子化自定义清单项（人类可读中文标题）
+    // 用于首次种子化自定义清单项（中文默认清单）
     static let preDefaultTitles: [String] = [
-        "胎压","灯光","后视镜","雨刷","油/电量","座椅方向盘","导航","随车工具"
+        "检查周围环境是否安全（车底，周边行人、小孩等）",
+        "检查车子是否正常（胎压、仪表盘显示）",
+        "调整好方向盘、座椅，以及内后视镜和外后视镜",
+        "如果下雨天，提前做准备（雨刷检查、空调对两边吹、后视镜加热，去油膜处理）",
+        "如果在停车场，提前缴费再开车出去",
+        "规划好行车路线"
     ]
     static let postDefaultTitles: [String] = [
-        "手刹/P档","车窗","灯光关闭","贵重物品","车门锁"
+        "检查车子位置是否有问题",
+        "关窗、锁门、熄火，ok 后再确认停车🅿",
+        "打开\"王朝\"app 再次确认车子情况",
+        "如果陌生停车场，停车拍照 + 设置定位 + 手动记位置",
+        "将本次\"失误–反思–改进\"条目补录到行车日记中",
+        "记账 - 充电、加油、停车等费用"
     ]
 }

@@ -51,18 +51,17 @@ struct ChecklistView: View {
                     }
 
                     // 移除模板项的勾选显示，只保留自定义项维护
-                    Section(header: Text("自定义项目")) {
-                        let customItems = vm.mode == .pre ? vm.itemsPre : vm.itemsPost
-                        ForEach(customItems, id: \.id) { ci in
-                            HStack {
-                                Text(ci.title)
-                                Spacer()
-                                Button("编辑") { editingItem = ci; newTitle = ci.title }
-                                    .buttonStyle(.bordered)
+                    Section(header: Text("自定义项目（可置顶与排序）")) {
+                        if vm.mode == .pre {
+                            ForEach(vm.itemsPre, id: \.id) { ci in
+                                rowView(ci)
                             }
-                            .swipeActions {
-                                Button(role: .destructive) { vm.deleteItem(ci) } label: { Label("删除", systemImage: "trash") }
+                            .onMove(perform: vm.moveItemsPre)
+                        } else {
+                            ForEach(vm.itemsPost, id: \.id) { ci in
+                                rowView(ci)
                             }
+                            .onMove(perform: vm.moveItemsPost)
                         }
                         Button(action: { showingAdd = true; newTitle = "" }) { Label("添加项目", systemImage: "plus") }
                     }
@@ -75,9 +74,10 @@ struct ChecklistView: View {
                             Button("打卡") { showingPunch = true }
                         }
                     }
+                    ToolbarItem(placement: .navigationBarLeading) { EditButton() }
                 }
             }
-            .navigationTitle("检查")
+            .navigationTitle("检查清单")
             .navigationDestination(for: ChecklistPunch.self) { p in
                 ChecklistPunchDetailView(punch: p).environmentObject(AppDI.shared)
             }
@@ -155,6 +155,27 @@ struct ChecklistView: View {
         case "valuables": return "贵重物品"
         case "lock": return "车门锁"
         default: return key
+        }
+    }
+}
+
+private extension ChecklistView {
+    @ViewBuilder
+    func rowView(_ ci: ChecklistItem) -> some View {
+        HStack {
+            if (ci.isPinned ?? false) { Image(systemName: "pin.fill").foregroundStyle(.orange) }
+            Text(ci.title)
+            Spacer()
+            Button("编辑") { editingItem = ci; newTitle = ci.title }
+                .buttonStyle(.bordered)
+        }
+        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+            Button(role: .destructive) { vm.deleteItem(ci) } label: { Label("删除", systemImage: "trash") }
+        }
+        .swipeActions(edge: .leading, allowsFullSwipe: true) {
+            let pinned = ci.isPinned ?? false
+            Button { vm.togglePin(ci) } label: { Label(pinned ? "取消置顶" : "置顶", systemImage: pinned ? "pin.slash" : "pin") }
+                .tint(pinned ? .gray : .orange)
         }
     }
 }

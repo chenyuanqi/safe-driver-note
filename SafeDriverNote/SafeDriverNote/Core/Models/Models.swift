@@ -63,11 +63,15 @@ struct ChecklistItemState: Codable, Hashable {
     @Attribute(.unique) var id: UUID
     var title: String
     var mode: ChecklistMode
+    var isPinned: Bool?
+    var sortOrder: Int?
 
-    init(id: UUID = UUID(), title: String, mode: ChecklistMode) {
+    init(id: UUID = UUID(), title: String, mode: ChecklistMode, isPinned: Bool? = false, sortOrder: Int? = 0) {
         self.id = id
         self.title = title
         self.mode = mode
+        self.isPinned = isPinned
+        self.sortOrder = sortOrder
     }
 }
 
