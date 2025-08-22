@@ -24,6 +24,13 @@ struct LogListView: View {
                         Image(systemName: "line.3.horizontal.decrease.circle")
                     }
                 }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    NavigationLink {
+                        LogStatsView(logs: vm.logs)
+                    } label: {
+                        Image(systemName: "chart.bar.xaxis")
+                    }
+                }
                 ToolbarItem(placement: .primaryAction) {
                     Button { showingAdd = true } label: { Image(systemName: "plus") }
                 }
@@ -137,6 +144,13 @@ struct LogListView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 12) {
+            // Stats summary
+            HStack(spacing: 12) {
+                statCard(title: "本月总次数", value: "\(monthTotal)", color: .blue)
+                statCard(title: "本月失误", value: "\(monthMistakes)", color: .red)
+                statCard(title: "改进率", value: improvementRateFormatted, color: .green)
+            }
+
             Picker("类型", selection: Binding(get: {
                 selectedSegment
             }, set: { seg in
@@ -226,6 +240,35 @@ struct LogListView: View {
         }
         .padding(12)
         .background(Color(.secondarySystemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    // MARK: - Month Stats
+    private var monthLogs: [LogEntry] {
+        let cal = Calendar(identifier: .gregorian)
+        guard let start = cal.date(from: cal.dateComponents([.year, .month], from: Date())) else { return [] }
+        return vm.logs.filter { $0.createdAt >= start }
+    }
+    private var monthTotal: Int { monthLogs.count }
+    private var monthMistakes: Int { monthLogs.filter { $0.type == .mistake }.count }
+    private var monthSuccess: Int { monthLogs.filter { $0.type == .success }.count }
+    private var improvementRateFormatted: String {
+        guard monthTotal > 0 else { return "--%" }
+        let rate = Double(monthSuccess) / Double(monthTotal)
+        return String(format: "%.0f%%", rate * 100)
+    }
+    @ViewBuilder
+    private func statCard(title: String, value: String, color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text(value)
+                .font(.headline)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(color.opacity(0.08))
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
