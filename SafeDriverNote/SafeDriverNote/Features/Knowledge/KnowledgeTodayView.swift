@@ -29,8 +29,16 @@ struct KnowledgeTodayView: View {
                     .listStyle(.insetGrouped)
                 }
             }
-            .navigationTitle("今日知识")
-            .toolbar { ToolbarItem(placement: .navigationBarTrailing) { Button("刷新") { vm.loadToday() } } }
+            .navigationTitle("")
+            .toolbarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text("今日知识")
+                        .font(.system(size: 24, weight: .semibold))
+                        .foregroundStyle(Color.brandSecondary900)
+                }
+                ToolbarItem(placement: .navigationBarTrailing) { Button("刷新") { vm.loadToday() } }
+            }
         }
     }
 

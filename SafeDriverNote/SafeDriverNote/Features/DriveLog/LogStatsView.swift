@@ -50,9 +50,9 @@ struct LogStatsView: View {
         ScrollView {
             VStack(spacing: 16) {
                 HStack(spacing: 12) {
-                    statCard(title: "本月总次数", value: "\(monthTotal)", color: .blue)
-                    statCard(title: "本月失误", value: "\(monthMistakes)", color: .red)
-                    statCard(title: "改进率", value: improvementRateText, color: .green)
+                    statCard(title: "本月总次数", value: "\(monthTotal)", color: .brandInfo500)
+                    statCard(title: "本月失误", value: "\(monthMistakes)", color: .brandDanger500)
+                    statCard(title: "改进率", value: improvementRateText, color: .brandPrimary500)
                 }
 
                 VStack(alignment: .leading, spacing: 12) {
@@ -62,7 +62,7 @@ struct LogStatsView: View {
                         .frame(height: 140)
                 }
                 .padding()
-                .background(Color(.secondarySystemBackground))
+                .background(Color.brandSecondary100)
                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 12) {
@@ -71,12 +71,20 @@ struct LogStatsView: View {
                     vBarList(items: sceneDistribution)
                 }
                 .padding()
-                .background(Color(.secondarySystemBackground))
+                .background(Color.brandSecondary100)
                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             }
             .padding()
         }
-        .navigationTitle("数据统计")
+        .navigationTitle("")
+        .toolbarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                Text("数据统计")
+                    .font(.system(size: 24, weight: .semibold))
+                    .foregroundStyle(Color.brandSecondary900)
+            }
+        }
     }
 
     // MARK: - Components
@@ -90,7 +98,7 @@ struct LogStatsView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)
-        .background(color.opacity(0.08))
+        .background(color.opacity(0.12))
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 

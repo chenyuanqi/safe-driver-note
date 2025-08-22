@@ -13,16 +13,13 @@ struct LogListView: View {
             Group {
                 if filteredLogs.isEmpty { emptyState } else { list }
             }
-            .navigationTitle("驾驶日志")
+            .navigationTitle("")
+            .toolbarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Menu {
-                        Button("全部") { vm.filter = nil; selectedSegment = .all }
-                        Button("失误") { vm.filter = .mistake; selectedSegment = .mistake }
-                        Button("成功") { vm.filter = .success; selectedSegment = .success }
-                    } label: {
-                        Image(systemName: "line.3.horizontal.decrease.circle")
-                    }
+                ToolbarItem(placement: .principal) {
+                    Text("驾驶日志")
+                        .font(.system(size: 24, weight: .semibold))
+                        .foregroundStyle(Color.brandSecondary900)
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     NavigationLink {
@@ -36,7 +33,6 @@ struct LogListView: View {
                 }
             }
             .safeAreaInset(edge: .top) { header }
-            .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "搜索场景/地点/标签")
             .sheet(isPresented: $showingAdd) { LogEditorView(entry: nil) { type, detail, location, scene, cause, improvement, tags, photos, audioFileName, transcript in
                 vm.create(type: type,
                           detail: detail,
@@ -144,11 +140,29 @@ struct LogListView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 12) {
+            // Search row: TextField + filter menu
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                TextField("搜索场景/地点/标签", text: $searchText)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                Menu {
+                    Button("全部") { vm.filter = nil; selectedSegment = .all }
+                    Button("失误") { vm.filter = .mistake; selectedSegment = .mistake }
+                    Button("成功") { vm.filter = .success; selectedSegment = .success }
+                } label: {
+                    Image(systemName: "line.3.horizontal.decrease.circle")
+                        .imageScale(.large)
+                }
+            }
+            .padding(12)
+            .background(Color(.secondarySystemBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             // Stats summary
             HStack(spacing: 12) {
-                statCard(title: "本月总次数", value: "\(monthTotal)", color: .blue)
-                statCard(title: "本月失误", value: "\(monthMistakes)", color: .red)
-                statCard(title: "改进率", value: improvementRateFormatted, color: .green)
+                statCard(title: "本月总次数", value: "\(monthTotal)", color: .brandInfo500)
+                statCard(title: "本月失误", value: "\(monthMistakes)", color: .brandDanger500)
+                statCard(title: "改进率", value: improvementRateFormatted, color: .brandPrimary500)
             }
 
             Picker("类型", selection: Binding(get: {
@@ -180,7 +194,7 @@ struct LogListView: View {
                             .font(.caption)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 6)
-                            .background(Color(.secondarySystemBackground))
+                            .background(Color.brandSecondary100)
                             .clipShape(Capsule())
                         }
                     }
@@ -207,8 +221,8 @@ struct LogListView: View {
                     .font(.caption2)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 2)
-                    .background((log.type == .mistake ? Color.red.opacity(0.1) : Color.green.opacity(0.1)))
-                    .foregroundColor(log.type == .mistake ? .red : .green)
+                    .background((log.type == .mistake ? Color.brandDanger100 : Color.brandPrimary100))
+                    .foregroundColor(log.type == .mistake ? .brandDanger600 : .brandPrimary700)
                     .clipShape(Capsule())
             }
             Text(title(for: log))
@@ -232,14 +246,14 @@ struct LogListView: View {
                             .font(.caption2)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
-                            .background(Color.accentColor.opacity(0.08))
+                            .background(Color.brandPrimary50)
                             .clipShape(Capsule())
                     }
                 }
             }
         }
         .padding(12)
-        .background(Color(.secondarySystemBackground))
+        .background(Color.brandSecondary100)
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 

@@ -75,9 +75,15 @@ struct ChecklistView: View {
                         }
                     }
                     ToolbarItem(placement: .navigationBarLeading) { EditButton() }
+                    ToolbarItem(placement: .principal) {
+                        Text("检查清单")
+                            .font(.system(size: 24, weight: .semibold))
+                            .foregroundStyle(Color.brandSecondary900)
+                    }
                 }
             }
-            .navigationTitle("检查清单")
+            .navigationTitle("")
+            .toolbarTitleDisplayMode(.inline)
             .navigationDestination(for: ChecklistPunch.self) { p in
                 ChecklistPunchDetailView(punch: p).environmentObject(AppDI.shared)
             }
