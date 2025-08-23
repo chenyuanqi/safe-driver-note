@@ -2,31 +2,42 @@ import SwiftUI
 
 struct KnowledgeTodayView: View {
     @StateObject private var vm = KnowledgeViewModel(repository: AppDI.shared.knowledgeRepository)
+    @State private var dragOffset: CGFloat = 0
 
     var body: some View {
         NavigationStack {
             Group {
-                if vm.today.isEmpty {
-                    emptyState
-                } else {
-                    List(vm.today, id: \.id) { card in
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack { Text(card.title).font(.headline); Spacer() }
-                            Text(card.what).font(.subheadline)
-                            DisclosureGroup("Why") { Text(card.why) }
-                            DisclosureGroup("How") { Text(card.how) }
-                            HStack {
-                                ForEach(card.tags, id: \.self) { t in
-                                    Text(t).font(.caption2).padding(.horizontal, 6).padding(.vertical, 2).background(Color.blue.opacity(0.1)).clipShape(Capsule())
-                                }
-                                Spacer()
-                                Button("掌握") { vm.mark(card: card) }
-                                    .buttonStyle(.borderedProminent)
-                            }
-                        }
-                        .padding(.vertical, 4)
+                if let card = vm.today.first {
+                    VStack(spacing: 12) {
+                        Spacer(minLength: 0)
+                        cardFullView(card)
+                            .offset(x: dragOffset)
+                            .rotationEffect(.degrees(Double(dragOffset / 20)))
+                            .opacity(1.0 - Double(min(abs(dragOffset) / 600, 0.4)))
+                            .gesture(
+                                DragGesture(minimumDistance: 20)
+                                    .onChanged { value in
+                                        dragOffset = value.translation.width
+                                    }
+                                    .onEnded { value in
+                                        let dx = value.translation.width
+                                        if dx > 100 { // 右滑：掌握
+                                            withAnimation(.spring) { vm.mark(card: card); dragOffset = 0 }
+                                        } else if dx < -100 { // 左滑：稍后
+                                            withAnimation(.spring) { vm.snooze(card: card); dragOffset = 0 }
+                                        } else {
+                                            withAnimation(.spring) { dragOffset = 0 }
+                                        }
+                                    }
+                            )
+                        Text("提示：右滑=掌握，左滑=稍后再看")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Spacer(minLength: 0)
                     }
-                    .listStyle(.insetGrouped)
+                    .padding(.horizontal)
+                } else {
+                    emptyState
                 }
             }
             .navigationTitle("")
@@ -45,6 +56,38 @@ struct KnowledgeTodayView: View {
                 }
             }
         }
+    }
+
+    @ViewBuilder
+    private func cardFullView(_ card: KnowledgeCard) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                Text(card.title)
+                    .font(.title2)
+                    .fontWeight(.semibold)
+                Text(card.what)
+                    .font(.body)
+                DisclosureGroup("Why") { Text(card.why).font(.body) }
+                DisclosureGroup("How") { Text(card.how).font(.body) }
+                HStack {
+                    ForEach(card.tags, id: \.self) { t in
+                        Text(t)
+                            .font(.caption2)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.blue.opacity(0.1))
+                            .clipShape(Capsule())
+                    }
+                    Spacer()
+                }
+            }
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .background(Color.brandSecondary100)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .shadow(color: .black.opacity(0.06), radius: 6, x: 0, y: 3)
+        .frame(maxHeight: .infinity)
     }
 
     private var emptyState: some View {

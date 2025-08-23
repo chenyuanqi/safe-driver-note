@@ -20,6 +20,10 @@ final class KnowledgeViewModel: ObservableObject {
         today.removeAll { $0.id == card.id }
     }
 
+    func snooze(card: KnowledgeCard) {
+        today.removeAll { $0.id == card.id }
+    }
+
     func syncRemote() async {
         do {
             try await AppDI.shared.knowledgeSyncService.sync()
