@@ -40,6 +40,8 @@ struct SafeDriverNoteApp: App {
 struct RootTabView: View {
     var body: some View {
         TabView {
+            HomeView()
+                .tabItem { Label("首页", systemImage: "house") }
             LogListView()
                 .tabItem { Label("日志", systemImage: "list.bullet") }
             ChecklistView()
