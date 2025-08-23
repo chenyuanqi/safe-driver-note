@@ -8,34 +8,50 @@ struct KnowledgeTodayView: View {
         NavigationStack {
             Group {
                 if let card = vm.today.first {
-                    VStack(spacing: 12) {
-                        Spacer(minLength: 0)
-                        cardFullView(card)
-                            .offset(x: dragOffset)
-                            .rotationEffect(.degrees(Double(dragOffset / 20)))
-                            .opacity(1.0 - Double(min(abs(dragOffset) / 600, 0.4)))
-                            .gesture(
-                                DragGesture(minimumDistance: 20)
-                                    .onChanged { value in
-                                        dragOffset = value.translation.width
+                    GeometryReader { geo in
+                        let cardHeight = geo.size.height * 0.66
+                        VStack(spacing: 12) {
+                            Spacer(minLength: 0)
+                            cardFullView(card)
+                                .frame(height: cardHeight)
+                                .offset(x: dragOffset)
+                                .rotationEffect(.degrees(Double(dragOffset / 20)))
+                                .opacity(1.0 - Double(min(abs(dragOffset) / 600, 0.4)))
+                                .overlay(alignment: .topLeading) {
+                                    if dragOffset < 0 {
+                                        feedbackLabel(text: "稍后", color: .blue, opacity: min(Double(abs(dragOffset) / 120), 1.0))
+                                            .padding(12)
                                     }
-                                    .onEnded { value in
-                                        let dx = value.translation.width
-                                        if dx > 100 { // 右滑：掌握
-                                            withAnimation(.spring) { vm.mark(card: card); dragOffset = 0 }
-                                        } else if dx < -100 { // 左滑：稍后
-                                            withAnimation(.spring) { vm.snooze(card: card); dragOffset = 0 }
-                                        } else {
-                                            withAnimation(.spring) { dragOffset = 0 }
+                                }
+                                .overlay(alignment: .topTrailing) {
+                                    if dragOffset > 0 {
+                                        feedbackLabel(text: "掌握", color: .green, opacity: min(Double(abs(dragOffset) / 120), 1.0))
+                                            .padding(12)
+                                    }
+                                }
+                                .gesture(
+                                    DragGesture(minimumDistance: 20)
+                                        .onChanged { value in
+                                            dragOffset = value.translation.width
                                         }
-                                    }
-                            )
-                        Text("提示：右滑=掌握，左滑=稍后再看")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        Spacer(minLength: 0)
+                                        .onEnded { value in
+                                            let dx = value.translation.width
+                                            if dx > 100 { // 右滑：掌握
+                                                withAnimation(.spring) { vm.mark(card: card); dragOffset = 0 }
+                                            } else if dx < -100 { // 左滑：稍后
+                                                withAnimation(.spring) { vm.snooze(card: card); dragOffset = 0 }
+                                            } else {
+                                                withAnimation(.spring) { dragOffset = 0 }
+                                            }
+                                        }
+                                )
+                            Text("提示：右滑=掌握，左滑=稍后再看")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Spacer(minLength: 0)
+                        }
+                        .padding(.horizontal)
                     }
-                    .padding(.horizontal)
                 } else {
                     emptyState
                 }
@@ -59,12 +75,23 @@ struct KnowledgeTodayView: View {
     }
 
     @ViewBuilder
+    private func feedbackLabel(text: String, color: Color, opacity: Double) -> some View {
+        Text(text)
+            .font(.headline)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(color.opacity(0.15))
+            .foregroundStyle(color)
+            .clipShape(Capsule())
+            .opacity(opacity)
+    }
+
+    @ViewBuilder
     private func cardFullView(_ card: KnowledgeCard) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
                 Text(card.title)
-                    .font(.title2)
-                    .fontWeight(.semibold)
+                    .font(.system(size: 26, weight: .semibold, design: .serif))
                 Text(card.what)
                     .font(.body)
                 DisclosureGroup("Why") { Text(card.why).font(.body) }
@@ -87,7 +114,6 @@ struct KnowledgeTodayView: View {
         .background(Color.brandSecondary100)
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .shadow(color: .black.opacity(0.06), radius: 6, x: 0, y: 3)
-        .frame(maxHeight: .infinity)
     }
 
     private var emptyState: some View {
