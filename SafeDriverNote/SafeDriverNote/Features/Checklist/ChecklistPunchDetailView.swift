@@ -25,7 +25,17 @@ struct ChecklistPunchDetailView: View {
                 }
                 VStack(alignment: .leading, spacing: 6) {
                     Text("项目")
-                    Text(titles(for: punch).joined(separator: "、")).foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 6) {
+                        ForEach(titles(for: punch), id: \.self) { t in
+                            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                                Image(systemName: "checkmark.circle")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                                Text(t)
+                                    .font(.subheadline)
+                            }
+                        }
+                    }
                 }
             }
 
