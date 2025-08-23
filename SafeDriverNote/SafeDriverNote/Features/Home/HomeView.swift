@@ -11,6 +11,7 @@ struct HomeView: View {
 					statsRow
 					quickActions
 					recentSection
+					todayPunchSection
 				}
 				.padding()
 			}
@@ -32,7 +33,7 @@ struct HomeView: View {
 			Text(vm.greeting)
 				.font(.title3)
 				.foregroundStyle(.secondary)
-			Text("安全驾驶，从记录开始")
+			Text("安全驾驶，从记录开始！")
 				.font(.headline)
 				.foregroundStyle(Color.brandSecondary700)
 		}
@@ -60,6 +61,20 @@ struct HomeView: View {
 				}
 				NavigationLink(destination: ChecklistView()) {
 					actionButton(title: "开始打卡", systemImage: "checklist", color: .brandInfo500)
+				}
+			}
+		}
+	}
+	
+	private var todayPunchSection: some View {
+		VStack(alignment: .leading, spacing: 12) {
+			Text("今日打卡").font(.headline)
+			HStack(spacing: 12) {
+				NavigationLink(destination: ChecklistView()) {
+					statCard(title: "行前", value: "\(vm.todayPreCount)次", color: .brandInfo500)
+				}
+				NavigationLink(destination: ChecklistView()) {
+					statCard(title: "行后", value: "\(vm.todayPostCount)次", color: .brandPrimary500)
 				}
 			}
 		}
@@ -120,7 +135,9 @@ struct HomeView: View {
 final class HomeViewModel: ObservableObject {
 	@Published private(set) var allLogs: [LogEntry] = []
 	@Published private(set) var recentLogs: [LogEntry] = []
-	
+	@Published private(set) var todayPreCount: Int = 0
+	@Published private(set) var todayPostCount: Int = 0
+		
 	init() { reload() }
 	
 	func reload() {
@@ -129,6 +146,13 @@ final class HomeViewModel: ObservableObject {
 			self.allLogs = sorted
 			self.recentLogs = Array(sorted.prefix(3))
 		}
+		// Checklist today
+		let today = Date()
+		let repo = AppDI.shared.checklistRepository
+		let pre = (try? repo.fetchPunches(on: today, mode: .pre)) ?? []
+		let post = (try? repo.fetchPunches(on: today, mode: .post)) ?? []
+		self.todayPreCount = pre.count
+		self.todayPostCount = post.count
 	}
 	
 	var monthLogs: [LogEntry] {
