@@ -37,7 +37,12 @@ struct KnowledgeTodayView: View {
                         .font(.system(size: 24, weight: .semibold))
                         .foregroundStyle(Color.brandSecondary900)
                 }
-                ToolbarItem(placement: .navigationBarTrailing) { Button("刷新") { vm.loadToday() } }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Menu {
+                        Button("同步网络知识") { Task { await vm.syncRemote() } }
+                        Button("重新抽取") { vm.loadToday() }
+                    } label: { Image(systemName: "arrow.triangle.2.circlepath") }
+                }
             }
         }
     }

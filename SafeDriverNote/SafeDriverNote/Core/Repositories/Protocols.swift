@@ -29,4 +29,5 @@ protocol KnowledgeRepository {
     func allCards() throws -> [KnowledgeCard]
     func todayCards(limit: Int) throws -> [KnowledgeCard]
     func mark(cardId: String) throws
+    func upsert(cards: [KnowledgeCard]) throws
 }

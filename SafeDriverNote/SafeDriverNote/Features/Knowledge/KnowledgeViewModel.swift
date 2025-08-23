@@ -16,7 +16,16 @@ final class KnowledgeViewModel: ObservableObject {
     }
 
     func mark(card: KnowledgeCard) {
-    try? repository.mark(cardId: card.id)
+        try? repository.mark(cardId: card.id)
         today.removeAll { $0.id == card.id }
+    }
+
+    func syncRemote() async {
+        do {
+            try await AppDI.shared.knowledgeSyncService.sync()
+            loadToday()
+        } catch {
+            // 简单忽略错误，实际可加入用户提示
+        }
     }
 }

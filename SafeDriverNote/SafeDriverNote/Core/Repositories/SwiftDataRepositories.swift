@@ -140,6 +140,25 @@ struct KnowledgeRepositorySwiftData: KnowledgeRepository {
         }
         try ctx.save()
     }
+    func upsert(cards: [KnowledgeCard]) throws {
+        let ctx = try context()
+        // 读取已有，构建索引
+        let existing = try ctx.fetch(FetchDescriptor<KnowledgeCard>())
+        var map: [String: KnowledgeCard] = [:]
+        for c in existing { map[c.id] = c }
+        for src in cards {
+            if let dst = map[src.id] {
+                dst.title = src.title
+                dst.what = src.what
+                dst.why = src.why
+                dst.how = src.how
+                dst.tags = src.tags
+            } else {
+                ctx.insert(src)
+            }
+        }
+        try ctx.save()
+    }
 }
 
 // MARK: - Checklist Templates
