@@ -15,53 +15,38 @@ struct LogListView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Custom Navigation Bar
-            HStack {
-                Button(action: { showingAdd = true }) {
-                    Image(systemName: "plus")
-                        .font(.bodyLarge)
-                        .foregroundColor(.brandSecondary700)
-                }
-                .iconStyle(size: 40, backgroundColor: .brandSecondary100)
-                
-                Spacer()
-                
-                Text("驾驶日志")
-                    .font(.navTitle)
-                    .foregroundColor(.brandSecondary900)
-                
-                Spacer()
-                
-                Button(action: { showingStats = true }) {
-                    Image(systemName: "chart.bar.xaxis")
-                        .font(.bodyLarge)
-                        .foregroundColor(.brandSecondary700)
-                }
-                .iconStyle(size: 40, backgroundColor: .brandSecondary100)
-            }
-            .frame(height: Spacing.navBarHeight)
-            .padding(.horizontal, Spacing.cardPadding)
-            .background(Color.white)
-            .overlay(
-                Rectangle()
-                    .fill(Color.brandSecondary300)
-                    .frame(height: 0.5),
-                alignment: .bottom
+            StandardNavigationBar(
+                title: "驾驶日志",
+                showBackButton: false,
+                trailingButtons: [
+                    StandardNavigationBar.NavBarButton(icon: "plus") {
+                        showingAdd = true
+                    },
+                    StandardNavigationBar.NavBarButton(icon: "chart.bar.xaxis") {
+                        showingStats = true
+                    }
+                ]
             )
             
-            // Tab Bar
-            tabBarSection
-            
-            // Filter Bar
-            filterBarSection
-            
-            // Content
-            Group {
-                if filteredLogs.isEmpty {
-                    emptyStateView
-                } else {
-                    logListView
+            ScrollView {
+                VStack(spacing: Spacing.xxxl) {
+                    // Tab Bar
+                    tabBarSection
+                    
+                    // Filter Bar
+                    filterBarSection
+                    
+                    // Content
+                    Group {
+                        if filteredLogs.isEmpty {
+                            emptyStateView
+                        } else {
+                            logListView
+                        }
+                    }
                 }
+                .padding(.horizontal, Spacing.pagePadding)
+                .padding(.vertical, Spacing.lg)
             }
             .background(Color.brandSecondary50)
         }
@@ -109,9 +94,6 @@ struct LogListView: View {
             options: Segment.allCases,
             displayText: { $0.rawValue }
         )
-        .padding(.horizontal, Spacing.pagePadding)
-        .padding(.top, 0)
-        .padding(.bottom, Spacing.lg)
         .background(Color.white)
         .onChange(of: selectedSegment) { _, newValue in
             updateFilter(for: newValue)
@@ -150,17 +132,7 @@ struct LogListView: View {
             // Tag Filter Row
             tagFilterRow
         }
-        .padding(.horizontal, Spacing.pagePadding)
-        .padding(.top, Spacing.sm)
-        .padding(.bottom, Spacing.lg)
         .background(Color.white)
-        .overlay(
-            Rectangle()
-                .fill(Color.brandSecondary300)
-                .frame(height: 0.5)
-                .offset(y: Spacing.lg),
-            alignment: .bottom
-        )
     }
     
     // MARK: - Monthly Stats Row
