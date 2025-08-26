@@ -18,6 +18,7 @@ struct LogListView: View {
             // Custom Navigation Bar
             StandardNavigationBar(
                 title: "驾驶日志",
+                showBackButton: false,
                 trailingButtons: [
                     StandardNavigationBar.NavBarButton(icon: "plus") {
                         showingAdd = true

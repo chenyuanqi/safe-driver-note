@@ -8,7 +8,7 @@ struct HomeView: View {
 		VStack(spacing: 0) {
 			// Custom Navigation Bar
 			StandardNavigationBar(
-				title: "安全驾驶日记",
+				title: "安全第一！",
 				showBackButton: false,
 				trailingButtons: [
 					StandardNavigationBar.NavBarButton(icon: "bell") {
@@ -229,15 +229,38 @@ struct HomeView: View {
 				.font(.title3)
 				.fontWeight(.semibold)
 				.foregroundColor(.brandSecondary900)
+				.frame(maxWidth: .infinity, alignment: .leading)
 			
 			if vm.recentLogs.isEmpty {
-				EmptyStateCard(
-					icon: "car",
-					title: "还没有驾驶记录",
-					subtitle: "开始记录你的安全驾驶之旅",
-					actionTitle: "开始记录"
-				) {
-					// Navigate to log creation
+				Card(backgroundColor: .white, shadow: false) {
+					VStack(spacing: Spacing.lg) {
+						Image(systemName: "car")
+							.font(.system(size: 48))
+							.foregroundColor(.brandSecondary300)
+						
+						Text("还没有驾驶记录")
+							.font(.bodyLarge)
+							.fontWeight(.medium)
+							.foregroundColor(.brandSecondary900)
+						
+						Text("开始记录你的安全驾驶之旅")
+							.font(.body)
+							.foregroundColor(.brandSecondary500)
+						
+						NavigationLink(destination: LogListView()) {
+							Text("开始记录")
+								.font(.body)
+								.fontWeight(.medium)
+								.foregroundColor(.white)
+								.padding(.horizontal, Spacing.xl)
+								.padding(.vertical, Spacing.lg)
+								.background(Color.brandPrimary500)
+								.clipShape(RoundedRectangle(cornerRadius: CornerRadius.lg, style: .continuous))
+						}
+						.buttonStyle(PlainButtonStyle())
+					}
+					.frame(maxWidth: .infinity)
+					.padding(.vertical, Spacing.xxxl)
 				}
 			} else {
 				VStack(spacing: Spacing.md) {

@@ -38,16 +38,15 @@ struct BrandNavigationBar<Leading: View, Center: View, Trailing: View>: View {
         }
         .frame(height: Spacing.navBarHeight)
         .padding(.horizontal, Spacing.cardPadding)
+        .padding(.top, 0)
         .background(
             Rectangle()
                 .fill(backgroundColor)
-                .ignoresSafeArea(.container, edges: .top)
         )
         .overlay(
             Rectangle()
                 .fill(Color.brandSecondary300)
-                .frame(height: 0.5)
-                .offset(y: Spacing.navBarHeight / 2),
+                .frame(height: 0.5),
             alignment: .bottom
         )
     }

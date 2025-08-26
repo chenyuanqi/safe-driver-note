@@ -11,6 +11,8 @@ struct ChecklistView: View {
     @State private var showingHistory = false
     @State private var showSavedAlert = false
     @State private var editMode: EditMode = .inactive
+    @State private var preCheckItems: [ChecklistItemData] = []
+    @State private var postCheckItems: [ChecklistItemData] = []
 
     var body: some View {
         VStack(spacing: 0) {
@@ -34,6 +36,9 @@ struct ChecklistView: View {
                 .padding(.vertical, Spacing.lg)
             }
             .background(Color.brandSecondary50)
+        }
+        .onAppear {
+            initializeChecklistItems()
         }
         .sheet(isPresented: $showingAdd) {
             NavigationStack {
@@ -99,7 +104,7 @@ struct ChecklistView: View {
             
             ProgressCard(
                 title: "完成进度",
-                progress: 0.0,
+                progress: currentProgress,
                 color: .brandPrimary500
             )
         }
@@ -107,11 +112,10 @@ struct ChecklistView: View {
     
     private var checklistItemsSection: some View {
         VStack(spacing: Spacing.lg) {
-            let items = vm.mode == .pre ? defaultPreDriveItems : defaultPostDriveItems
+            let items = vm.mode == .pre ? preCheckItems : postCheckItems
             
             ForEach(items.indices, id: \.self) { index in
-                let item = items[index]
-                checklistItemCard(item: item)
+                checklistItemCard(item: items[index], index: index)
             }
         }
     }
@@ -119,7 +123,7 @@ struct ChecklistView: View {
     private var actionButtonsSection: some View {
         VStack(spacing: Spacing.lg) {
             Button("快速完成全部检查") {
-                showingPunch = true
+                completeAllItems()
             }
             .primaryStyle()
             
@@ -168,27 +172,74 @@ struct ChecklistView: View {
         .buttonStyle(PlainButtonStyle())
     }
     
-    private func checklistItemCard(item: ChecklistItemData) -> some View {
-        Card(backgroundColor: .white, shadow: false) {
-            HStack(spacing: Spacing.lg) {
-                Image(systemName: "circle")
-                    .font(.title2)
-                    .foregroundColor(.brandSecondary300)
-                
-                VStack(alignment: .leading, spacing: Spacing.sm) {
-                    Text(item.title)
-                        .font(.bodyLarge)
-                        .fontWeight(.medium)
-                        .foregroundColor(.brandSecondary900)
+    private func checklistItemCard(item: ChecklistItemData, index: Int) -> some View {
+        Button {
+            toggleItem(at: index)
+        } label: {
+            Card(backgroundColor: .white, shadow: false) {
+                HStack(spacing: Spacing.lg) {
+                    Image(systemName: item.isCompleted ? "checkmark.circle.fill" : "circle")
+                        .font(.title2)
+                        .foregroundColor(item.isCompleted ? .brandPrimary500 : .brandSecondary300)
                     
-                    Text(item.subtitle)
-                        .font(.bodySmall)
-                        .foregroundColor(.brandSecondary500)
+                    VStack(alignment: .leading, spacing: Spacing.sm) {
+                        Text(item.title)
+                            .font(.bodyLarge)
+                            .fontWeight(.medium)
+                            .foregroundColor(item.isCompleted ? .brandSecondary500 : .brandSecondary900)
+                            .strikethrough(item.isCompleted)
+                        
+                        Text(item.subtitle)
+                            .font(.bodySmall)
+                            .foregroundColor(.brandSecondary500)
+                    }
+                    
+                    Spacer()
                 }
-                
-                Spacer()
             }
         }
+        .buttonStyle(PlainButtonStyle())
+        .contextMenu {
+            Button("编辑") {
+                // Handle edit
+            }
+            Button("删除", role: .destructive) {
+                // Handle delete
+            }
+        }
+    }
+    
+    // MARK: - Helper Methods
+    private func initializeChecklistItems() {
+        preCheckItems = defaultPreDriveItems
+        postCheckItems = defaultPostDriveItems
+    }
+    
+    private func toggleItem(at index: Int) {
+        if vm.mode == .pre {
+            preCheckItems[index].isCompleted.toggle()
+        } else {
+            postCheckItems[index].isCompleted.toggle()
+        }
+    }
+    
+    private func completeAllItems() {
+        if vm.mode == .pre {
+            for i in preCheckItems.indices {
+                preCheckItems[i].isCompleted = true
+            }
+        } else {
+            for i in postCheckItems.indices {
+                postCheckItems[i].isCompleted = true
+            }
+        }
+    }
+    
+    private var currentProgress: Double {
+        let items = vm.mode == .pre ? preCheckItems : postCheckItems
+        guard !items.isEmpty else { return 0.0 }
+        let completedCount = items.filter(\.isCompleted).count
+        return Double(completedCount) / Double(items.count)
     }
     
     private var defaultPreDriveItems: [ChecklistItemData] {
