@@ -13,11 +13,17 @@ struct ChecklistView: View {
     @State private var editMode: EditMode = .inactive
     @State private var preCheckItems: [ChecklistItemData] = []
     @State private var postCheckItems: [ChecklistItemData] = []
+    @State private var editingItemId: UUID? = nil
+    @State private var editingText: String = ""
+    @State private var showingDeleteAlert = false
+    @State private var itemToDelete: ChecklistItemData? = nil
+    @State private var showingPunchCompleteAlert = false
 
     var body: some View {
         VStack(spacing: 0) {
             StandardNavigationBar(
                 title: "检查清单",
+                showBackButton: false,
                 trailingButtons: [
                     StandardNavigationBar.NavBarButton(icon: "chart.bar") {
                         showingHistory = true
@@ -60,6 +66,44 @@ struct ChecklistView: View {
                     .environmentObject(AppDI.shared)
                     .navigationTitle("历史打卡")
             }
+        }
+        .alert("确认删除", isPresented: $showingDeleteAlert) {
+            Button("取消", role: .cancel) { }
+            Button("删除", role: .destructive) {
+                if let item = itemToDelete {
+                    if let index = (vm.mode == .pre ? preCheckItems : postCheckItems).firstIndex(where: { $0.id == item.id }) {
+                        if vm.mode == .pre {
+                            preCheckItems.remove(at: index)
+                        } else {
+                            postCheckItems.remove(at: index)
+                        }
+                    }
+                    itemToDelete = nil
+                }
+            }
+        } message: {
+            Text("确定要删除这个检查项吗？此操作无法撤销。")
+        }
+        .alert("打卡完成", isPresented: $showingPunchCompleteAlert) {
+            Button("确定") {
+                // 记录打卡
+                let items = vm.mode == .pre ? preCheckItems : postCheckItems
+                let checkedIds = items.enumerated().compactMap { index, item in
+                    item.isCompleted ? index : nil
+                }
+                // 这里调用ViewModel的方法来记录打卡
+                // vm.recordPunch(mode: vm.mode, checkedItemIds: checkedIds)
+                showSavedAlert = true
+            }
+        } message: {
+            let items = vm.mode == .pre ? preCheckItems : postCheckItems
+            let completedCount = items.filter(\.isCompleted).count
+            Text("已记录本次打卡，共完成 \(completedCount) 项检查。")
+        }
+        .alert("保存成功", isPresented: $showSavedAlert) {
+            Button("确定") { }
+        } message: {
+            Text("打卡记录已保存")
         }
     }
     
@@ -117,6 +161,35 @@ struct ChecklistView: View {
             ForEach(items.indices, id: \.self) { index in
                 checklistItemCard(item: items[index], index: index)
             }
+            .onMove { from, to in
+                if vm.mode == .pre {
+                    preCheckItems.move(fromOffsets: from, toOffset: to)
+                } else {
+                    postCheckItems.move(fromOffsets: from, toOffset: to)
+                }
+            }
+            
+            // 打卡完成按钮 - 当有项目被勾选时显示
+            if items.contains(where: { $0.isCompleted }) {
+                Button(action: {
+                    showingPunchCompleteAlert = true
+                }) {
+                    HStack {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.title2)
+                        Text("打卡完成")
+                            .font(.bodyLarge)
+                            .fontWeight(.semibold)
+                    }
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, Spacing.lg)
+                    .background(Color.brandPrimary500)
+                    .clipShape(RoundedRectangle(cornerRadius: CornerRadius.lg))
+                }
+                .buttonStyle(PlainButtonStyle())
+                .transition(.scale.combined(with: .opacity))
+            }
         }
     }
     
@@ -124,13 +197,19 @@ struct ChecklistView: View {
         VStack(spacing: Spacing.lg) {
             Button("快速完成全部检查") {
                 completeAllItems()
+                // 生成打卡记录
+                let completedItems = vm.mode == .pre ? preCheckItems : postCheckItems
+                let checkedIds = completedItems.enumerated().compactMap { index, item in
+                    item.isCompleted ? index : nil
+                }
+                // 这里调用ViewModel的方法来记录打卡
+                // vm.recordPunch(mode: vm.mode, checkedItemIds: checkedIds)
             }
             .primaryStyle()
             
             HStack(spacing: Spacing.lg) {
                 Button("添加自定义项目") {
-                    showingAdd = true
-                    newTitle = ""
+                    addCustomItem()
                 }
                 .secondaryStyle()
                 
@@ -173,38 +252,79 @@ struct ChecklistView: View {
     }
     
     private func checklistItemCard(item: ChecklistItemData, index: Int) -> some View {
-        Button {
-            toggleItem(at: index)
-        } label: {
-            Card(backgroundColor: .white, shadow: false) {
-                HStack(spacing: Spacing.lg) {
+        Card(backgroundColor: .white, shadow: false) {
+            HStack(spacing: Spacing.lg) {
+                Button {
+                    toggleItem(at: index)
+                } label: {
                     Image(systemName: item.isCompleted ? "checkmark.circle.fill" : "circle")
                         .font(.title2)
                         .foregroundColor(item.isCompleted ? .brandPrimary500 : .brandSecondary300)
-                    
-                    VStack(alignment: .leading, spacing: Spacing.sm) {
+                }
+                .buttonStyle(PlainButtonStyle())
+                
+                VStack(alignment: .leading, spacing: Spacing.sm) {
+                    if editingItemId == item.id {
+                        // 编辑模式
+                        TextField("项目名称", text: $editingText)
+                            .font(.bodyLarge)
+                            .fontWeight(.medium)
+                            .textFieldStyle(RoundedBorderTextFieldStyle())
+                            .onSubmit {
+                                if !editingText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                                    // 保存编辑
+                                    if vm.mode == .pre {
+                                        preCheckItems[index].title = editingText
+                                    } else {
+                                        postCheckItems[index].title = editingText
+                                    }
+                                    editingItemId = nil
+                                    editingText = ""
+                                }
+                            }
+                            .onAppear {
+                                editingText = item.title
+                            }
+                    } else {
+                        // 显示模式
                         Text(item.title)
                             .font(.bodyLarge)
                             .fontWeight(.medium)
                             .foregroundColor(item.isCompleted ? .brandSecondary500 : .brandSecondary900)
                             .strikethrough(item.isCompleted)
-                        
-                        Text(item.subtitle)
-                            .font(.bodySmall)
-                            .foregroundColor(.brandSecondary500)
                     }
                     
-                    Spacer()
+                    Text(item.subtitle)
+                        .font(.bodySmall)
+                        .foregroundColor(.brandSecondary500)
+                }
+                
+                Spacer()
+                
+                // 编辑按钮
+                if editingItemId != item.id {
+                    Button(action: {
+                        editingItemId = item.id
+                        editingText = item.title
+                    }) {
+                        Image(systemName: "pencil")
+                            .font(.body)
+                            .foregroundColor(.brandSecondary500)
+                    }
+                    .buttonStyle(PlainButtonStyle())
                 }
             }
         }
-        .buttonStyle(PlainButtonStyle())
-        .contextMenu {
+        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
             Button("编辑") {
-                // Handle edit
+                editingItemId = item.id
+                editingText = item.title
             }
+            .tint(.brandInfo500)
+            
             Button("删除", role: .destructive) {
-                // Handle delete
+                itemToDelete = item
+                showingDeleteAlert = true
             }
         }
     }
@@ -242,6 +362,18 @@ struct ChecklistView: View {
         return Double(completedCount) / Double(items.count)
     }
     
+    private func addCustomItem() {
+        let newItem = ChecklistItemData(title: "", subtitle: "自定义检查项", isCompleted: false)
+        if vm.mode == .pre {
+            preCheckItems.append(newItem)
+        } else {
+            postCheckItems.append(newItem)
+        }
+        // 自动进入编辑模式
+        editingItemId = newItem.id
+        editingText = ""
+    }
+    
     private var defaultPreDriveItems: [ChecklistItemData] {
         [
             ChecklistItemData(title: "胎压检查", subtitle: "检查四轮胎压是否正常"),
@@ -268,7 +400,7 @@ struct ChecklistView: View {
 
 struct ChecklistItemData: Identifiable {
     let id = UUID()
-    let title: String
+    var title: String
     let subtitle: String
     var isCompleted: Bool = false
 }
