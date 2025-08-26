@@ -3,6 +3,7 @@ import SwiftUI
 struct HomeView: View {
 	@StateObject private var vm = HomeViewModel()
 	@State private var selectedKnowledgeIndex = 0
+	@State private var showingLogEditor = false
 	
 	var body: some View {
 		VStack(spacing: 0) {
@@ -40,6 +41,26 @@ struct HomeView: View {
 			.background(Color.brandSecondary50)
 		}
 		.onAppear { vm.reload() }
+		.sheet(isPresented: $showingLogEditor) {
+			LogEditorView(entry: nil) { type, detail, location, scene, cause, improvement, tags, photos, audioFileName, transcript in
+				// 创建新的驾驶日志
+				let newEntry = LogEntry(
+					type: type,
+					locationNote: location,
+					scene: scene,
+					detail: detail,
+					cause: cause,
+					improvement: improvement,
+					tags: tags.isEmpty ? [] : tags.components(separatedBy: ",").map { $0.trimmingCharacters(in: .whitespaces) },
+					photoLocalIds: photos,
+					audioFileName: audioFileName,
+					transcript: transcript
+				)
+				try? AppDI.shared.logRepository.add(newEntry)
+				// 重新加载数据
+				vm.reload()
+			}
+		}
 	}
 	
 	// MARK: - Status Panel
@@ -247,16 +268,16 @@ struct HomeView: View {
 							.font(.body)
 							.foregroundColor(.brandSecondary500)
 						
-						NavigationLink(destination: LogListView()) {
-							Text("开始记录")
-								.font(.body)
-								.fontWeight(.medium)
-								.foregroundColor(.white)
-								.padding(.horizontal, Spacing.xl)
-								.padding(.vertical, Spacing.lg)
-								.background(Color.brandPrimary500)
-								.clipShape(RoundedRectangle(cornerRadius: CornerRadius.lg, style: .continuous))
+						Button("开始记录") {
+							showingLogEditor = true
 						}
+						.font(.body)
+						.fontWeight(.medium)
+						.foregroundColor(.white)
+						.padding(.horizontal, Spacing.xl)
+						.padding(.vertical, Spacing.lg)
+						.background(Color.brandPrimary500)
+						.clipShape(RoundedRectangle(cornerRadius: CornerRadius.lg, style: .continuous))
 						.buttonStyle(PlainButtonStyle())
 					}
 					.frame(maxWidth: .infinity)
