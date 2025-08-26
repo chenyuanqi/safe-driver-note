@@ -4,12 +4,13 @@ struct HomeView: View {
 	@StateObject private var vm = HomeViewModel()
 	@State private var selectedKnowledgeIndex = 0
 	@State private var showingLogEditor = false
+	@State private var showingSafetyAlert = false
 	
 	var body: some View {
 		VStack(spacing: 0) {
 			// Custom Navigation Bar
 			StandardNavigationBar(
-				title: "安全第一！",
+				title: "安全驾驶",
 				showBackButton: false,
 				trailingButtons: [
 					StandardNavigationBar.NavBarButton(icon: "bell") {
@@ -61,6 +62,11 @@ struct HomeView: View {
 				vm.reload()
 			}
 		}
+		.alert("安全提醒", isPresented: $showingSafetyAlert) {
+			Button("知道了") { }
+		} message: {
+			Text("道路千万条，安全第一条！平安抵达目的地才是唯一目的！")
+		}
 	}
 	
 	// MARK: - Status Panel
@@ -111,7 +117,9 @@ struct HomeView: View {
 				.foregroundColor(.brandSecondary900)
 			
 			// Primary Action - Start Driving
-			NavigationLink(destination: LogListView()) {
+			Button(action: {
+				showingSafetyAlert = true
+			}) {
 				Card(backgroundColor: .brandPrimary500, shadow: true) {
 					HStack(spacing: Spacing.lg) {
 						Image(systemName: "car")
