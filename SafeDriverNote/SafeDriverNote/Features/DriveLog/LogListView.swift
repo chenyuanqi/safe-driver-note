@@ -16,28 +16,37 @@ struct LogListView: View {
     var body: some View {
         VStack(spacing: 0) {
             // Custom Navigation Bar
-            BrandNavigationBar(
-                leading: {
-                    Button(action: { showingAdd = true }) {
-                        Image(systemName: "plus")
-                            .font(.bodyLarge)
-                            .foregroundColor(.brandSecondary700)
-                    }
-                    .iconStyle(size: 40, backgroundColor: .brandSecondary100)
-                },
-                center: {
-                    Text("驾驶日志")
-                        .font(.navTitle)
-                        .foregroundColor(.brandSecondary900)
-                },
-                trailing: {
-                    Button(action: { showingStats = true }) {
-                        Image(systemName: "chart.bar.xaxis")
-                            .font(.bodyLarge)
-                            .foregroundColor(.brandSecondary700)
-                    }
-                    .iconStyle(size: 40, backgroundColor: .brandSecondary100)
+            HStack {
+                Button(action: { showingAdd = true }) {
+                    Image(systemName: "plus")
+                        .font(.bodyLarge)
+                        .foregroundColor(.brandSecondary700)
                 }
+                .iconStyle(size: 40, backgroundColor: .brandSecondary100)
+                
+                Spacer()
+                
+                Text("驾驶日志")
+                    .font(.navTitle)
+                    .foregroundColor(.brandSecondary900)
+                
+                Spacer()
+                
+                Button(action: { showingStats = true }) {
+                    Image(systemName: "chart.bar.xaxis")
+                        .font(.bodyLarge)
+                        .foregroundColor(.brandSecondary700)
+                }
+                .iconStyle(size: 40, backgroundColor: .brandSecondary100)
+            }
+            .frame(height: Spacing.navBarHeight)
+            .padding(.horizontal, Spacing.cardPadding)
+            .background(Color.white)
+            .overlay(
+                Rectangle()
+                    .fill(Color.brandSecondary300)
+                    .frame(height: 0.5),
+                alignment: .bottom
             )
             
             // Tab Bar
@@ -101,7 +110,7 @@ struct LogListView: View {
             displayText: { $0.rawValue }
         )
         .padding(.horizontal, Spacing.pagePadding)
-        .padding(.top, Spacing.sm)
+        .padding(.top, 0)
         .padding(.bottom, Spacing.lg)
         .background(Color.white)
         .onChange(of: selectedSegment) { _, newValue in

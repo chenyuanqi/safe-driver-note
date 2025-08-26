@@ -39,6 +39,7 @@ struct BrandNavigationBar<Leading: View, Center: View, Trailing: View>: View {
         .frame(height: Spacing.navBarHeight)
         .padding(.horizontal, Spacing.cardPadding)
         .padding(.top, 0)
+        .padding(.bottom, 0)
         .background(
             Rectangle()
                 .fill(backgroundColor)
