@@ -5,35 +5,47 @@ struct LogListView: View {
     @State private var showingAdd = false
     @State private var searchText: String = ""
     @State private var selectedSegment: Segment = .all
+    @State private var showingStats = false
 
-    private enum Segment: Hashable, CaseIterable { case all, mistake, success }
+    private enum Segment: String, CaseIterable {
+        case all = "全部"
+        case mistake = "失误"
+        case success = "成功经验"
+    }
 
     var body: some View {
-        NavigationStack {
-            Group {
-                if filteredLogs.isEmpty { emptyState } else { list }
-            }
-            .navigationTitle("")
-            .toolbarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    Text("驾驶日志")
-                        .font(.system(size: 24, weight: .semibold))
-                        .foregroundStyle(Color.brandSecondary900)
-                }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    NavigationLink {
-                        LogStatsView(logs: vm.logs)
-                    } label: {
-                        Image(systemName: "chart.bar.xaxis")
+        VStack(spacing: 0) {
+            // Custom Navigation Bar
+            StandardNavigationBar(
+                title: "驾驶日志",
+                trailingButtons: [
+                    StandardNavigationBar.NavBarButton(icon: "plus") {
+                        showingAdd = true
+                    },
+                    StandardNavigationBar.NavBarButton(icon: "chart.bar.xaxis") {
+                        showingStats = true
                     }
-                }
-                ToolbarItem(placement: .primaryAction) {
-                    Button { showingAdd = true } label: { Image(systemName: "plus") }
+                ]
+            )
+            
+            // Tab Bar
+            tabBarSection
+            
+            // Filter Bar
+            filterBarSection
+            
+            // Content
+            Group {
+                if filteredLogs.isEmpty {
+                    emptyStateView
+                } else {
+                    logListView
                 }
             }
-            .safeAreaInset(edge: .top) { header }
-            .sheet(isPresented: $showingAdd) { LogEditorView(entry: nil) { type, detail, location, scene, cause, improvement, tags, photos, audioFileName, transcript in
+            .background(Color.brandSecondary50)
+        }
+        .sheet(isPresented: $showingAdd) {
+            LogEditorView(entry: nil) { type, detail, location, scene, cause, improvement, tags, photos, audioFileName, transcript in
                 vm.create(type: type,
                           detail: detail,
                           locationNote: location,
@@ -44,23 +56,302 @@ struct LogListView: View {
                           photoIds: photos,
                           audioFileName: audioFileName,
                           transcript: transcript)
-            } }
-            .sheet(item: $vm.editing) { entry in
-                LogEditorView(entry: entry) { type, detail, location, scene, cause, improvement, tags, photos, audioFileName, transcript in
-                    vm.update(entry: entry,
-                              type: type,
-                              detail: detail,
-                              locationNote: location,
-                              scene: scene,
-                              cause: cause,
-                              improvement: improvement,
-                              rawTags: tags,
-                              photoIds: photos,
-                              audioFileName: audioFileName,
-                              transcript: transcript)
+            }
+        }
+        .sheet(item: $vm.editing) { entry in
+            LogEditorView(entry: entry) { type, detail, location, scene, cause, improvement, tags, photos, audioFileName, transcript in
+                vm.update(entry: entry,
+                          type: type,
+                          detail: detail,
+                          locationNote: location,
+                          scene: scene,
+                          cause: cause,
+                          improvement: improvement,
+                          rawTags: tags,
+                          photoIds: photos,
+                          audioFileName: audioFileName,
+                          transcript: transcript)
+            }
+        }
+        .sheet(isPresented: $showingStats) {
+            NavigationStack {
+                LogStatsView(logs: vm.logs)
+                    .navigationTitle("数据统计")
+            }
+        }
+    }
+    
+    // MARK: - Tab Bar Section
+    private var tabBarSection: some View {
+        BrandSegmentedControl(
+            selection: $selectedSegment,
+            options: Segment.allCases,
+            displayText: { $0.rawValue }
+        )
+        .padding(.horizontal, Spacing.pagePadding)
+        .padding(.vertical, Spacing.lg)
+        .background(Color.white)
+        .onChange(of: selectedSegment) { _, newValue in
+            updateFilter(for: newValue)
+        }
+    }
+    
+    // MARK: - Filter Bar Section
+    private var filterBarSection: some View {
+        VStack(spacing: Spacing.lg) {
+            // Search and Filter Row
+            HStack(spacing: Spacing.lg) {
+                SearchField(
+                    text: $searchText,
+                    placeholder: "搜索场景/地点/标签"
+                )
+                
+                Menu {
+                    Button("最新优先") { /* Handle sort */ }
+                    Button("最早优先") { /* Handle sort */ }
+                    Button("按类型排序") { /* Handle sort */ }
+                } label: {
+                    Image(systemName: "line.3.horizontal.decrease.circle")
+                        .font(.bodyLarge)
+                        .foregroundColor(.brandSecondary700)
+                        .frame(width: 40, height: 40)
+                        .background(
+                            RoundedRectangle(cornerRadius: CornerRadius.md, style: .continuous)
+                                .fill(Color.brandSecondary100)
+                        )
+                }
+            }
+            
+            // Statistics Row
+            monthlyStatsRow
+            
+            // Tag Filter Row
+            tagFilterRow
+        }
+        .padding(.horizontal, Spacing.pagePadding)
+        .padding(.vertical, Spacing.lg)
+        .background(Color.white)
+        .overlay(
+            Rectangle()
+                .fill(Color.brandSecondary300)
+                .frame(height: 0.5)
+                .offset(y: Spacing.lg),
+            alignment: .bottom
+        )
+    }
+    
+    // MARK: - Monthly Stats Row
+    private var monthlyStatsRow: some View {
+        HStack(spacing: Spacing.lg) {
+            StatusCard(
+                title: "本月总次数",
+                value: "\(monthTotal)",
+                color: .brandInfo500
+            )
+            
+            StatusCard(
+                title: "本月失误",
+                value: "\(monthMistakes)",
+                color: .brandDanger500
+            )
+            
+            StatusCard(
+                title: "改进率",
+                value: improvementRateFormatted,
+                color: .brandPrimary500
+            )
+        }
+    }
+    
+    // MARK: - Tag Filter Row
+    private var tagFilterRow: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: Spacing.md) {
+                ForEach(vm.tagOptions, id: \.self) { tag in
+                    Button {
+                        vm.toggleMultiTag(tag)
+                    } label: {
+                        HStack(spacing: Spacing.sm) {
+                            Image(systemName: vm.selectedTags.contains(tag) ? "checkmark.circle.fill" : "circle")
+                                .font(.caption)
+                            Text(tag)
+                                .font(.caption)
+                        }
+                        .padding(.horizontal, Spacing.md)
+                        .padding(.vertical, Spacing.sm)
+                        .background(
+                            RoundedRectangle(cornerRadius: CornerRadius.lg, style: .continuous)
+                                .fill(vm.selectedTags.contains(tag) ? Color.brandPrimary100 : Color.brandSecondary100)
+                        )
+                        .foregroundColor(vm.selectedTags.contains(tag) ? .brandPrimary700 : .brandSecondary700)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                }
+                
+                Button(action: { vm.toggleShowAllTags() }) {
+                    HStack(spacing: Spacing.sm) {
+                        Image(systemName: vm.showAllTags ? "chevron.up" : "ellipsis.circle")
+                            .font(.caption)
+                        Text(vm.showAllTags ? "收起" : "更多(\(vm.fullTagCount))")
+                            .font(.caption)
+                    }
+                    .padding(.horizontal, Spacing.md)
+                    .padding(.vertical, Spacing.sm)
+                    .background(
+                        RoundedRectangle(cornerRadius: CornerRadius.lg, style: .continuous)
+                            .fill(Color.brandSecondary100)
+                    )
+                    .foregroundColor(.brandSecondary700)
+                }
+                .buttonStyle(PlainButtonStyle())
+            }
+            .padding(.horizontal, Spacing.pagePadding)
+        }
+    }
+    
+    // MARK: - Content Views
+    private var emptyStateView: some View {
+        EmptyStateCard(
+            icon: "car",
+            title: "还没有驾驶记录",
+            subtitle: "开始记录你的安全驾驶之旅",
+            actionTitle: "开始记录"
+        ) {
+            showingAdd = true
+        }
+        .padding(Spacing.pagePadding)
+    }
+    
+    private var logListView: some View {
+        ScrollView {
+            LazyVStack(spacing: Spacing.lg) {
+                ForEach(groupedByDay, id: \.key) { section in
+                    VStack(alignment: .leading, spacing: Spacing.lg) {
+                        // Date Header
+                        Text(section.key)
+                            .font(.bodyLarge)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.brandSecondary900)
+                            .padding(.horizontal, Spacing.pagePadding)
+                        
+                        // Log Cards
+                        VStack(spacing: Spacing.md) {
+                            ForEach(section.items, id: \.id) { log in
+                                modernLogCard(for: log)
+                                    .padding(.horizontal, Spacing.pagePadding)
+                                    .onTapGesture {
+                                        vm.beginEdit(log)
+                                    }
+                            }
+                        }
+                    }
+                }
+            }
+            .padding(.vertical, Spacing.lg)
+        }
+    }
+    
+    // MARK: - Helper Methods
+    private func updateFilter(for segment: Segment) {
+        switch segment {
+        case .all:
+            vm.filter = nil
+        case .mistake:
+            vm.filter = .mistake
+        case .success:
+            vm.filter = .success
+        }
+    }
+    
+    private func modernLogCard(for log: LogEntry) -> some View {
+        Card(backgroundColor: .white, shadow: true) {
+            VStack(alignment: .leading, spacing: Spacing.lg) {
+                // Header Row
+                HStack {
+                    HStack(spacing: Spacing.md) {
+                        Image(systemName: log.type == .mistake ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
+                            .font(.body)
+                            .foregroundColor(log.type == .mistake ? .brandDanger500 : .brandPrimary500)
+                        
+                        Text(Self.zhCNFormatter.string(from: log.createdAt))
+                            .font(.bodySmall)
+                            .foregroundColor(.brandSecondary500)
+                    }
+                    
+                    Spacer()
+                    
+                    Text(log.type == .mistake ? "失误" : "成功")
+                        .tagStyle(log.type == .mistake ? .error : .success)
+                    
+                    // Swipe Actions Menu
+                    Menu {
+                        Button(role: .destructive) {
+                            if let idx = vm.logs.firstIndex(where: { $0.id == log.id }) {
+                                vm.delete(at: IndexSet(integer: idx))
+                            }
+                        } label: {
+                            Label("删除", systemImage: "trash")
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis")
+                            .font(.body)
+                            .foregroundColor(.brandSecondary500)
+                            .frame(width: 32, height: 32)
+                            .background(
+                                RoundedRectangle(cornerRadius: CornerRadius.md, style: .continuous)
+                                    .fill(Color.clear)
+                            )
+                    }
+                }
+                
+                // Content
+                VStack(alignment: .leading, spacing: Spacing.md) {
+                    Text(cleanTitle(for: log))
+                        .font(.bodyLarge)
+                        .fontWeight(.medium)
+                        .foregroundColor(.brandSecondary900)
+                        .multilineTextAlignment(.leading)
+                    
+                    if !log.locationNote.isEmpty || !log.scene.isEmpty {
+                        HStack(spacing: Spacing.sm) {
+                            Image(systemName: "location")
+                                .font(.bodySmall)
+                                .foregroundColor(.brandSecondary500)
+                            
+                            Text("\(log.locationNote)  ·  \(log.scene)")
+                                .font(.bodySmall)
+                                .foregroundColor(.brandSecondary500)
+                        }
+                    }
+                    
+                    // Attachments
+                    if let attach = vm.attachmentSummary(for: log) {
+                        Text(attach)
+                            .font(.caption)
+                            .foregroundColor(.brandSecondary500)
+                    }
+                    
+                    // Tags
+                    if !log.tags.isEmpty {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: Spacing.sm) {
+                                ForEach(log.tags.prefix(6), id: \.self) { tag in
+                                    Text("#" + tag)
+                                        .tagStyle(.neutral)
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
+    }
+    
+    private func cleanTitle(for log: LogEntry) -> String {
+        if !log.scene.isEmpty { return log.scene }
+        if !log.locationNote.isEmpty { return log.locationNote }
+        if !log.detail.isEmpty { return String(log.detail.prefix(50)) }
+        return "记录"
     }
 
     private var filteredLogs: [LogEntry] {
