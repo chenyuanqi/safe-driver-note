@@ -16,17 +16,28 @@ struct LogListView: View {
     var body: some View {
         VStack(spacing: 0) {
             // Custom Navigation Bar
-            StandardNavigationBar(
-                title: "驾驶日志",
-                showBackButton: false,
-                trailingButtons: [
-                    StandardNavigationBar.NavBarButton(icon: "plus") {
-                        showingAdd = true
-                    },
-                    StandardNavigationBar.NavBarButton(icon: "chart.bar.xaxis") {
-                        showingStats = true
+            BrandNavigationBar(
+                leading: {
+                    Button(action: { showingAdd = true }) {
+                        Image(systemName: "plus")
+                            .font(.bodyLarge)
+                            .foregroundColor(.brandSecondary700)
                     }
-                ]
+                    .iconStyle(size: 40, backgroundColor: .brandSecondary100)
+                },
+                center: {
+                    Text("驾驶日志")
+                        .font(.navTitle)
+                        .foregroundColor(.brandSecondary900)
+                },
+                trailing: {
+                    Button(action: { showingStats = true }) {
+                        Image(systemName: "chart.bar.xaxis")
+                            .font(.bodyLarge)
+                            .foregroundColor(.brandSecondary700)
+                    }
+                    .iconStyle(size: 40, backgroundColor: .brandSecondary100)
+                }
             )
             
             // Tab Bar
@@ -90,7 +101,8 @@ struct LogListView: View {
             displayText: { $0.rawValue }
         )
         .padding(.horizontal, Spacing.pagePadding)
-        .padding(.vertical, Spacing.lg)
+        .padding(.top, Spacing.sm)
+        .padding(.bottom, Spacing.lg)
         .background(Color.white)
         .onChange(of: selectedSegment) { _, newValue in
             updateFilter(for: newValue)
@@ -130,7 +142,8 @@ struct LogListView: View {
             tagFilterRow
         }
         .padding(.horizontal, Spacing.pagePadding)
-        .padding(.vertical, Spacing.lg)
+        .padding(.top, Spacing.sm)
+        .padding(.bottom, Spacing.lg)
         .background(Color.white)
         .overlay(
             Rectangle()
