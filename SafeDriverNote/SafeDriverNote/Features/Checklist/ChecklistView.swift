@@ -265,11 +265,11 @@ struct ChecklistView: View {
                 
                 VStack(alignment: .leading, spacing: Spacing.sm) {
                     if editingItemId == item.id {
-                        // 编辑模式
+                        // 编辑模式 - 不显示明显的输入框，直接在当前行编辑
                         TextField("项目名称", text: $editingText)
                             .font(.bodyLarge)
                             .fontWeight(.medium)
-                            .textFieldStyle(RoundedBorderTextFieldStyle())
+                            .foregroundColor(.brandSecondary900)
                             .onSubmit {
                                 if !editingText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                                     // 保存编辑
@@ -284,6 +284,10 @@ struct ChecklistView: View {
                             }
                             .onAppear {
                                 editingText = item.title
+                                // 自动聚焦，拉起输入法
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                    // 这里需要触发键盘显示
+                                }
                             }
                     } else {
                         // 显示模式
@@ -301,17 +305,31 @@ struct ChecklistView: View {
                 
                 Spacer()
                 
-                // 编辑按钮
+                // 编辑和删除按钮
                 if editingItemId != item.id {
-                    Button(action: {
-                        editingItemId = item.id
-                        editingText = item.title
-                    }) {
-                        Image(systemName: "pencil")
-                            .font(.body)
-                            .foregroundColor(.brandSecondary500)
+                    HStack(spacing: Spacing.sm) {
+                        // 编辑按钮
+                        Button(action: {
+                            editingItemId = item.id
+                            editingText = item.title
+                        }) {
+                            Image(systemName: "pencil")
+                                .font(.body)
+                                .foregroundColor(.brandSecondary500)
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        
+                        // 删除按钮
+                        Button(action: {
+                            itemToDelete = item
+                            showingDeleteAlert = true
+                        }) {
+                            Image(systemName: "trash")
+                                .font(.body)
+                                .foregroundColor(.brandDanger500)
+                        }
+                        .buttonStyle(PlainButtonStyle())
                     }
-                    .buttonStyle(PlainButtonStyle())
                 }
             }
         }
