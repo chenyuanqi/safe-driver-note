@@ -108,7 +108,12 @@ final class ChecklistViewModel: ObservableObject {
 
     // MARK: Punch
     func punch(selectedItemIds: [UUID]) {
-        try? repository.addPunch(mode: mode == .pre ? .pre : .post, checkedItemIds: selectedItemIds)
+        try? repository.addPunch(
+            mode: mode == .pre ? .pre : .post, 
+            checkedItemIds: selectedItemIds,
+            isQuickComplete: false,
+            score: selectedItemIds.count * 10 // 简单的计分逗辑
+        )
         reloadPunchesToday()
     }
 
@@ -125,5 +130,70 @@ final class ChecklistViewModel: ObservableObject {
     func titles(for punch: ChecklistPunch) -> [String] {
         let dict: [UUID:String] = Dictionary(uniqueKeysWithValues: (itemsPre + itemsPost).map { ($0.id, $0.title) })
         return punch.checkedItemIds.compactMap { dict[$0] }
+    }
+    
+    // MARK: - New Methods for Enhanced Functionality
+    
+    /// Save a punch record
+    func savePunch(_ punch: ChecklistPunch) {
+        try? repository.addPunch(
+            mode: punch.mode, 
+            checkedItemIds: punch.checkedItemIds,
+            isQuickComplete: punch.isQuickComplete,
+            score: punch.score
+        )
+        reloadPunchesToday()
+    }
+    
+    /// Save items for a specific mode
+    func saveItems(_ items: [ChecklistItem], for mode: Mode) {
+        // First delete existing items for this mode
+        let existingItems = mode == .pre ? itemsPre : itemsPost
+        for item in existingItems {
+            try? repository.deleteItem(item)
+        }
+        
+        // Then add new items
+        for item in items {
+            try? repository.addItem(item)
+        }
+        
+        reloadItems()
+    }
+    
+    /// Get daily summary for today
+    func getDailySummary() -> DailyCheckinSummary {
+        let preSummaries = punchesTodayPre.map { punch in
+            ChecklistPunchSummary(
+                id: punch.id,
+                createdAt: punch.createdAt,
+                mode: punch.mode,
+                checkedItemIds: punch.checkedItemIds,
+                isQuickComplete: punch.isQuickComplete,
+                score: punch.score
+            )
+        }
+        
+        let postSummaries = punchesTodayPost.map { punch in
+            ChecklistPunchSummary(
+                id: punch.id,
+                createdAt: punch.createdAt,
+                mode: punch.mode,
+                checkedItemIds: punch.checkedItemIds,
+                isQuickComplete: punch.isQuickComplete,
+                score: punch.score
+            )
+        }
+        
+        return DailyCheckinSummary(
+            date: Date(),
+            prePunches: preSummaries,
+            postPunches: postSummaries
+        )
+    }
+    
+    /// Get items for current mode
+    var currentModeItems: [ChecklistItem] {
+        return mode == .pre ? itemsPre : itemsPost
     }
 }

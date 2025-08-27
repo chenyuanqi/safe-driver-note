@@ -21,6 +21,9 @@ extension Font {
     /// 标准正文 (16px)
     static let body = Font.system(size: 16, weight: .regular, design: .default)
     
+    /// 中等正文 (16px)
+    static let bodyMedium = Font.system(size: 16, weight: .medium, design: .default)
+    
     /// 辅助信息 (14px)
     static let bodySmall = Font.system(size: 14, weight: .regular, design: .default)
     

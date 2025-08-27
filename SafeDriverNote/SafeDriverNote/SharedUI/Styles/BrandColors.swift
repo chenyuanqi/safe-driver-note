@@ -27,10 +27,14 @@ extension Color {
 	static let brandPrimary700 = Color(hex: "#15803D")
 
 	// Secondary
+	static let brandSecondary25  = Color(hex: "#FCFCFD")
 	static let brandSecondary50  = Color(hex: "#F8FAFC")
 	static let brandSecondary100 = Color(hex: "#F1F5F9")
+	static let brandSecondary200 = Color(hex: "#E2E8F0")
 	static let brandSecondary300 = Color(hex: "#CBD5E1")
+	static let brandSecondary400 = Color(hex: "#94A3B8")
 	static let brandSecondary500 = Color(hex: "#64748B")
+	static let brandSecondary600 = Color(hex: "#475569")
 	static let brandSecondary700 = Color(hex: "#334155")
 	static let brandSecondary900 = Color(hex: "#0F172A")
 
@@ -46,4 +50,8 @@ extension Color {
 	static let brandInfo100 = Color(hex: "#DBEAFE")
 	static let brandInfo500 = Color(hex: "#3B82F6")
 	static let brandInfo600 = Color(hex: "#2563EB")
+
+	static let brandSuccess100 = Color(hex: "#DCFCE7")
+	static let brandSuccess500 = Color(hex: "#22C55E")
+	static let brandSuccess700 = Color(hex: "#15803D")
 }

@@ -37,6 +37,28 @@ enum LogType: String, Codable, CaseIterable { case mistake, success }
 // MARK: - Checklist
 enum ChecklistMode: String, Codable, CaseIterable { case pre, post }
 
+enum ChecklistPriority: String, Codable, CaseIterable {
+    case high = "high"
+    case medium = "medium"
+    case low = "low"
+    
+    var displayName: String {
+        switch self {
+        case .high: return "高"
+        case .medium: return "中"
+        case .low: return "低"
+        }
+    }
+    
+    var color: String {
+        switch self {
+        case .high: return "brandDanger500"
+        case .medium: return "brandWarning500"
+        case .low: return "brandSecondary400"
+        }
+    }
+}
+
 @Model final class ChecklistRecord {
     @Attribute(.unique) var id: UUID
     var date: Date
@@ -62,16 +84,26 @@ struct ChecklistItemState: Codable, Hashable {
 @Model final class ChecklistItem {
     @Attribute(.unique) var id: UUID
     var title: String
+    var itemDescription: String? // 新增：检查项详细描述
     var mode: ChecklistMode
+    var priority: ChecklistPriority // 新增：优先级设置
     var isPinned: Bool?
     var sortOrder: Int?
+    var isCustom: Bool // 新增：区分系统默认和用户自定义
+    var createdAt: Date
+    var updatedAt: Date
 
-    init(id: UUID = UUID(), title: String, mode: ChecklistMode, isPinned: Bool? = false, sortOrder: Int? = 0) {
+    init(id: UUID = UUID(), title: String, itemDescription: String? = nil, mode: ChecklistMode, priority: ChecklistPriority = .medium, isPinned: Bool? = false, sortOrder: Int? = 0, isCustom: Bool = true, createdAt: Date = Date(), updatedAt: Date = Date()) {
         self.id = id
         self.title = title
+        self.itemDescription = itemDescription
         self.mode = mode
+        self.priority = priority
         self.isPinned = isPinned
         self.sortOrder = sortOrder
+        self.isCustom = isCustom
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
     }
 }
 
@@ -81,12 +113,16 @@ struct ChecklistItemState: Codable, Hashable {
     var createdAt: Date
     var mode: ChecklistMode
     var checkedItemIds: [UUID]
+    var isQuickComplete: Bool // 新增：标记是否为快速完成
+    var score: Int // 新增：本次打卡得分
 
-    init(id: UUID = UUID(), createdAt: Date = .now, mode: ChecklistMode, checkedItemIds: [UUID]) {
+    init(id: UUID = UUID(), createdAt: Date = .now, mode: ChecklistMode, checkedItemIds: [UUID], isQuickComplete: Bool = false, score: Int = 0) {
         self.id = id
         self.createdAt = createdAt
         self.mode = mode
         self.checkedItemIds = checkedItemIds
+        self.isQuickComplete = isQuickComplete
+        self.score = score
     }
 }
 
@@ -118,5 +154,43 @@ struct ChecklistItemState: Codable, Hashable {
         self.id = id
         self.cardId = cardId
         self.markedDates = markedDates
+    }
+}
+
+// MARK: - Daily Checkin Summary
+struct ChecklistPunchSummary: Codable {
+    let id: UUID
+    let createdAt: Date
+    let mode: ChecklistMode
+    let checkedItemIds: [UUID]
+    let isQuickComplete: Bool
+    let score: Int
+}
+
+struct DailyCheckinSummary: Codable {
+    let date: Date
+    let prePunches: [ChecklistPunchSummary]
+    let postPunches: [ChecklistPunchSummary]
+    
+    var totalScore: Int {
+        let preScore = prePunches.reduce(0) { $0 + $1.score }
+        let postScore = postPunches.reduce(0) { $0 + $1.score }
+        return preScore + postScore
+    }
+    
+    var completionStatus: String {
+        let hasPreCheck = !prePunches.isEmpty
+        let hasPostCheck = !postPunches.isEmpty
+        
+        switch (hasPreCheck, hasPostCheck) {
+        case (true, true):
+            return "已完成行前行后检查"
+        case (true, false):
+            return "仅完成行前检查"
+        case (false, true):
+            return "仅完成行后检查"
+        case (false, false):
+            return "未进行检查"
+        }
     }
 }

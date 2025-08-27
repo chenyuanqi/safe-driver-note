@@ -143,7 +143,7 @@ struct HomeView: View {
 			
 			// Secondary Actions
 			HStack(spacing: Spacing.lg) {
-				NavigationLink(destination: ChecklistView()) {
+				NavigationLink(destination: ChecklistView(initialMode: .pre)) {
 					ActionCard(
 						title: "行前检查",
 						icon: "checkmark.seal",
