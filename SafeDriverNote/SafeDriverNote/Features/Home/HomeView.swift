@@ -7,39 +7,41 @@ struct HomeView: View {
 	@State private var showingSafetyAlert = false
 	
 	var body: some View {
-		VStack(spacing: 0) {
-			// Custom Navigation Bar
-			StandardNavigationBar(
-				title: "安全驾驶",
-				showBackButton: false,
-				trailingButtons: [
-					StandardNavigationBar.NavBarButton(icon: "bell") {
-						// Handle notifications
+		NavigationStack {
+			VStack(spacing: 0) {
+				// Custom Navigation Bar
+				StandardNavigationBar(
+					title: "安全驾驶",
+					showBackButton: false,
+					trailingButtons: [
+						StandardNavigationBar.NavBarButton(icon: "bell") {
+							// Handle notifications
+						}
+					]
+				)
+				
+				ScrollView {
+					VStack(spacing: Spacing.xxxl) {
+						// Status Panel
+						statusPanel
+						
+						// Quick Actions
+						quickActionsSection
+						
+						// Today Learning
+						todayLearningSection
+						
+						// Smart Recommendations
+						smartRecommendationsSection
+						
+						// Recent Activity
+						recentActivitySection
 					}
-				]
-			)
-			
-			ScrollView {
-				VStack(spacing: Spacing.xxxl) {
-					// Status Panel
-					statusPanel
-					
-					// Quick Actions
-					quickActionsSection
-					
-					// Today Learning
-					todayLearningSection
-					
-					// Smart Recommendations
-					smartRecommendationsSection
-					
-					// Recent Activity
-					recentActivitySection
+					.padding(.horizontal, Spacing.pagePadding)
+					.padding(.vertical, Spacing.lg)
 				}
-				.padding(.horizontal, Spacing.pagePadding)
-				.padding(.vertical, Spacing.lg)
+				.background(Color.brandSecondary50)
 			}
-			.background(Color.brandSecondary50)
 		}
 		.onAppear { vm.reload() }
 		.sheet(isPresented: $showingLogEditor) {
