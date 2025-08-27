@@ -1,85 +1,35 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <!-- 绿色电池风格渐变 -->
-    <linearGradient id="batteryGreen" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" style="stop-color:#4ade80;stop-opacity:1" />
-      <stop offset="50%" style="stop-color:#22c55e;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#16a34a;stop-opacity:1" />
-    </linearGradient>
-    
-    <!-- 深绿色 -->
-    <linearGradient id="darkGreen" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" style="stop-color:#166534;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#14532d;stop-opacity:1" />
-    </linearGradient>
-    
-    <!-- 白色高光 -->
-    <linearGradient id="whiteHighlight" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" style="stop-color:#ffffff;stop-opacity:0.9" />
-      <stop offset="100%" style="stop-color:#ffffff;stop-opacity:0.3" />
-    </linearGradient>
-  </defs>
-  
-  <!-- 圆角矩形背景 -->
-  <rect x="0" y="0" width="1024" height="1024" rx="180" ry="180" fill="url(#batteryGreen)"/>
-  
-  <!-- 盾牌形状 - 简化版 -->
-  <g transform="translate(512, 480)">
-    <path d="M -150 -180 
-             Q -150 -210 -120 -210
-             L 120 -210
-             Q 150 -210 150 -180
-             L 150 60
-             Q 150 120 120 150
-             L 15 240
-             Q 0 255 -15 240
-             L -120 150
-             Q -150 120 -150 60
-             Z" 
-          fill="url(#darkGreen)" 
-          stroke="#065f46" 
-          stroke-width="6"/>
-    
-    <!-- 盾牌内部高光 -->
-    <path d="M -130 -180 
-             Q -130 -190 -110 -190
-             L 110 -190
-             Q 130 -190 130 -180
-             L 130 50
-             Q 130 100 110 125
-             L 12 200
-             Q 0 212 -12 200
-             L -110 125
-             Q -130 100 -130 50
-             Z" 
-          fill="url(#whiteHighlight)" 
-          opacity="0.2"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <title>安全驾驶日记 (Tinted)</title>
+  <desc>透明背景，绿色小汽车+盾牌+笔形打勾。</desc>
+
+  <!-- 小汽车 -->
+  <g fill="none" stroke="#34C759" stroke-width="36" stroke-linecap="round" stroke-linejoin="round">
+    <!-- 车身 -->
+    <rect x="300" y="380" width="424" height="220" rx="60" ry="60"/>
+    <!-- 车顶 -->
+    <rect x="360" y="300" width="304" height="120" rx="40" ry="40"/>
+    <!-- 车灯 -->
+    <circle cx="300" cy="490" r="28" fill="#34C759" stroke="none"/>
+    <circle cx="724" cy="490" r="28" fill="#34C759" stroke="none"/>
+    <!-- 车轮 -->
+    <circle cx="360" cy="640" r="44" fill="#34C759" stroke="none"/>
+    <circle cx="664" cy="640" r="44" fill="#34C759" stroke="none"/>
   </g>
-  
-  <!-- 方向盘 - 简化版 -->
-  <g transform="translate(512, 420)">
-    <!-- 方向盘外圈 -->
-    <circle cx="0" cy="0" r="100" fill="url(#darkGreen)" stroke="#065f46" stroke-width="5"/>
-    
-    <!-- 方向盘内圈 -->
-    <circle cx="0" cy="0" r="80" fill="none" stroke="url(#whiteHighlight)" stroke-width="6" opacity="0.8"/>
-    
-    <!-- 简化的方向盘辐条 -->
-    <g stroke="url(#darkGreen)" stroke-width="10" stroke-linecap="round">
-      <!-- 顶部 -->
-      <line x1="0" y1="-80" x2="0" y2="-30"/>
-      <!-- 左下 -->
-      <line x1="-69.3" y1="40" x2="-26" y2="15"/>
-      <!-- 右下 -->
-      <line x1="69.3" y1="40" x2="26" y2="15"/>
-    </g>
-    
-    <!-- 方向盘中心 -->
-    <circle cx="0" cy="0" r="20" fill="url(#whiteHighlight)" opacity="0.9"/>
-    <circle cx="0" cy="0" r="6" fill="url(#darkGreen)"/>
+
+  <!-- 盾牌（右下角） -->
+  <g transform="translate(200,220)">
+    <!-- 盾牌外形 -->
+    <path d="M720 620
+             C 760 620, 804 634, 840 656
+             C 840 720, 814 770, 720 830
+             C 626 770, 600 720, 600 656
+             C 636 634, 680 620, 720 620 Z"
+          fill="#34C759"/>
+    <!-- 笔形打勾 -->
+    <path d="M660 710 L710 760 L792 678" 
+          fill="none" stroke="#FFFFFF" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- 笔尖效果 -->
+    <path d="M790 676 L802 664 L796 690 Z" fill="#FFFFFF"/>
   </g>
-  
-  <!-- 整体高光效果 -->
-  <ellipse cx="380" cy="280" rx="80" ry="160" fill="url(#whiteHighlight)" opacity="0.1" transform="rotate(-25 380 280)"/>
 </svg>
