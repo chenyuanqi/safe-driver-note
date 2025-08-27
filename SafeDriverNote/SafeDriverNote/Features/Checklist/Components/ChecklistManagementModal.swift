@@ -5,6 +5,9 @@ struct ChecklistManagementModal: View {
     let mode: ChecklistViewModel.Mode
     @State private var items: [ChecklistItem]
     @State private var editingItem: ChecklistItem?
+    @State private var editingTitle = ""
+    @State private var editingDescription = ""
+    @State private var editingPriority = ChecklistPriority.medium
     @State private var newItemTitle = ""
     @State private var newItemDescription = ""
     @State private var newItemPriority = ChecklistPriority.medium
@@ -32,19 +35,26 @@ struct ChecklistManagementModal: View {
             VStack(spacing: 0) {
                 headerSection
                 
-                ScrollView {
-                    LazyVStack(spacing: Spacing.md) {
-                        // 新增检查项按钮
+                List {
+                    // 新增检查项按钮
+                    Section {
                         addNewItemButton
-                        
-                        // 检查项列表
+                    }
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
+                    
+                    // 检查项列表
+                    Section {
                         ForEach(items.indices, id: \.self) { index in
                             checklistItemRow(item: items[index], index: index)
                         }
                         .onMove(perform: moveItems)
                     }
-                    .padding(Spacing.lg)
+                    .listRowInsets(EdgeInsets())
+                    .listRowBackground(Color.clear)
                 }
+                .listStyle(PlainListStyle())
+                .background(Color.brandSecondary25)
             }
             .background(Color.brandSecondary25)
             .navigationBarHidden(true)
@@ -121,14 +131,16 @@ struct ChecklistManagementModal: View {
             )
         }
         .buttonStyle(PlainButtonStyle())
+        .padding(.horizontal, Spacing.lg)
     }
     
     private func checklistItemRow(item: ChecklistItem, index: Int) -> some View {
         HStack(spacing: Spacing.md) {
-            // 拖动手柄
+            // 拖动手柄（始终显示）
             Image(systemName: "line.3.horizontal")
                 .font(.body)
                 .foregroundColor(.brandSecondary400)
+                .frame(width: 20)
             
             VStack(alignment: .leading, spacing: Spacing.xs) {
                 HStack {
@@ -151,77 +163,93 @@ struct ChecklistManagementModal: View {
                 }
             }
             
-            // 操作按钮
-            HStack(spacing: Spacing.sm) {
-                Button(action: {
-                    editItem(item)
-                }) {
-                    Image(systemName: "pencil")
-                        .font(.body)
-                        .foregroundColor(.brandInfo500)
-                        .frame(width: 32, height: 32)
-                        .background(Color.brandInfo100)
-                        .cornerRadius(CornerRadius.sm)
-                }
-                .buttonStyle(PlainButtonStyle())
-                
-                Button(action: {
-                    itemToDelete = item
-                    showingDeleteAlert = true
-                }) {
-                    Image(systemName: "trash")
-                        .font(.body)
-                        .foregroundColor(.brandDanger500)
-                        .frame(width: 32, height: 32)
-                        .background(Color.brandDanger100)
-                        .cornerRadius(CornerRadius.sm)
-                }
-                .buttonStyle(PlainButtonStyle())
-            }
+            Spacer()
         }
         .padding(Spacing.lg)
         .background(Color.white)
         .cornerRadius(CornerRadius.lg)
         .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
+        .padding(.horizontal, Spacing.lg)
+        .padding(.vertical, Spacing.sm)
+        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+            // 删除按钮
+            Button {
+                itemToDelete = item
+                showingDeleteAlert = true
+            } label: {
+                Image(systemName: "trash")
+            }
+            .tint(.brandDanger500)
+            
+            // 编辑按钮
+            Button {
+                editItem(item)
+            } label: {
+                Image(systemName: "pencil")
+            }
+            .tint(.brandInfo500)
+        }
+        .onTapGesture {
+            // 点击编辑
+            editItem(item)
+        }
     }
     
     private func priorityLabel(_ priority: ChecklistPriority) -> some View {
         Text(priority.displayName)
             .font(.caption)
             .fontWeight(.medium)
-            .foregroundColor(Color(priority.color))
+            .foregroundColor(priorityColor(priority))
             .padding(.horizontal, Spacing.sm)
             .padding(.vertical, Spacing.xs)
-            .background(Color(priority.color).opacity(0.1))
+            .background(priorityColor(priority).opacity(0.1))
             .cornerRadius(CornerRadius.sm)
+    }
+    
+    private func priorityColor(_ priority: ChecklistPriority) -> Color {
+        switch priority {
+        case .high:
+            return .brandDanger500
+        case .medium:
+            return .brandWarning500
+        case .low:
+            return .brandSecondary400
+        }
     }
     
     private func itemFormView(isEditing: Bool) -> some View {
         NavigationView {
             Form {
                 Section("基本信息") {
-                    TextField("检查项标题", text: isEditing ? Binding(
-                        get: { editingItem?.title ?? "" },
-                        set: { editingItem?.title = $0 }
-                    ) : $newItemTitle)
-                    
-                    TextField("检查项描述", text: isEditing ? Binding(
-                        get: { editingItem?.itemDescription ?? "" },
-                        set: { editingItem?.itemDescription = $0 }
-                    ) : $newItemDescription, axis: .vertical)
-                    .lineLimit(3...6)
+                    if isEditing {
+                        TextField("检查项标题", text: $editingTitle)
+                        
+                        TextField("检查项描述", text: $editingDescription, axis: .vertical)
+                            .lineLimit(3...6)
+                    } else {
+                        TextField("检查项标题", text: $newItemTitle)
+                        
+                        TextField("检查项描述", text: $newItemDescription, axis: .vertical)
+                            .lineLimit(3...6)
+                    }
                 }
                 
                 Section("设置") {
-                    Picker("优先级", selection: isEditing ? Binding(
-                        get: { editingItem?.priority ?? .medium },
-                        set: { editingItem?.priority = $0 }
-                    ) : $newItemPriority) {
-                        ForEach(ChecklistPriority.allCases, id: \.self) { priority in
-                            Text(priority.displayName).tag(priority)
+                    if isEditing {
+                        Picker("优先级", selection: $editingPriority) {
+                            ForEach(ChecklistPriority.allCases, id: \.self) { priority in
+                                Text(priority.displayName).tag(priority)
+                            }
                         }
+                        .pickerStyle(SegmentedPickerStyle())
+                    } else {
+                        Picker("优先级", selection: $newItemPriority) {
+                            ForEach(ChecklistPriority.allCases, id: \.self) { priority in
+                                Text(priority.displayName).tag(priority)
+                            }
+                        }
+                        .pickerStyle(SegmentedPickerStyle())
                     }
-                    .pickerStyle(SegmentedPickerStyle())
                 }
             }
             .navigationTitle(isEditing ? "编辑检查项" : "新增检查项")
@@ -241,7 +269,7 @@ struct ChecklistManagementModal: View {
                     Button("保存") {
                         saveItem(isEditing: isEditing)
                     }
-                    .disabled((isEditing ? (editingItem?.title.isEmpty ?? true) : newItemTitle.isEmpty))
+                    .disabled(isEditing ? editingTitle.isEmpty : newItemTitle.isEmpty)
                 }
             }
         }
@@ -254,14 +282,27 @@ struct ChecklistManagementModal: View {
     }
     
     private func editItem(_ item: ChecklistItem) {
+        // 设置编辑状态
         editingItem = item
+        editingTitle = item.title
+        editingDescription = item.itemDescription ?? ""
+        editingPriority = item.priority
         showingEditForm = true
     }
     
     private func saveItem(isEditing: Bool) {
         if isEditing {
+            // 更新现有项目
+            if let originalItem = editingItem,
+               let index = items.firstIndex(where: { $0.id == originalItem.id }) {
+                items[index].title = editingTitle
+                items[index].itemDescription = editingDescription.isEmpty ? nil : editingDescription
+                items[index].priority = editingPriority
+                items[index].updatedAt = Date()
+            }
             showingEditForm = false
         } else {
+            // 添加新项目
             let newItem = ChecklistItem(
                 title: newItemTitle,
                 itemDescription: newItemDescription.isEmpty ? nil : newItemDescription,
