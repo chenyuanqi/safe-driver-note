@@ -1,109 +1,51 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <title>安全驾驶日记</title>
+  <desc>电池绿背景，中央小汽车，右下角盾牌内带有笔形状的打勾。</desc>
+
+  <!-- 背景 -->
   <defs>
-    <!-- 绿色电池风格渐变 -->
-    <linearGradient id="batteryGreen" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" style="stop-color:#4ade80;stop-opacity:1" />
-      <stop offset="50%" style="stop-color:#22c55e;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#16a34a;stop-opacity:1" />
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#34C759"/>
+      <stop offset="100%" stop-color="#22B34B"/>
     </linearGradient>
-    
-    <!-- 深绿色渐变 -->
-    <linearGradient id="darkGreen" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" style="stop-color:#166534;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#14532d;stop-opacity:1" />
-    </linearGradient>
-    
-    <!-- 亮绿色高光 -->
-    <linearGradient id="lightGreen" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" style="stop-color:#86efac;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#65a30d;stop-opacity:1" />
-    </linearGradient>
-    
-    <!-- 阴影滤镜 -->
-    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000000" flood-opacity="0.25"/>
-    </filter>
+    <clipPath id="round">
+      <rect x="0" y="0" width="1024" height="1024" rx="222" ry="222"/>
+    </clipPath>
   </defs>
-  
-  <!-- 圆角矩形背景 -->
-  <rect x="0" y="0" width="1024" height="1024" rx="180" ry="180" fill="url(#batteryGreen)" filter="url(#shadow)"/>
-  
-  <!-- 盾牌主体 -->
-  <g transform="translate(512, 450)">
-    <!-- 盾牌外轮廓 -->
-    <path d="M -180 -200 
-             Q -180 -240 -140 -240
-             L 140 -240
-             Q 180 -240 180 -200
-             L 180 80
-             Q 180 140 140 180
-             L 20 280
-             Q 0 300 -20 280
-             L -140 180
-             Q -180 140 -180 80
-             Z" 
-          fill="url(#darkGreen)" 
-          stroke="#065f46" 
-          stroke-width="8"/>
-    
-    <!-- 盾牌内部高光 -->
-    <path d="M -160 -200 
-             Q -160 -220 -130 -220
-             L 130 -220
-             Q 160 -220 160 -200
-             L 160 70
-             Q 160 120 130 150
-             L 15 240
-             Q 0 255 -15 240
-             L -130 150
-             Q -160 120 -160 70
-             Z" 
-          fill="url(#lightGreen)" 
-          opacity="0.3"/>
+
+  <g clip-path="url(#round)">
+    <rect x="0" y="0" width="1024" height="1024" rx="222" ry="222" fill="url(#bg)"/>
+    <ellipse cx="512" cy="260" rx="540" ry="300" fill="#FFFFFF" opacity="0.10"/>
   </g>
-  
-  <!-- 方向盘 -->
-  <g transform="translate(512, 400)">
-    <!-- 方向盘外圈 -->
-    <circle cx="0" cy="0" r="120" fill="url(#darkGreen)" stroke="#065f46" stroke-width="6"/>
-    
-    <!-- 方向盘内圈 -->
-    <circle cx="0" cy="0" r="100" fill="none" stroke="url(#lightGreen)" stroke-width="8"/>
-    
-    <!-- 方向盘辐条 -->
-    <g stroke="url(#darkGreen)" stroke-width="12" stroke-linecap="round">
-      <!-- 顶部辐条 -->
-      <line x1="0" y1="-100" x2="0" y2="-40"/>
-      <!-- 左侧辐条 -->
-      <line x1="-86.6" y1="50" x2="-34.6" y2="20"/>
-      <!-- 右侧辐条 -->
-      <line x1="86.6" y1="50" x2="34.6" y2="20"/>
-    </g>
-    
-    <!-- 方向盘中心 -->
-    <circle cx="0" cy="0" r="25" fill="url(#batteryGreen)" stroke="url(#darkGreen)" stroke-width="3"/>
-    
-    <!-- 中心Logo点 -->
-    <circle cx="0" cy="0" r="8" fill="url(#lightGreen)"/>
+
+  <!-- 小汽车 -->
+  <g fill="none" stroke="#FFFFFF" stroke-width="36" stroke-linecap="round" stroke-linejoin="round">
+    <!-- 车身 -->
+    <rect x="300" y="380" width="424" height="220" rx="60" ry="60"/>
+    <!-- 车顶 -->
+    <rect x="360" y="300" width="304" height="120" rx="40" ry="40"/>
+    <!-- 车灯 -->
+    <circle cx="300" cy="490" r="28" fill="#FFFFFF" stroke="none"/>
+    <circle cx="724" cy="490" r="28" fill="#FFFFFF" stroke="none"/>
+    <!-- 车轮 -->
+    <circle cx="360" cy="640" r="44" fill="#FFFFFF" stroke="none"/>
+    <circle cx="664" cy="640" r="44" fill="#FFFFFF" stroke="none"/>
   </g>
-  
-  <!-- 装饰性安全元素 -->
-  <g transform="translate(512, 512)">
-    <!-- 左上角装饰 -->
-    <circle cx="-200" cy="-200" r="12" fill="url(#lightGreen)" opacity="0.6"/>
-    <circle cx="-170" cy="-220" r="8" fill="url(#lightGreen)" opacity="0.4"/>
-    
-    <!-- 右上角装饰 -->
-    <circle cx="200" cy="-200" r="12" fill="url(#lightGreen)" opacity="0.6"/>
-    <circle cx="170" cy="-220" r="8" fill="url(#lightGreen)" opacity="0.4"/>
-    
-    <!-- 底部装饰点 -->
-    <circle cx="-150" cy="200" r="10" fill="url(#lightGreen)" opacity="0.5"/>
-    <circle cx="150" cy="200" r="10" fill="url(#lightGreen)" opacity="0.5"/>
-    <circle cx="0" cy="220" r="6" fill="url(#lightGreen)" opacity="0.3"/>
+
+  <!-- 盾牌（右下角） -->
+  <g transform="translate(200,220)">
+    <!-- 盾牌外形 -->
+    <path d="M720 620
+             C 760 620, 804 634, 840 656
+             C 840 720, 814 770, 720 830
+             C 626 770, 600 720, 600 656
+             C 636 634, 680 620, 720 620 Z"
+          fill="#FFFFFF"/>
+    <!-- 笔形打勾 -->
+    <path d="M660 710 L710 760 L792 678" 
+          fill="none" stroke="#19A34A" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"/>
+    <!-- 笔尖效果 -->
+    <path d="M790 676 L802 664 L796 690 Z" fill="#19A34A"/>
   </g>
-  
-  <!-- 整体高光效果 -->
-  <ellipse cx="400" cy="300" rx="100" ry="200" fill="url(#lightGreen)" opacity="0.15" transform="rotate(-30 400 300)"/>
 </svg>
