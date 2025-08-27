@@ -5,6 +5,7 @@ struct HomeView: View {
 	@State private var selectedKnowledgeIndex = 0
 	@State private var showingLogEditor = false
 	@State private var showingSafetyAlert = false
+	@State private var showingVoiceRecordingAlert = false
 	
 	var body: some View {
 		NavigationStack {
@@ -68,6 +69,11 @@ struct HomeView: View {
 			Button("知道了") { }
 		} message: {
 			Text("道路千万条，安全第一条！平安抵达目的地才是唯一目的！")
+		}
+		.alert("功能开发中", isPresented: $showingVoiceRecordingAlert) {
+			Button("知道了") { }
+		} message: {
+			Text("语音记录功能正在开发中，敬请期待！")
 		}
 	}
 	
@@ -146,21 +152,42 @@ struct HomeView: View {
 			// Secondary Actions
 			HStack(spacing: Spacing.lg) {
 				NavigationLink(destination: ChecklistView(initialMode: .pre)) {
-					ActionCard(
-						title: "行前检查",
-						icon: "checkmark.seal",
-						color: .brandInfo500
-					) {}
+					Card(backgroundColor: Color.brandInfo500.opacity(0.12), shadow: false) {
+						HStack(spacing: Spacing.md) {
+							Image(systemName: "checkmark.seal")
+								.font(.title3)
+								.foregroundColor(.brandInfo500)
+							
+							Text("行前检查")
+								.font(.bodyLarge)
+								.foregroundColor(.brandInfo500)
+								.fontWeight(.medium)
+							
+							Spacer()
+						}
+					}
 				}
 				.buttonStyle(PlainButtonStyle())
 				
-				ActionCard(
-					title: "语音记录",
-					icon: "mic",
-					color: .brandWarning500
-				) {
-					// Handle voice recording
+				Button(action: {
+					showingVoiceRecordingAlert = true
+				}) {
+					Card(backgroundColor: Color.brandWarning500.opacity(0.12), shadow: false) {
+						HStack(spacing: Spacing.md) {
+							Image(systemName: "mic")
+								.font(.title3)
+								.foregroundColor(.brandWarning500)
+							
+							Text("语音记录")
+								.font(.bodyLarge)
+								.foregroundColor(.brandWarning500)
+								.fontWeight(.medium)
+							
+							Spacer()
+						}
+					}
 				}
+				.buttonStyle(PlainButtonStyle())
 			}
 		}
 	}
