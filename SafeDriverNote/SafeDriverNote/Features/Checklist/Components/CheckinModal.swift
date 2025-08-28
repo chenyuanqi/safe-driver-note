@@ -2,10 +2,14 @@ import SwiftUI
 
 struct CheckinModal: View {
     @StateObject private var viewModel: CheckinModalViewModel
+    @StateObject private var locationService = LocationService.shared
     @Binding var isPresented: Bool
     let mode: ChecklistViewModel.Mode
     let items: [ChecklistItem]
     let onSave: (ChecklistPunch) -> Void
+    
+    @State private var isGettingLocation = false
+    @State private var currentLocationText = "获取位置中..."
     
     init(
         isPresented: Binding<Bool>,
@@ -24,6 +28,9 @@ struct CheckinModal: View {
         VStack(spacing: Spacing.xl) {
             // 标题栏
             titleHeader
+            
+            // 位置信息
+            locationSection
             
             // 快速完成按钮
             quickCompleteButton
@@ -44,6 +51,9 @@ struct CheckinModal: View {
         .frame(maxWidth: .infinity)
         .frame(maxHeight: UIScreen.main.bounds.height * 0.8)
         .animation(.easeInOut(duration: 0.3), value: viewModel.selectedItemIds)
+        .onAppear {
+            getCurrentLocation()
+        }
     }
     
     private var titleHeader: some View {
@@ -59,6 +69,46 @@ struct CheckinModal: View {
             
             Spacer()
         }
+    }
+    
+    private var locationSection: some View {
+        HStack(spacing: Spacing.md) {
+            Image(systemName: "location.fill")
+                .font(.body)
+                .foregroundColor(.brandInfo500)
+            
+            VStack(alignment: .leading, spacing: Spacing.xs) {
+                Text("打卡位置")
+                    .font(.bodySmall)
+                    .foregroundColor(.brandSecondary500)
+                
+                if isGettingLocation {
+                    HStack(spacing: Spacing.xs) {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                        Text("获取位置中...")
+                            .font(.bodyMedium)
+                            .foregroundColor(.brandSecondary600)
+                    }
+                } else {
+                    Text(currentLocationText)
+                        .font(.bodyMedium)
+                        .foregroundColor(.brandSecondary900)
+                }
+            }
+            
+            Spacer()
+            
+            Button(action: getCurrentLocation) {
+                Image(systemName: "location.circle")
+                    .font(.title3)
+                    .foregroundColor(.brandPrimary500)
+            }
+            .disabled(isGettingLocation)
+        }
+        .padding(Spacing.md)
+        .background(Color.brandSecondary50)
+        .cornerRadius(CornerRadius.md)
     }
     
     private var quickCompleteButton: some View {
@@ -151,7 +201,8 @@ struct CheckinModal: View {
             .cornerRadius(CornerRadius.md)
             
             Button("保存打卡") {
-                viewModel.saveCheckin(mode: mode) { punch in
+                let locationNote = currentLocationText == "获取位置中..." ? nil : currentLocationText
+                viewModel.saveCheckin(mode: mode, locationNote: locationNote) { punch in
                     onSave(punch)
                     isPresented = false
                 }
@@ -176,4 +227,29 @@ struct CheckinModal: View {
         ],
         onSave: { _ in }
     )
+}
+
+// MARK: - 位置获取
+extension CheckinModal {
+    private func getCurrentLocation() {
+        guard !isGettingLocation else { return }
+        
+        isGettingLocation = true
+        currentLocationText = "获取位置中..."
+        
+        Task {
+            // 首先检查权限
+            if !locationService.hasLocationPermission {
+                locationService.requestLocationPermission()
+            }
+            
+            // 获取位置描述
+            let locationDescription = await locationService.getCurrentLocationDescription()
+            
+            await MainActor.run {
+                self.isGettingLocation = false
+                self.currentLocationText = locationDescription
+            }
+        }
+    }
 }

@@ -11,6 +11,7 @@ final class AppDI: ObservableObject {
     var knowledgeRepository: KnowledgeRepository { KnowledgeRepositorySwiftData() }
     var tagSuggestionService: TagSuggestionService { TagSuggestionService.shared }
     var knowledgeSyncService: KnowledgeSyncService { KnowledgeSyncService(repository: knowledgeRepository) }
+    var locationService: LocationService { LocationService.shared }
 
     private init() {}
 }

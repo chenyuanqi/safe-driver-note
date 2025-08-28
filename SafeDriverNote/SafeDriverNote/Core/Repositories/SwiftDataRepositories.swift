@@ -87,9 +87,9 @@ struct ChecklistRepositorySwiftData: ChecklistRepository {
     }
 
     // MARK: Punches
-    func addPunch(mode: ChecklistMode, checkedItemIds: [UUID], isQuickComplete: Bool = false, score: Int = 0) throws {
+    func addPunch(mode: ChecklistMode, checkedItemIds: [UUID], isQuickComplete: Bool = false, score: Int = 0, locationNote: String? = nil) throws {
         let ctx = try context()
-        let punch = ChecklistPunch(mode: mode, checkedItemIds: checkedItemIds, isQuickComplete: isQuickComplete, score: score)
+        let punch = ChecklistPunch(mode: mode, checkedItemIds: checkedItemIds, isQuickComplete: isQuickComplete, score: score, locationNote: locationNote)
         ctx.insert(punch)
         try ctx.save()
     }

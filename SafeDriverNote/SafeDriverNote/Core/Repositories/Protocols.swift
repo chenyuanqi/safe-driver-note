@@ -19,7 +19,7 @@ protocol ChecklistRepository {
     func deleteItem(_ item: ChecklistItem) throws
 
     // Punch records
-    func addPunch(mode: ChecklistMode, checkedItemIds: [UUID], isQuickComplete: Bool, score: Int) throws
+    func addPunch(mode: ChecklistMode, checkedItemIds: [UUID], isQuickComplete: Bool, score: Int, locationNote: String?) throws
     func fetchPunches(on date: Date, mode: ChecklistMode?) throws -> [ChecklistPunch]
     func fetchAllPunches(mode: ChecklistMode?) throws -> [ChecklistPunch]
     func deletePunch(_ punch: ChecklistPunch) throws

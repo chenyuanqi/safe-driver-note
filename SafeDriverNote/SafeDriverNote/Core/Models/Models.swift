@@ -115,14 +115,16 @@ struct ChecklistItemState: Codable, Hashable {
     var checkedItemIds: [UUID]
     var isQuickComplete: Bool // 新增：标记是否为快速完成
     var score: Int // 新增：本次打卡得分
+    var locationNote: String? // 新增：位置信息
 
-    init(id: UUID = UUID(), createdAt: Date = .now, mode: ChecklistMode, checkedItemIds: [UUID], isQuickComplete: Bool = false, score: Int = 0) {
+    init(id: UUID = UUID(), createdAt: Date = .now, mode: ChecklistMode, checkedItemIds: [UUID], isQuickComplete: Bool = false, score: Int = 0, locationNote: String? = nil) {
         self.id = id
         self.createdAt = createdAt
         self.mode = mode
         self.checkedItemIds = checkedItemIds
         self.isQuickComplete = isQuickComplete
         self.score = score
+        self.locationNote = locationNote
     }
 }
 
@@ -165,6 +167,7 @@ struct ChecklistPunchSummary: Codable {
     let checkedItemIds: [UUID]
     let isQuickComplete: Bool
     let score: Int
+    let locationNote: String? // 新增：位置信息
 }
 
 struct DailyCheckinSummary: Codable {

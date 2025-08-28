@@ -127,6 +127,20 @@ struct DailyCheckinSummaryView: View {
                         .foregroundColor(.brandSecondary500)
                         .lineLimit(2)
                 }
+                
+                // 显示位置信息
+                if let locationNote = punch.locationNote, !locationNote.isEmpty {
+                    HStack(spacing: Spacing.xs) {
+                        Image(systemName: "location.fill")
+                            .font(.caption2)
+                            .foregroundColor(.brandInfo500)
+                        
+                        Text(locationNote)
+                            .font(.caption)
+                            .foregroundColor(.brandSecondary400)
+                            .lineLimit(1)
+                    }
+                }
             }
             
             VStack {
@@ -180,7 +194,8 @@ extension DateFormatter {
                 mode: .pre,
                 checkedItemIds: [sampleItems[0].id, sampleItems[1].id],
                 isQuickComplete: true,
-                score: 100
+                score: 100,
+                locationNote: "测试位置"
             )
         ],
         postPunches: []

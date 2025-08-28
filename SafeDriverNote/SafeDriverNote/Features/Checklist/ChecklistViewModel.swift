@@ -107,12 +107,13 @@ final class ChecklistViewModel: ObservableObject {
     }
 
     // MARK: Punch
-    func punch(selectedItemIds: [UUID]) {
+    func punch(selectedItemIds: [UUID], locationNote: String? = nil) {
         try? repository.addPunch(
             mode: mode == .pre ? .pre : .post, 
             checkedItemIds: selectedItemIds,
             isQuickComplete: false,
-            score: selectedItemIds.count * 10 // 简单的计分逗辑
+            score: selectedItemIds.count * 10, // 简单的计分逻辑
+            locationNote: locationNote
         )
         reloadPunchesToday()
     }
@@ -140,7 +141,8 @@ final class ChecklistViewModel: ObservableObject {
             mode: punch.mode, 
             checkedItemIds: punch.checkedItemIds,
             isQuickComplete: punch.isQuickComplete,
-            score: punch.score
+            score: punch.score,
+            locationNote: punch.locationNote
         )
         reloadPunchesToday()
     }
@@ -170,7 +172,8 @@ final class ChecklistViewModel: ObservableObject {
                 mode: punch.mode,
                 checkedItemIds: punch.checkedItemIds,
                 isQuickComplete: punch.isQuickComplete,
-                score: punch.score
+                score: punch.score,
+                locationNote: punch.locationNote
             )
         }
         
@@ -181,7 +184,8 @@ final class ChecklistViewModel: ObservableObject {
                 mode: punch.mode,
                 checkedItemIds: punch.checkedItemIds,
                 isQuickComplete: punch.isQuickComplete,
-                score: punch.score
+                score: punch.score,
+                locationNote: punch.locationNote
             )
         }
         

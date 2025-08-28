@@ -2,6 +2,7 @@ import SwiftUI
 
 struct LogEditorView: View {
     @Environment(\.dismiss) private var dismiss
+    @StateObject private var locationService = LocationService.shared
     @State private var type: LogType = .mistake
     @State private var detail: String = ""
     @State private var locationNote: String = ""
@@ -13,6 +14,9 @@ struct LogEditorView: View {
     @State private var photos: [String] = [] // 临时用本地标识符 / 文件名字符串
     @State private var audioFileName: String? = nil
     @State private var transcript: String? = nil
+    
+    // 位置获取状态
+    @State private var isGettingLocation = false
 
     // 快速输入
     @State private var showingQuickInput: Bool = false
@@ -93,8 +97,36 @@ struct LogEditorView: View {
 
     @ViewBuilder private var locationSection: some View {
         Section("地点 / 场景") {
-            TextField("地点备注，如：商场地下车库", text: $locationNote)
+            HStack {
+                TextField("地点备注，如：商场地下车库", text: $locationNote)
+                
+                Spacer()
+                
+                Button(action: autoFillLocation) {
+                    HStack(spacing: 4) {
+                        if isGettingLocation {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                        } else {
+                            Image(systemName: "location.fill")
+                                .font(.body)
+                        }
+                        
+                        Text(isGettingLocation ? "获取中" : "自动填充")
+                            .font(.bodySmall)
+                    }
+                    .foregroundColor(.brandPrimary500)
+                }
+                .disabled(isGettingLocation)
+            }
+            
             TextField("场景描述，如：直角弯、倒车入位", text: $scene)
+        }
+        .onAppear {
+            // 新建日志时自动获取位置
+            if entry == nil && locationNote.isEmpty {
+                autoFillLocation()
+            }
         }
     }
 
@@ -295,4 +327,30 @@ private extension String {
 
 #Preview {
     LogEditorView(entry: nil) { _,_,_,_,_,_,_,_,_,_  in }
+}
+
+// MARK: - 位置自动填充
+extension LogEditorView {
+    private func autoFillLocation() {
+        guard !isGettingLocation else { return }
+        
+        isGettingLocation = true
+        
+        Task {
+            // 首先检查权限
+            if !locationService.hasLocationPermission {
+                locationService.requestLocationPermission()
+            }
+            
+            // 获取位置描述
+            let locationDescription = await locationService.getCurrentLocationDescription()
+            
+            await MainActor.run {
+                self.isGettingLocation = false
+                if locationDescription != "未知位置" {
+                    self.locationNote = locationDescription
+                }
+            }
+        }
+    }
 }

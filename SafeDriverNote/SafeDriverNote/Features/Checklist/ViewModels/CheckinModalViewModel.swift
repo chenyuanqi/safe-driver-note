@@ -22,7 +22,7 @@ final class CheckinModalViewModel: ObservableObject {
         selectedItemIds = Set(items.map { $0.id })
     }
     
-    func saveCheckin(mode: ChecklistViewModel.Mode, onComplete: @escaping (ChecklistPunch) -> Void) {
+    func saveCheckin(mode: ChecklistViewModel.Mode, locationNote: String? = nil, onComplete: @escaping (ChecklistPunch) -> Void) {
         let isQuickComplete = selectedItemIds.count == items.count
         let score = calculateScore()
         
@@ -30,7 +30,8 @@ final class CheckinModalViewModel: ObservableObject {
             mode: mode == .pre ? .pre : .post,
             checkedItemIds: Array(selectedItemIds),
             isQuickComplete: isQuickComplete,
-            score: score
+            score: score,
+            locationNote: locationNote
         )
         
         onComplete(punch)

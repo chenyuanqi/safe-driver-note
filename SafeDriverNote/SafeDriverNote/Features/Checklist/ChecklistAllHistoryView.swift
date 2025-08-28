@@ -16,6 +16,20 @@ struct ChecklistAllHistoryView: View {
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                                 Text(titles(for: punch).joined(separator: "、"))
+                                
+                                // 显示位置信息
+                                if let locationNote = punch.locationNote, !locationNote.isEmpty {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "location.fill")
+                                            .font(.caption2)
+                                            .foregroundColor(.brandInfo500)
+                                        
+                                        Text(locationNote)
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                            .lineLimit(1)
+                                    }
+                                }
                             }
                         }
                         .swipeActions {
