@@ -3,7 +3,7 @@ import SwiftData
 
 // 创建并共享一个 SwiftData ModelContainer（MVP 简化处理）
 let sharedModelContainer: ModelContainer = {
-    let schema = Schema([LogEntry.self, ChecklistRecord.self, KnowledgeCard.self, KnowledgeProgress.self, ChecklistItem.self, ChecklistPunch.self])
+    let schema = Schema([LogEntry.self, ChecklistRecord.self, KnowledgeCard.self, KnowledgeProgress.self, ChecklistItem.self, ChecklistPunch.self, DriveRoute.self])
     let config = ModelConfiguration()
     do {
         return try ModelContainer(for: schema, configurations: [config])

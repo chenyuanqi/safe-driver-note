@@ -31,3 +31,13 @@ protocol KnowledgeRepository {
     func mark(cardId: String) throws
     func upsert(cards: [KnowledgeCard]) throws
 }
+
+protocol DriveRouteRepository {
+    func startRoute(startLocation: RouteLocation?) throws -> DriveRoute
+    func getCurrentActiveRoute() throws -> DriveRoute?
+    func endRoute(routeId: UUID, endLocation: RouteLocation?) throws
+    func fetchAllRoutes() throws -> [DriveRoute]
+    func fetchRecentRoutes(limit: Int) throws -> [DriveRoute]
+    func deleteRoute(_ route: DriveRoute) throws
+    func updateRoute(_ route: DriveRoute, mutate: (DriveRoute) -> Void) throws
+}

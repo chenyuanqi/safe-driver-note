@@ -2,10 +2,12 @@ import SwiftUI
 
 struct HomeView: View {
 	@StateObject private var vm = HomeViewModel()
+	@StateObject private var driveService = AppDI.shared.driveService
 	@State private var selectedKnowledgeIndex = 0
 	@State private var showingLogEditor = false
 	@State private var showingSafetyAlert = false
 	@State private var showingVoiceRecordingAlert = false
+	@State private var showingDriveConfirmation = false
 	
 	var body: some View {
 		NavigationStack {
@@ -44,7 +46,12 @@ struct HomeView: View {
 				.background(Color.brandSecondary50)
 			}
 		}
-		.onAppear { vm.reload() }
+		.onAppear { 
+			vm.reload() 
+			Task {
+				await vm.loadRecentRoutes()
+			}
+		}
 		.sheet(isPresented: $showingLogEditor) {
 			LogEditorView(entry: nil) { type, detail, location, scene, cause, improvement, tags, photos, audioFileName, transcript in
 				// 创建新的驾驶日志
@@ -74,6 +81,17 @@ struct HomeView: View {
 			Button("知道了") { }
 		} message: {
 			Text("语音记录功能正在开发中，敬请期待！")
+		}
+		.alert("开始驾驶", isPresented: $showingDriveConfirmation) {
+			Button("取消", role: .cancel) { }
+			Button("开始") {
+				Task {
+					await driveService.startDriving()
+					await vm.loadRecentRoutes()
+				}
+			}
+		} message: {
+			Text("将记录您的驾驶路线和时间，帮助您更好地管理驾驶行为。道路千万条，安全第一条！")
 		}
 	}
 	
@@ -124,20 +142,43 @@ struct HomeView: View {
 				.fontWeight(.semibold)
 				.foregroundColor(.brandSecondary900)
 			
-			// Primary Action - Start Driving
+			// Primary Action - Start/End Driving
 			Button(action: {
-				showingSafetyAlert = true
+				if driveService.isDriving {
+					// 结束驾驶
+					Task {
+						await driveService.endDriving()
+						await vm.loadRecentRoutes()
+					}
+				} else {
+					// 开始驾驶前显示确认对话框
+					showingDriveConfirmation = true
+				}
 			}) {
-				Card(backgroundColor: .brandPrimary500, shadow: true) {
+				Card(backgroundColor: driveService.isDriving ? .brandDanger500 : .brandPrimary500, shadow: true) {
 					HStack(spacing: Spacing.lg) {
-						Image(systemName: "car")
-							.font(.title2)
-							.foregroundColor(.white)
+						if driveService.isStartingDrive || driveService.isEndingDrive {
+							ProgressView()
+								.progressViewStyle(CircularProgressViewStyle(tint: .white))
+								.scaleEffect(0.8)
+						} else {
+							Image(systemName: driveService.isDriving ? "stop.circle" : "car")
+								.font(.title2)
+								.foregroundColor(.white)
+						}
 						
-						Text("开始驾驶")
-							.font(.bodyLarge)
-							.fontWeight(.semibold)
-							.foregroundColor(.white)
+						VStack(alignment: .leading, spacing: Spacing.xs) {
+							Text(driveService.isDriving ? "结束驾驶" : "开始驾驶")
+								.font(.bodyLarge)
+								.fontWeight(.semibold)
+								.foregroundColor(.white)
+							
+							if driveService.isDriving, let route = driveService.currentRoute {
+								Text("已驾驶 \(vm.formatDrivingTime(from: route.startTime))")
+									.font(.bodySmall)
+									.foregroundColor(.white.opacity(0.8))
+							}
+						}
 						
 						Spacer()
 						
@@ -148,6 +189,7 @@ struct HomeView: View {
 				}
 			}
 			.buttonStyle(PlainButtonStyle())
+			.disabled(driveService.isStartingDrive || driveService.isEndingDrive)
 			
 			// Secondary Actions
 			HStack(spacing: Spacing.lg) {
@@ -289,14 +331,14 @@ struct HomeView: View {
 				.foregroundColor(.brandSecondary900)
 				.frame(maxWidth: .infinity, alignment: .leading)
 			
-			if vm.recentLogs.isEmpty {
+			if vm.recentActivities.isEmpty {
 				Card(backgroundColor: .white, shadow: false) {
 					VStack(spacing: Spacing.lg) {
 						Image(systemName: "car")
 							.font(.system(size: 48))
 							.foregroundColor(.brandSecondary300)
 						
-						Text("还没有驾驶记录")
+						Text("还没有活动记录")
 							.font(.bodyLarge)
 							.fontWeight(.medium)
 							.foregroundColor(.brandSecondary900)
@@ -322,8 +364,8 @@ struct HomeView: View {
 				}
 			} else {
 				VStack(spacing: Spacing.md) {
-					ForEach(vm.recentLogs.prefix(3), id: \.id) { log in
-						recentActivityItem(log)
+					ForEach(vm.recentActivities.prefix(3), id: \.id) { activity in
+						recentActivityItem(activity)
 					}
 					
 					NavigationLink(destination: LogListView()) {
@@ -375,28 +417,35 @@ struct HomeView: View {
 		}
 	}
 	
-	private func recentActivityItem(_ log: LogEntry) -> some View {
+	private func recentActivityItem(_ activity: RecentActivity) -> some View {
 		ListItemCard(
-			leadingIcon: log.type == .mistake ? "exclamationmark.triangle.fill" : "checkmark.circle.fill",
-			leadingColor: log.type == .mistake ? .brandDanger500 : .brandPrimary500
+			leadingIcon: activity.icon,
+			leadingColor: activity.color
 		) {
 			VStack(alignment: .leading, spacing: Spacing.xs) {
 				HStack {
-					Text(vm.formatDate(log.createdAt))
+					Text(vm.formatDate(activity.date))
 						.font(.caption)
 						.foregroundColor(.brandSecondary500)
 					
 					Spacer()
 					
-					Text(log.type == .mistake ? "失误" : "成功")
-						.tagStyle(log.type == .mistake ? .error : .success)
+					Text(activity.type)
+						.tagStyle(activity.tagStyle)
 				}
 				
-				Text(vm.title(for: log))
+				Text(activity.title)
 					.font(.body)
 					.fontWeight(.medium)
 					.foregroundColor(.brandSecondary900)
 					.lineLimit(2)
+				
+				if let subtitle = activity.subtitle {
+					Text(subtitle)
+						.font(.caption)
+						.foregroundColor(.brandSecondary500)
+						.lineLimit(1)
+				}
 			}
 		}
 	}
@@ -412,10 +461,24 @@ struct KnowledgeCardData: Identifiable {
 	let isLearned: Bool
 }
 
+// MARK: - Recent Activity Data
+struct RecentActivity: Identifiable {
+	let id = UUID()
+	let date: Date
+	let type: String
+	let title: String
+	let subtitle: String?
+	let icon: String
+	let color: Color
+	let tagStyle: TagStyle.TagType
+}
+
 @MainActor
 final class HomeViewModel: ObservableObject {
 	@Published private(set) var allLogs: [LogEntry] = []
 	@Published private(set) var recentLogs: [LogEntry] = []
+	@Published private(set) var recentRoutes: [DriveRoute] = []
+	@Published private(set) var recentActivities: [RecentActivity] = []
 	@Published private(set) var todayPreCount: Int = 0
 	@Published private(set) var todayPostCount: Int = 0
 	@Published private(set) var todayKnowledgeCards: [KnowledgeCardData] = []
@@ -438,6 +501,91 @@ final class HomeViewModel: ObservableObject {
 		
 		// Load today's knowledge cards
 		loadTodayKnowledgeCards()
+		
+		// Load recent activities (combine logs and routes)
+		updateRecentActivities()
+	}
+	
+	func loadRecentRoutes() async {
+		let routeService = AppDI.shared.driveService
+		self.recentRoutes = routeService.getRecentRoutes(limit: 5)
+		updateRecentActivities()
+	}
+	
+	private func updateRecentActivities() {
+		var activities: [RecentActivity] = []
+		
+		// Add log entries
+		for log in recentLogs {
+			let activity = RecentActivity(
+				date: log.createdAt,
+				type: log.type == .mistake ? "失误" : "成功",
+				title: title(for: log),
+				subtitle: log.locationNote.isEmpty ? nil : log.locationNote,
+				icon: log.type == .mistake ? "exclamationmark.triangle.fill" : "checkmark.circle.fill",
+				color: log.type == .mistake ? .brandDanger500 : .brandPrimary500,
+				tagStyle: log.type == .mistake ? .error : .success
+			)
+			activities.append(activity)
+		}
+		
+		// Add drive routes
+		for route in recentRoutes {
+			let duration = AppDI.shared.driveService.formatDuration(route.duration)
+			let distance = AppDI.shared.driveService.formatDistance(route.distance)
+			
+			let subtitle: String
+			if let dur = route.duration, let dist = route.distance {
+				subtitle = "\(duration) · \(distance)"
+			} else if route.duration != nil {
+				subtitle = duration
+			} else if route.distance != nil {
+				subtitle = distance
+			} else {
+				subtitle = "驾驶记录"
+			}
+			
+			let activity = RecentActivity(
+				date: route.endTime ?? route.startTime,
+				type: "驾驶",
+				title: formatRouteTitle(route),
+				subtitle: subtitle,
+				icon: "car.fill",
+				color: .brandPrimary500,
+				tagStyle: .primary
+			)
+			activities.append(activity)
+		}
+		
+		// Sort by date and take recent ones
+		self.recentActivities = activities
+			.sorted { $0.date > $1.date }
+			.prefix(5)
+			.map { $0 }
+	}
+	
+	private func formatRouteTitle(_ route: DriveRoute) -> String {
+		if let start = route.startLocation?.address, let end = route.endLocation?.address {
+			return "\(start) → \(end)"
+		} else if let start = route.startLocation?.address {
+			return "从 \(start) 出发"
+		} else if let end = route.endLocation?.address {
+			return "抵达 \(end)"
+		} else {
+			return "驾驶记录"
+		}
+	}
+	
+	func formatDrivingTime(from startTime: Date) -> String {
+		let elapsed = Date().timeIntervalSince(startTime)
+		let hours = Int(elapsed) / 3600
+		let minutes = (Int(elapsed) % 3600) / 60
+		
+		if hours > 0 {
+			return "\(hours)小时\(minutes)分钟"
+		} else {
+			return "\(minutes)分钟"
+		}
 	}
 	
 	private func loadTodayKnowledgeCards() {

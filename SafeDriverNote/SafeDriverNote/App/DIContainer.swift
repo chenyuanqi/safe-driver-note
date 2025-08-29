@@ -9,9 +9,11 @@ final class AppDI: ObservableObject {
     var logRepository: LogRepository { LogRepositorySwiftData() }
     var checklistRepository: ChecklistRepository { ChecklistRepositorySwiftData() }
     var knowledgeRepository: KnowledgeRepository { KnowledgeRepositorySwiftData() }
+    var driveRouteRepository: DriveRouteRepository { DriveRouteRepositorySwiftData() }
     var tagSuggestionService: TagSuggestionService { TagSuggestionService.shared }
     var knowledgeSyncService: KnowledgeSyncService { KnowledgeSyncService(repository: knowledgeRepository) }
     var locationService: LocationService { LocationService.shared }
+    var driveService: DriveService { DriveService.shared }
 
     private init() {}
 }

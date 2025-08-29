@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import CoreLocation
 
 @MainActor
 private func context() throws -> ModelContext {
@@ -157,6 +158,74 @@ struct KnowledgeRepositorySwiftData: KnowledgeRepository {
                 ctx.insert(src)
             }
         }
+        try ctx.save()
+    }
+}
+
+// MARK: - DriveRouteRepository Implementation
+@MainActor
+struct DriveRouteRepositorySwiftData: DriveRouteRepository {
+    func startRoute(startLocation: RouteLocation?) throws -> DriveRoute {
+        let ctx = try context()
+        let route = DriveRoute(
+            startLocation: startLocation,
+            status: .active
+        )
+        ctx.insert(route)
+        try ctx.save()
+        return route
+    }
+    
+    func getCurrentActiveRoute() throws -> DriveRoute? {
+        let ctx = try context()
+        let routes = try ctx.fetch(FetchDescriptor<DriveRoute>())
+        return routes.first { $0.status == .active }
+    }
+    
+    func endRoute(routeId: UUID, endLocation: RouteLocation?) throws {
+        let ctx = try context()
+        let routes = try ctx.fetch(FetchDescriptor<DriveRoute>())
+        guard let route = routes.first(where: { $0.id == routeId }) else {
+            throw RepositoryError.notFound
+        }
+        
+        route.endTime = Date()
+        route.endLocation = endLocation
+        route.status = .completed
+        
+        // 计算驾驶时长
+        route.duration = route.endTime!.timeIntervalSince(route.startTime)
+        
+        // 如果有起始和结束位置，计算距离
+        if let start = route.startLocation, let end = endLocation {
+            let startCLLocation = CLLocation(latitude: start.latitude, longitude: start.longitude)
+            let endCLLocation = CLLocation(latitude: end.latitude, longitude: end.longitude)
+            route.distance = startCLLocation.distance(from: endCLLocation)
+        }
+        
+        try ctx.save()
+    }
+    
+    func fetchAllRoutes() throws -> [DriveRoute] {
+        let ctx = try context()
+        let routes = try ctx.fetch(FetchDescriptor<DriveRoute>())
+        return routes.sorted { $0.startTime > $1.startTime }
+    }
+    
+    func fetchRecentRoutes(limit: Int) throws -> [DriveRoute] {
+        let routes = try fetchAllRoutes()
+        return Array(routes.prefix(limit))
+    }
+    
+    func deleteRoute(_ route: DriveRoute) throws {
+        let ctx = try context()
+        ctx.delete(route)
+        try ctx.save()
+    }
+    
+    func updateRoute(_ route: DriveRoute, mutate: (DriveRoute) -> Void) throws {
+        let ctx = try context()
+        mutate(route)
         try ctx.save()
     }
 }

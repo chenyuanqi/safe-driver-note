@@ -197,3 +197,64 @@ struct DailyCheckinSummary: Codable {
         }
     }
 }
+
+// MARK: - Drive Route
+@Model final class DriveRoute: Identifiable {
+    @Attribute(.unique) var id: UUID
+    var startTime: Date
+    var endTime: Date?
+    var startLocation: RouteLocation?
+    var endLocation: RouteLocation?
+    var distance: Double? // 距离（米）
+    var duration: TimeInterval? // 驾驶时长（秒）
+    var status: DriveStatus
+    var notes: String?
+    
+    init(id: UUID = UUID(), startTime: Date = .now, endTime: Date? = nil, startLocation: RouteLocation? = nil, endLocation: RouteLocation? = nil, distance: Double? = nil, duration: TimeInterval? = nil, status: DriveStatus = .active, notes: String? = nil) {
+        self.id = id
+        self.startTime = startTime
+        self.endTime = endTime
+        self.startLocation = startLocation
+        self.endLocation = endLocation
+        self.distance = distance
+        self.duration = duration
+        self.status = status
+        self.notes = notes
+    }
+}
+
+struct RouteLocation: Codable {
+    let latitude: Double
+    let longitude: Double
+    let address: String
+    let timestamp: Date
+    
+    init(latitude: Double, longitude: Double, address: String, timestamp: Date = .now) {
+        self.latitude = latitude
+        self.longitude = longitude
+        self.address = address
+        self.timestamp = timestamp
+    }
+}
+
+enum DriveStatus: String, Codable, CaseIterable {
+    case active = "active"     // 正在驾驶
+    case completed = "completed" // 已完成
+    case cancelled = "cancelled" // 已取消
+    
+    var displayName: String {
+        switch self {
+        case .active: return "驾驶中"
+        case .completed: return "已完成"
+        case .cancelled: return "已取消"
+        }
+    }
+    
+    var color: String {
+        switch self {
+        case .active: return "brandWarning500"
+        case .completed: return "brandPrimary500"
+        case .cancelled: return "brandSecondary400"
+        }
+    }
+}
