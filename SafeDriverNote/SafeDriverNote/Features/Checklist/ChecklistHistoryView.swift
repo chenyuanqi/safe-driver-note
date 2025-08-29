@@ -137,7 +137,7 @@ struct ChecklistHistoryView: View {
     private func recentRecordRow(punch: ChecklistPunch) -> some View {
         HStack(spacing: Spacing.md) {
             VStack(alignment: .leading, spacing: Spacing.xs) {
-                Text(punch.createdAt, format: Date.FormatStyle(date: .abbreviated, time: .shortened).locale(Locale(identifier: "zh_CN")))
+                Text(formatDateTime(punch.createdAt))
                     .font(.bodySmall)
                     .foregroundColor(.brandSecondary500)
                 
@@ -206,6 +206,13 @@ struct ChecklistHistoryView: View {
     private func delete(_ p: ChecklistPunch) {
         try? di.checklistRepository.deletePunch(p)
         reload()
+    }
+    
+    private func formatDateTime(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "zh_CN")
+        formatter.dateFormat = "yyyy 年 M 月 d日 HH:mm"
+        return formatter.string(from: date)
     }
 }
 
