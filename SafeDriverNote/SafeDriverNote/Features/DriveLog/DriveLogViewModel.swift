@@ -4,7 +4,9 @@ import SwiftUI
 @MainActor
 final class DriveLogViewModel: ObservableObject {
     @Published private(set) var logs: [LogEntry] = []
+    @Published private(set) var routes: [DriveRoute] = []
     @Published var filter: LogType? = nil { didSet { applyFilter() } }
+    @Published var showDriveRoutes: Bool = false { didSet { applyFilter() } }
     @Published var editing: LogEntry? = nil
     @Published private(set) var tagOptions: [String] = []
     @Published var selectedTags: Set<String> = [] { didSet { applyFilter() } }
@@ -12,15 +14,24 @@ final class DriveLogViewModel: ObservableObject {
     @Published private(set) var fullTagCount: Int = 0
 
     private let repository: LogRepository
+    private let routeRepository: DriveRouteRepository
     private var all: [LogEntry] = []
+    private var allRoutes: [DriveRoute] = []
 
-    init(repository: LogRepository) {
+    init(repository: LogRepository, routeRepository: DriveRouteRepository? = nil) {
         self.repository = repository
+        self.routeRepository = routeRepository ?? AppDI.shared.driveRouteRepository
         load()
     }
 
     func load() {
-        if let list = try? repository.fetchAll() { self.all = list; applyFilter() }
+        if let list = try? repository.fetchAll() { 
+            self.all = list
+        }
+        if let routeList = try? routeRepository.fetchAllRoutes() {
+            self.allRoutes = routeList
+        }
+        applyFilter()
     }
 
     func create(type: LogType,
@@ -88,11 +99,19 @@ final class DriveLogViewModel: ObservableObject {
     }
 
     private func applyFilter() {
-    var tmp = all
-    if let f = filter { tmp = tmp.filter { $0.type == f } }
-    if !selectedTags.isEmpty { tmp = tmp.filter { Set($0.tags).isSuperset(of: selectedTags) } }
-    logs = tmp
-    recomputeTags() // 更新候选
+        if showDriveRoutes {
+            // 显示驾驶记录
+            routes = allRoutes.sorted { $0.startTime > $1.startTime }
+            logs = []
+        } else {
+            // 显示日志记录
+            var tmp = all
+            if let f = filter { tmp = tmp.filter { $0.type == f } }
+            if !selectedTags.isEmpty { tmp = tmp.filter { Set($0.tags).isSuperset(of: selectedTags) } }
+            logs = tmp.sorted { $0.createdAt > $1.createdAt }
+            routes = []
+        }
+        recomputeTags() // 更新候选
     }
 
     // MARK: - Helpers

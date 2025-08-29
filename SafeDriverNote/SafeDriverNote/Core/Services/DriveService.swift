@@ -10,9 +10,11 @@ class DriveService: ObservableObject {
     @Published var currentRoute: DriveRoute?
     @Published var isStartingDrive: Bool = false
     @Published var isEndingDrive: Bool = false
+    @Published var currentDrivingTime: String = ""
     
     private let repository: DriveRouteRepository
     private let locationService: LocationService
+    private var drivingTimer: Timer?
     
     @MainActor
     init(repository: DriveRouteRepository? = nil,
@@ -27,6 +29,9 @@ class DriveService: ObservableObject {
         if let activeRoute = try? repository.getCurrentActiveRoute() {
             self.currentRoute = activeRoute
             self.isDriving = true
+            
+            // 如果有正在进行的路线，启动定时器
+            startDrivingTimer()
         }
     }
     
@@ -57,6 +62,9 @@ class DriveService: ObservableObject {
             self.currentRoute = route
             self.isDriving = true
             
+            // 启动定时器
+            startDrivingTimer()
+            
         } catch {
             print("开始驾驶失败: \(error)")
             // 即使位置获取失败，也允许开始驾驶
@@ -64,6 +72,9 @@ class DriveService: ObservableObject {
                 let route = try repository.startRoute(startLocation: nil)
                 self.currentRoute = route
                 self.isDriving = true
+                
+                // 启动定时器
+                startDrivingTimer()
             } catch {
                 print("创建路线失败: \(error)")
             }
@@ -97,6 +108,9 @@ class DriveService: ObservableObject {
             self.currentRoute = nil
             self.isDriving = false
             
+            // 停止定时器
+            stopDrivingTimer()
+            
         } catch {
             print("结束驾驶失败: \(error)")
             // 即使位置获取失败，也允许结束驾驶
@@ -104,6 +118,9 @@ class DriveService: ObservableObject {
                 try repository.endRoute(routeId: routeId, endLocation: nil)
                 self.currentRoute = nil
                 self.isDriving = false
+                
+                // 停止定时器
+                stopDrivingTimer()
             } catch {
                 print("结束路线失败: \(error)")
             }
@@ -122,6 +139,9 @@ class DriveService: ObservableObject {
             
             self.currentRoute = nil
             self.isDriving = false
+            
+            // 停止定时器
+            stopDrivingTimer()
             
         } catch {
             print("取消驾驶失败: \(error)")
@@ -155,6 +175,53 @@ class DriveService: ObservableObject {
             return String(format: "%.1f公里", distance / 1000)
         } else {
             return String(format: "%.0f米", distance)
+        }
+    }
+    
+    // MARK: - Timer Management
+    
+    /// 启动驾驶计时器
+    private func startDrivingTimer() {
+        stopDrivingTimer() // 确保旧的定时器停止
+        
+        // 立即更新一次
+        updateDrivingTime()
+        
+        // 启动定时器，每60秒更新一次
+        drivingTimer = Timer.scheduledTimer(withTimeInterval: 60.0, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                self?.updateDrivingTime()
+            }
+        }
+    }
+    
+    /// 停止驾驶计时器
+    private func stopDrivingTimer() {
+        drivingTimer?.invalidate()
+        drivingTimer = nil
+        currentDrivingTime = ""
+    }
+    
+    /// 更新驾驶时间显示
+    private func updateDrivingTime() {
+        guard let route = currentRoute else {
+            currentDrivingTime = ""
+            return
+        }
+        
+        let elapsed = Date().timeIntervalSince(route.startTime)
+        currentDrivingTime = formatDrivingTime(elapsed)
+    }
+    
+    /// 格式化驾驶时间
+    private func formatDrivingTime(_ timeInterval: TimeInterval) -> String {
+        let hours = Int(timeInterval) / 3600
+        let minutes = (Int(timeInterval) % 3600) / 60
+        
+        if hours > 0 {
+            return "\(hours)小时\(minutes)分钟"
+        } else {
+            return "\(minutes)分钟"
         }
     }
 }

@@ -10,7 +10,8 @@ struct LogListView: View {
     private enum Segment: String, CaseIterable {
         case all = "全部"
         case mistake = "失误"
-        case success = "成功经验"
+        case success = "成功"
+        case driveRoute = "行驶记录"
     }
 
     var body: some View {
@@ -38,10 +39,18 @@ struct LogListView: View {
                     
                     // Content
                     Group {
-                        if filteredLogs.isEmpty {
-                            emptyStateView
+                        if selectedSegment == .driveRoute {
+                            if filteredRoutes.isEmpty {
+                                driveRouteEmptyStateView
+                            } else {
+                                driveRouteListView
+                            }
                         } else {
-                            logListView
+                            if filteredLogs.isEmpty {
+                                emptyStateView
+                            } else {
+                                logListView
+                            }
                         }
                     }
                 }
@@ -107,30 +116,36 @@ struct LogListView: View {
             HStack(spacing: Spacing.lg) {
                 SearchField(
                     text: $searchText,
-                    placeholder: "搜索场景/地点/标签"
+                    placeholder: selectedSegment == .driveRoute ? "搜索起点/终点地址" : "搜索场景/地点/标签"
                 )
                 
-                Menu {
-                    Button("最新优先") { /* Handle sort */ }
-                    Button("最早优先") { /* Handle sort */ }
-                    Button("按类型排序") { /* Handle sort */ }
-                } label: {
-                    Image(systemName: "line.3.horizontal.decrease.circle")
-                        .font(.bodyLarge)
-                        .foregroundColor(.brandSecondary700)
-                        .frame(width: 40, height: 40)
-                        .background(
-                            RoundedRectangle(cornerRadius: CornerRadius.md, style: .continuous)
-                                .fill(Color.brandSecondary100)
-                        )
+                // 只在非行驶记录时显示排序菜单
+                if selectedSegment != .driveRoute {
+                    Menu {
+                        Button("最新优先") { /* Handle sort */ }
+                        Button("最早优先") { /* Handle sort */ }
+                        Button("按类型排序") { /* Handle sort */ }
+                    } label: {
+                        Image(systemName: "line.3.horizontal.decrease.circle")
+                            .font(.bodyLarge)
+                            .foregroundColor(.brandSecondary700)
+                            .frame(width: 40, height: 40)
+                            .background(
+                                RoundedRectangle(cornerRadius: CornerRadius.md, style: .continuous)
+                                    .fill(Color.brandSecondary100)
+                            )
+                    }
                 }
             }
             
-            // Statistics Row
-            monthlyStatsRow
-            
-            // Tag Filter Row
-            tagFilterRow
+            // 只在非行驶记录时显示统计数据
+            if selectedSegment != .driveRoute {
+                // Statistics Row
+                monthlyStatsRow
+                
+                // Tag Filter Row
+                tagFilterRow
+            }
         }
         .background(Color.white)
     }
@@ -217,6 +232,18 @@ struct LogListView: View {
         .padding(Spacing.pagePadding)
     }
     
+    private var driveRouteEmptyStateView: some View {
+        EmptyStateCard(
+            icon: "car.side",
+            title: "还没有行驶记录",
+            subtitle: "从首页开始你的驾驶之旅",
+            actionTitle: "去首页"
+        ) {
+            // 这里可以添加跳转到首页的逻辑
+        }
+        .padding(Spacing.pagePadding)
+    }
+    
     private var logListView: some View {
         ScrollView {
             LazyVStack(spacing: Spacing.lg) {
@@ -246,15 +273,47 @@ struct LogListView: View {
         }
     }
     
+    private var driveRouteListView: some View {
+        ScrollView {
+            LazyVStack(spacing: Spacing.lg) {
+                ForEach(groupedRoutesByDay, id: \.key) { section in
+                    VStack(alignment: .leading, spacing: Spacing.lg) {
+                        // Date Header
+                        Text(section.key)
+                            .font(.bodyLarge)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.brandSecondary900)
+                            .padding(.horizontal, Spacing.pagePadding)
+                        
+                        // Route Cards
+                        VStack(spacing: Spacing.md) {
+                            ForEach(section.items, id: \.id) { route in
+                                driveRouteCard(for: route)
+                                    .padding(.horizontal, Spacing.pagePadding)
+                            }
+                        }
+                    }
+                }
+            }
+            .padding(.vertical, Spacing.lg)
+        }
+    }
+    
     // MARK: - Helper Methods
     private func updateFilter(for segment: Segment) {
         switch segment {
         case .all:
             vm.filter = nil
+            vm.showDriveRoutes = false
         case .mistake:
             vm.filter = .mistake
+            vm.showDriveRoutes = false
         case .success:
             vm.filter = .success
+            vm.showDriveRoutes = false
+        case .driveRoute:
+            vm.filter = nil
+            vm.showDriveRoutes = true
         }
     }
     
@@ -348,6 +407,138 @@ struct LogListView: View {
         if !log.detail.isEmpty { return String(log.detail.prefix(50)) }
         return "记录"
     }
+    
+    private func driveRouteCard(for route: DriveRoute) -> some View {
+        NavigationLink(destination: DriveRouteDetailView(route: route).environmentObject(AppDI.shared)) {
+            Card(backgroundColor: .white, shadow: true) {
+                VStack(alignment: .leading, spacing: Spacing.lg) {
+                    // Header Row
+                    HStack {
+                        HStack(spacing: Spacing.md) {
+                            Image(systemName: "car.fill")
+                                .font(.body)
+                                .foregroundColor(.brandPrimary500)
+                            
+                            Text(Self.zhCNFormatter.string(from: route.startTime))
+                                .font(.bodySmall)
+                                .foregroundColor(.brandSecondary500)
+                        }
+                        
+                        Spacer()
+                        
+                        Text(route.status.displayName)
+                            .tagStyle(statusTagType(for: route))
+                    }
+                    
+                    // Content
+                    VStack(alignment: .leading, spacing: Spacing.md) {
+                        Text(routeTitle(for: route))
+                            .font(.bodyLarge)
+                            .fontWeight(.medium)
+                            .foregroundColor(.brandSecondary900)
+                            .multilineTextAlignment(.leading)
+                        
+                        // 行驶信息
+                        HStack(spacing: Spacing.xl) {
+                            if let duration = route.duration {
+                                HStack(spacing: Spacing.sm) {
+                                    Image(systemName: "clock")
+                                        .font(.bodySmall)
+                                        .foregroundColor(.brandSecondary500)
+                                    
+                                    Text(formatDuration(duration))
+                                        .font(.bodySmall)
+                                        .foregroundColor(.brandSecondary700)
+                                }
+                            }
+                            
+                            if let distance = route.distance {
+                                HStack(spacing: Spacing.sm) {
+                                    Image(systemName: "road.lanes")
+                                        .font(.bodySmall)
+                                        .foregroundColor(.brandSecondary500)
+                                    
+                                    Text(formatDistance(distance))
+                                        .font(.bodySmall)
+                                        .foregroundColor(.brandSecondary700)
+                                }
+                            }
+                        }
+                        
+                        // 位置信息
+                        if route.startLocation != nil || route.endLocation != nil {
+                            VStack(alignment: .leading, spacing: Spacing.xs) {
+                                if let startAddr = route.startLocation?.address {
+                                    HStack(spacing: Spacing.sm) {
+                                        Image(systemName: "location.circle")
+                                            .font(.bodySmall)
+                                            .foregroundColor(.brandPrimary500)
+                                        Text("出发: \(startAddr)")
+                                            .font(.bodySmall)
+                                            .foregroundColor(.brandSecondary700)
+                                    }
+                                }
+                                
+                                if let endAddr = route.endLocation?.address {
+                                    HStack(spacing: Spacing.sm) {
+                                        Image(systemName: "location.circle.fill")
+                                            .font(.bodySmall)
+                                            .foregroundColor(.brandDanger500)
+                                        Text("到达: \(endAddr)")
+                                            .font(.bodySmall)
+                                            .foregroundColor(.brandSecondary700)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+    
+    private func routeTitle(for route: DriveRoute) -> String {
+        if let start = route.startLocation?.address, let end = route.endLocation?.address {
+            return "\(start) → \(end)"
+        } else if let start = route.startLocation?.address {
+            return "从 \(start) 出发"
+        } else if let end = route.endLocation?.address {
+            return "抵达 \(end)"
+        } else {
+            return "行驶记录"
+        }
+    }
+    
+    private func statusTagType(for route: DriveRoute) -> TagStyle.TagType {
+        switch route.status {
+        case .active:
+            return .warning
+        case .completed:
+            return .success
+        case .cancelled:
+            return .error
+        }
+    }
+    
+    private func formatDuration(_ duration: TimeInterval) -> String {
+        let hours = Int(duration) / 3600
+        let minutes = (Int(duration) % 3600) / 60
+        
+        if hours > 0 {
+            return "\(hours)小时\(minutes)分钟"
+        } else {
+            return "\(minutes)分钟"
+        }
+    }
+    
+    private func formatDistance(_ distance: Double) -> String {
+        if distance >= 1000 {
+            return String(format: "%.1f公里", distance / 1000)
+        } else {
+            return String(format: "%.0f米", distance)
+        }
+    }
 
     private var filteredLogs: [LogEntry] {
         let q = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
@@ -356,6 +547,17 @@ struct LogListView: View {
             let hay = [e.detail, e.locationNote, e.scene, e.tags.joined(separator: " ")]
                 .joined(separator: " ")
                 .lowercased()
+            return hay.contains(q)
+        }
+    }
+    
+    private var filteredRoutes: [DriveRoute] {
+        let q = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if q.isEmpty { return vm.routes }
+        return vm.routes.filter { route in
+            let startAddr = route.startLocation?.address ?? ""
+            let endAddr = route.endLocation?.address ?? ""
+            let hay = [startAddr, endAddr].joined(separator: " ").lowercased()
             return hay.contains(q)
         }
     }
@@ -369,6 +571,17 @@ struct LogListView: View {
         return groups
             .map { ($0.key, $0.value.sorted { $0.createdAt > $1.createdAt }) }
             .sorted { lhs, rhs in lhs.items.first?.createdAt ?? .distantPast > rhs.items.first?.createdAt ?? .distantPast }
+    }
+    
+    private var groupedRoutesByDay: [(key: String, items: [DriveRoute])] {
+        let df = DateFormatter()
+        df.locale = Locale(identifier: "zh_CN")
+        df.calendar = Calendar(identifier: .gregorian)
+        df.dateFormat = "yyyy年M月d日 EEEE"
+        let groups = Dictionary(grouping: filteredRoutes) { route in df.string(from: route.startTime) }
+        return groups
+            .map { ($0.key, $0.value.sorted { $0.startTime > $1.startTime }) }
+            .sorted { lhs, rhs in lhs.items.first?.startTime ?? .distantPast > rhs.items.first?.startTime ?? .distantPast }
     }
 
     private var list: some View {
@@ -432,14 +645,6 @@ struct LogListView: View {
                 TextField("搜索场景/地点/标签", text: $searchText)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
-                Menu {
-                    Button("全部") { vm.filter = nil; selectedSegment = .all }
-                    Button("失误") { vm.filter = .mistake; selectedSegment = .mistake }
-                    Button("成功") { vm.filter = .success; selectedSegment = .success }
-                } label: {
-                    Image(systemName: "line.3.horizontal.decrease.circle")
-                        .imageScale(.large)
-                }
             }
             .padding(12)
             .background(Color(.secondarySystemBackground))
@@ -450,22 +655,6 @@ struct LogListView: View {
                 statCard(title: "本月失误", value: "\(monthMistakes)", color: .brandDanger500)
                 statCard(title: "改进率", value: improvementRateFormatted, color: .brandPrimary500)
             }
-
-            Picker("类型", selection: Binding(get: {
-                selectedSegment
-            }, set: { seg in
-                selectedSegment = seg
-                switch seg {
-                case .all: vm.filter = nil
-                case .mistake: vm.filter = .mistake
-                case .success: vm.filter = .success
-                }
-            })) {
-                Text("全部").tag(Segment.all)
-                Text("失误").tag(Segment.mistake)
-                Text("成功").tag(Segment.success)
-            }
-            .pickerStyle(.segmented)
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {

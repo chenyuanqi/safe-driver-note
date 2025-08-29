@@ -40,14 +40,25 @@ struct SafeDriverNoteApp: App {
 struct RootTabView: View {
     var body: some View {
         TabView {
-            HomeView()
-                .tabItem { Label("首页", systemImage: "house") }
-            LogListView()
-                .tabItem { Label("日志", systemImage: "list.bullet") }
-            ChecklistView()
-                .tabItem { Label("清单", systemImage: "checklist") }
-            KnowledgeTodayView()
-                .tabItem { Label("知识", systemImage: "book") }
+            NavigationStack {
+                HomeView()
+            }
+            .tabItem { Label("首页", systemImage: "house") }
+            
+            NavigationStack {
+                LogListView()
+            }
+            .tabItem { Label("日志", systemImage: "list.bullet") }
+            
+            NavigationStack {
+                ChecklistView()
+            }
+            .tabItem { Label("清单", systemImage: "checklist") }
+            
+            NavigationStack {
+                KnowledgeTodayView()
+            }
+            .tabItem { Label("知识", systemImage: "book") }
         }
     }
 }

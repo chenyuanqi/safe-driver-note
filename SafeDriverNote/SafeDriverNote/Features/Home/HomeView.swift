@@ -174,7 +174,7 @@ struct HomeView: View {
 								.foregroundColor(.white)
 							
 							if driveService.isDriving, let route = driveService.currentRoute {
-								Text("已驾驶 \(vm.formatDrivingTime(from: route.startTime))")
+								Text("已驾驶 \(driveService.currentDrivingTime)")
 									.font(.bodySmall)
 									.foregroundColor(.white.opacity(0.8))
 							}
@@ -418,6 +418,30 @@ struct HomeView: View {
 	}
 	
 	private func recentActivityItem(_ activity: RecentActivity) -> some View {
+		Group {
+			if activity.activityType == .logEntry, let logId = activity.relatedId {
+				// 日志记录点击跳转到日志列表
+				NavigationLink(destination: LogListView()) {
+					activityItemContent(activity)
+				}
+				.buttonStyle(PlainButtonStyle())
+			} else if activity.activityType == .driveRoute, let routeId = activity.relatedId {
+				// 驾驶记录点击跳转到详情页
+				if let route = vm.recentRoutes.first(where: { $0.id == routeId }) {
+					NavigationLink(destination: DriveRouteDetailView(route: route).environmentObject(AppDI.shared)) {
+						activityItemContent(activity)
+					}
+					.buttonStyle(PlainButtonStyle())
+				} else {
+					activityItemContent(activity)
+				}
+			} else {
+				activityItemContent(activity)
+			}
+		}
+	}
+	
+	private func activityItemContent(_ activity: RecentActivity) -> some View {
 		ListItemCard(
 			leadingIcon: activity.icon,
 			leadingColor: activity.color
@@ -471,6 +495,13 @@ struct RecentActivity: Identifiable {
 	let icon: String
 	let color: Color
 	let tagStyle: TagStyle.TagType
+	let activityType: ActivityType
+	let relatedId: UUID?
+	
+	enum ActivityType {
+		case logEntry
+		case driveRoute
+	}
 }
 
 @MainActor
@@ -524,7 +555,9 @@ final class HomeViewModel: ObservableObject {
 				subtitle: log.locationNote.isEmpty ? nil : log.locationNote,
 				icon: log.type == .mistake ? "exclamationmark.triangle.fill" : "checkmark.circle.fill",
 				color: log.type == .mistake ? .brandDanger500 : .brandPrimary500,
-				tagStyle: log.type == .mistake ? .error : .success
+				tagStyle: log.type == .mistake ? .error : .success,
+				activityType: .logEntry,
+				relatedId: log.id
 			)
 			activities.append(activity)
 		}
@@ -552,7 +585,9 @@ final class HomeViewModel: ObservableObject {
 				subtitle: subtitle,
 				icon: "car.fill",
 				color: .brandPrimary500,
-				tagStyle: .primary
+				tagStyle: .primary,
+				activityType: .driveRoute,
+				relatedId: route.id
 			)
 			activities.append(activity)
 		}
