@@ -14,6 +14,7 @@ struct KnowledgeTodayView: View {
     @State private var fireworkColor = Color.brandPrimary500
     @State private var cardOpacity: Double = 1.0
     @State private var isDismissing = false
+    @State private var showDrivingRules = true
 
     var body: some View {
         NavigationStack {
@@ -23,7 +24,13 @@ struct KnowledgeTodayView: View {
                     .ignoresSafeArea()
                 
                 Group {
-                    if let card = vm.today.first {
+                    if showDrivingRules {
+                        DrivingRulesView(onDismiss: {
+                            withAnimation {
+                                showDrivingRules = false
+                            }
+                        })
+                    } else if let card = vm.today.first {
                         GeometryReader { geo in
                             let cardHeight = geo.size.height * 0.7
                             VStack(spacing: Spacing.xl) {
