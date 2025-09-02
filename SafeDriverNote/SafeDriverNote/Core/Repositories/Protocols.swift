@@ -35,7 +35,7 @@ protocol KnowledgeRepository {
 protocol DriveRouteRepository {
     func startRoute(startLocation: RouteLocation?) throws -> DriveRoute
     func getCurrentActiveRoute() throws -> DriveRoute?
-    func endRoute(routeId: UUID, endLocation: RouteLocation?) throws
+    func endRoute(routeId: UUID, endLocation: RouteLocation?, waypoints: [RouteLocation]?) throws
     func fetchAllRoutes() throws -> [DriveRoute]
     func fetchRecentRoutes(limit: Int) throws -> [DriveRoute]
     func deleteRoute(_ route: DriveRoute) throws

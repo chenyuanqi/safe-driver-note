@@ -42,17 +42,17 @@ struct DriveRouteDetailView: View {
                 HStack {
                     Image(systemName: "car.fill")
                         .font(.title2)
-                        .foregroundColor(.brandPrimary500)
+                        .foregroundColor(Color.brandPrimary500)
                     
                     VStack(alignment: .leading, spacing: Spacing.xs) {
                         Text("驾驶路线")
                             .font(.headline)
                             .fontWeight(.semibold)
-                            .foregroundColor(.brandSecondary900)
+                            .foregroundColor(Color.brandSecondary900)
                         
                         Text(routeTitle)
                             .font(.body)
-                            .foregroundColor(.brandSecondary700)
+                            .foregroundColor(Color.brandSecondary700)
                             .lineLimit(2)
                     }
                     
@@ -64,23 +64,23 @@ struct DriveRouteDetailView: View {
                         VStack(spacing: Spacing.xs) {
                             Text("驾驶时长")
                                 .font(.caption)
-                                .foregroundColor(.brandSecondary500)
+                                .foregroundColor(Color.brandSecondary500)
                             
                             Text(formatDuration(duration))
                                 .font(.bodyLarge)
                                 .fontWeight(.semibold)
-                                .foregroundColor(.brandSecondary900)
+                                .foregroundColor(Color.brandSecondary900)
                         }
                         
                         VStack(spacing: Spacing.xs) {
                             Text("行驶距离")
                                 .font(.caption)
-                                .foregroundColor(.brandSecondary500)
+                                .foregroundColor(Color.brandSecondary500)
                             
                             Text(formatDistance(distance))
                                 .font(.bodyLarge)
                                 .fontWeight(.semibold)
-                                .foregroundColor(.brandSecondary900)
+                                .foregroundColor(Color.brandSecondary900)
                         }
                         
                         Spacer()
@@ -97,12 +97,12 @@ struct DriveRouteDetailView: View {
                 HStack {
                     Image(systemName: "clock")
                         .font(.title3)
-                        .foregroundColor(.brandInfo500)
+                        .foregroundColor(Color.brandInfo500)
                     
                     Text("时间信息")
                         .font(.headline)
                         .fontWeight(.semibold)
-                        .foregroundColor(.brandSecondary900)
+                        .foregroundColor(Color.brandSecondary900)
                     
                     Spacer()
                 }
@@ -112,7 +112,7 @@ struct DriveRouteDetailView: View {
                         icon: "play.circle",
                         title: "开始时间",
                         value: formatDateTime(route.startTime),
-                        color: .brandPrimary500
+                        color: Color.brandPrimary500
                     )
                     
                     if let endTime = route.endTime {
@@ -120,7 +120,7 @@ struct DriveRouteDetailView: View {
                             icon: "stop.circle",
                             title: "结束时间",
                             value: formatDateTime(endTime),
-                            color: .brandDanger500
+                            color: Color.brandDanger500
                         )
                     }
                 }
@@ -135,12 +135,12 @@ struct DriveRouteDetailView: View {
                 HStack {
                     Image(systemName: "location")
                         .font(.title3)
-                        .foregroundColor(.brandWarning500)
+                        .foregroundColor(Color.brandWarning500)
                     
                     Text("位置信息")
                         .font(.headline)
                         .fontWeight(.semibold)
-                        .foregroundColor(.brandSecondary900)
+                        .foregroundColor(Color.brandSecondary900)
                     
                     Spacer()
                 }
@@ -152,7 +152,7 @@ struct DriveRouteDetailView: View {
                             title: "出发地点",
                             address: startLocation.address,
                             coordinates: "(\(String(format: "%.6f", startLocation.latitude)), \(String(format: "%.6f", startLocation.longitude)))",
-                            color: .brandPrimary500
+                            color: Color.brandPrimary500
                         )
                     }
                     
@@ -162,7 +162,7 @@ struct DriveRouteDetailView: View {
                             title: "到达地点",
                             address: endLocation.address,
                             coordinates: "(\(String(format: "%.6f", endLocation.latitude)), \(String(format: "%.6f", endLocation.longitude)))",
-                            color: .brandDanger500
+                            color: Color.brandDanger500
                         )
                     }
                 }
@@ -177,12 +177,12 @@ struct DriveRouteDetailView: View {
                 HStack {
                     Image(systemName: "map")
                         .font(.title3)
-                        .foregroundColor(.brandPrimary500)
+                        .foregroundColor(Color.brandPrimary500)
                     
                     Text("路线地图")
                         .font(.headline)
                         .fontWeight(.semibold)
-                        .foregroundColor(.brandSecondary900)
+                        .foregroundColor(Color.brandSecondary900)
                     
                     Spacer()
                 }
@@ -202,12 +202,12 @@ struct DriveRouteDetailView: View {
                 HStack {
                     Image(systemName: "info.circle")
                         .font(.title3)
-                        .foregroundColor(.brandSecondary500)
+                        .foregroundColor(Color.brandSecondary500)
                     
                     Text("状态信息")
                         .font(.headline)
                         .fontWeight(.semibold)
-                        .foregroundColor(.brandSecondary900)
+                        .foregroundColor(Color.brandSecondary900)
                     
                     Spacer()
                 }
@@ -215,7 +215,7 @@ struct DriveRouteDetailView: View {
                 HStack {
                     Text("记录状态")
                         .font(.body)
-                        .foregroundColor(.brandSecondary700)
+                        .foregroundColor(Color.brandSecondary700)
                     
                     Spacer()
                     
@@ -227,11 +227,11 @@ struct DriveRouteDetailView: View {
                     VStack(alignment: .leading, spacing: Spacing.xs) {
                         Text("备注")
                             .font(.body)
-                            .foregroundColor(.brandSecondary700)
+                            .foregroundColor(Color.brandSecondary700)
                         
                         Text(notes)
                             .font(.body)
-                            .foregroundColor(.brandSecondary900)
+                            .foregroundColor(Color.brandSecondary900)
                             .padding(.top, Spacing.xs)
                     }
                 }
@@ -250,11 +250,11 @@ struct DriveRouteDetailView: View {
             VStack(alignment: .leading, spacing: Spacing.xs) {
                 Text(title)
                     .font(.caption)
-                    .foregroundColor(.brandSecondary500)
+                    .foregroundColor(Color.brandSecondary500)
                 
                 Text(value)
                     .font(.body)
-                    .foregroundColor(.brandSecondary900)
+                    .foregroundColor(Color.brandSecondary900)
             }
             
             Spacer()
@@ -271,15 +271,15 @@ struct DriveRouteDetailView: View {
             VStack(alignment: .leading, spacing: Spacing.xs) {
                 Text(title)
                     .font(.caption)
-                    .foregroundColor(.brandSecondary500)
+                    .foregroundColor(Color.brandSecondary500)
                 
                 Text(address)
                     .font(.body)
-                    .foregroundColor(.brandSecondary900)
+                    .foregroundColor(Color.brandSecondary900)
                 
                 Text(coordinates)
                     .font(.caption)
-                    .foregroundColor(.brandSecondary400)
+                    .foregroundColor(Color.brandSecondary400)
             }
             
             Spacer()
@@ -343,65 +343,37 @@ struct DriveRouteDetailView: View {
 struct RouteMapView: View {
     let route: DriveRoute
     @State private var cameraPosition: MapCameraPosition = .automatic
+    @State private var selectedItem: MapFeature?
     
     var body: some View {
-        Map(position: $cameraPosition) {
-            // 添加起始位置标记
-            if let startLocation = route.startLocation {
-                Annotation("出发地", coordinate: CLLocationCoordinate2D(latitude: startLocation.latitude, longitude: startLocation.longitude)) {
-                    VStack(spacing: Spacing.xs) {
-                        Image(systemName: "location.circle.fill")
-                            .font(.title2)
-                            .foregroundColor(.brandPrimary500)
-                            .background(Circle().fill(.white).shadow(radius: 2))
-                        
-                        Text("出发")
-                            .font(.caption2)
-                            .fontWeight(.medium)
-                            .foregroundColor(.brandSecondary900)
-                            .padding(.horizontal, Spacing.xs)
-                            .padding(.vertical, 2)
-                            .background(
-                                RoundedRectangle(cornerRadius: 4, style: .continuous)
-                                    .fill(.white)
-                                    .shadow(radius: 1)
-                            )
-                    }
+        Map(position: $cameraPosition, selection: $selectedItem) {
+            Group {
+                // 添加起始位置标记
+                if let startLocation = route.startLocation {
+                    Marker("出发地", coordinate: CLLocationCoordinate2D(latitude: startLocation.latitude, longitude: startLocation.longitude))
+                        .tint(Color.brandPrimary500)
                 }
-            }
-            
-            // 添加结束位置标记
-            if let endLocation = route.endLocation {
-                Annotation("到达地", coordinate: CLLocationCoordinate2D(latitude: endLocation.latitude, longitude: endLocation.longitude)) {
-                    VStack(spacing: Spacing.xs) {
-                        Image(systemName: "location.circle.fill")
-                            .font(.title2)
-                            .foregroundColor(.brandDanger500)
-                            .background(Circle().fill(.white).shadow(radius: 2))
-                        
-                        Text("到达")
-                            .font(.caption2)
-                            .fontWeight(.medium)
-                            .foregroundColor(.brandSecondary900)
-                            .padding(.horizontal, Spacing.xs)
-                            .padding(.vertical, 2)
-                            .background(
-                                RoundedRectangle(cornerRadius: 4, style: .continuous)
-                                    .fill(.white)
-                                    .shadow(radius: 1)
-                            )
-                    }
+                
+                // 添加结束位置标记
+                if let endLocation = route.endLocation {
+                    Marker("到达地", coordinate: CLLocationCoordinate2D(latitude: endLocation.latitude, longitude: endLocation.longitude))
+                        .tint(Color.brandDanger500)
                 }
-            }
-            
-            // 添加路线（如果有起始和结束位置）
-            if let startLocation = route.startLocation,
-               let endLocation = route.endLocation {
-                MapPolyline(coordinates: [
-                    CLLocationCoordinate2D(latitude: startLocation.latitude, longitude: startLocation.longitude),
-                    CLLocationCoordinate2D(latitude: endLocation.latitude, longitude: endLocation.longitude)
-                ])
-                .stroke(Color.brandPrimary500, style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
+                
+                // 添加路线
+                if let waypoints = route.waypoints, !waypoints.isEmpty {
+                    // 如果有路径点，绘制路线
+                    let coordinates = createCoordinatesWithWaypoints(waypoints)
+                    MapPolyline(coordinates: coordinates)
+                        .stroke(Color.brandPrimary500, style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
+                } else if let startLocation = route.startLocation, let endLocation = route.endLocation {
+                    // 如果只有起终点，绘制直线
+                    MapPolyline(coordinates: [
+                        CLLocationCoordinate2D(latitude: startLocation.latitude, longitude: startLocation.longitude),
+                        CLLocationCoordinate2D(latitude: endLocation.latitude, longitude: endLocation.longitude)
+                    ])
+                    .stroke(Color.brandPrimary500, style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round))
+                }
             }
         }
         .mapStyle(.standard)
@@ -410,43 +382,92 @@ struct RouteMapView: View {
         }
     }
     
-    private func updateCameraPosition() {
-        if let startLocation = route.startLocation,
-           let endLocation = route.endLocation {
-            // 计算两点之间的中心点和区域
-            let centerLat = (startLocation.latitude + endLocation.latitude) / 2
-            let centerLon = (startLocation.longitude + endLocation.longitude) / 2
-            
-            let latDelta = abs(startLocation.latitude - endLocation.latitude)
-            let lonDelta = abs(startLocation.longitude - endLocation.longitude)
-            
-            // 添加一些边距以便更好地显示整个路线
-            let span = MKCoordinateSpan(
-                latitudeDelta: max(latDelta * 1.5, 0.01), // 最小值避免过度放大
-                longitudeDelta: max(lonDelta * 1.5, 0.01)
-            )
-            
-            let region = MKCoordinateRegion(
-                center: CLLocationCoordinate2D(latitude: centerLat, longitude: centerLon),
-                span: span
-            )
-            
-            cameraPosition = .region(region)
-        } else if let startLocation = route.startLocation {
-            // 只有起始位置
-            let region = MKCoordinateRegion(
-                center: CLLocationCoordinate2D(latitude: startLocation.latitude, longitude: startLocation.longitude),
-                span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
-            )
-            cameraPosition = .region(region)
-        } else if let endLocation = route.endLocation {
-            // 只有结束位置
-            let region = MKCoordinateRegion(
-                center: CLLocationCoordinate2D(latitude: endLocation.latitude, longitude: endLocation.longitude),
-                span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
-            )
-            cameraPosition = .region(region)
+    // 创建包含路径点的坐标数组
+    private func createCoordinatesWithWaypoints(_ waypoints: [RouteLocation]) -> [CLLocationCoordinate2D] {
+        var coordinates: [CLLocationCoordinate2D] = []
+        
+        // 添加起始位置（如果有）
+        if let startLocation = route.startLocation {
+            coordinates.append(CLLocationCoordinate2D(
+                latitude: startLocation.latitude,
+                longitude: startLocation.longitude
+            ))
         }
+        
+        // 添加所有中间路径点
+        for waypoint in waypoints {
+            coordinates.append(CLLocationCoordinate2D(
+                latitude: waypoint.latitude,
+                longitude: waypoint.longitude
+            ))
+        }
+        
+        // 添加结束位置（如果有）
+        if let endLocation = route.endLocation {
+            coordinates.append(CLLocationCoordinate2D(
+                latitude: endLocation.latitude,
+                longitude: endLocation.longitude
+            ))
+        }
+        
+        return coordinates
+    }
+    
+    private func updateCameraPosition() {
+        var coordinates: [CLLocationCoordinate2D] = []
+        
+        // 收集所有坐标点
+        if let startLocation = route.startLocation {
+            coordinates.append(CLLocationCoordinate2D(latitude: startLocation.latitude, longitude: startLocation.longitude))
+        }
+        
+        if let waypoints = route.waypoints, !waypoints.isEmpty {
+            for waypoint in waypoints {
+                coordinates.append(CLLocationCoordinate2D(latitude: waypoint.latitude, longitude: waypoint.longitude))
+            }
+        }
+        
+        if let endLocation = route.endLocation {
+            coordinates.append(CLLocationCoordinate2D(latitude: endLocation.latitude, longitude: endLocation.longitude))
+        }
+        
+        // 如果没有坐标点，则返回
+        if coordinates.isEmpty {
+            return
+        }
+        
+        // 计算所有点的边界
+        var minLat = coordinates[0].latitude
+        var maxLat = coordinates[0].latitude
+        var minLon = coordinates[0].longitude
+        var maxLon = coordinates[0].longitude
+        
+        for coordinate in coordinates {
+            minLat = min(minLat, coordinate.latitude)
+            maxLat = max(maxLat, coordinate.latitude)
+            minLon = min(minLon, coordinate.longitude)
+            maxLon = max(maxLon, coordinate.longitude)
+        }
+        
+        // 计算中心点和距离
+        let centerLat = (minLat + maxLat) / 2
+        let centerLon = (minLon + maxLon) / 2
+        
+        let latDelta = max(maxLat - minLat, 0.01) // 最小值避免过度放大
+        let lonDelta = max(maxLon - minLon, 0.01)
+        
+        // 添加一些边距以便更好地显示整个路线
+        let span = MKCoordinateSpan(
+            latitudeDelta: latDelta * 1.2,
+            longitudeDelta: lonDelta * 1.2
+        )
+        
+        let region = MKCoordinateRegion(
+            center: CLLocationCoordinate2D(latitude: centerLat, longitude: centerLon),
+            span: span
+        )
+        
+        cameraPosition = .region(region)
     }
 }
 
@@ -466,6 +487,23 @@ struct RouteMapView: View {
                     longitude: 116.3883,
                     address: "北京市西城区"
                 ),
+                waypoints: [
+                    RouteLocation(
+                        latitude: 39.9100,
+                        longitude: 116.4000,
+                        address: "北京市东城区中间点"
+                    ),
+                    RouteLocation(
+                        latitude: 39.9150,
+                        longitude: 116.3950,
+                        address: "北京市东城区中间点二"
+                    ),
+                    RouteLocation(
+                        latitude: 39.9200,
+                        longitude: 116.3900,
+                        address: "北京市西城区中间点"
+                    )
+                ],
                 distance: 15000,
                 duration: 3600,
                 status: .completed

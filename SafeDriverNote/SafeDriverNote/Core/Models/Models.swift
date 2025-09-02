@@ -205,17 +205,19 @@ struct DailyCheckinSummary: Codable {
     var endTime: Date?
     var startLocation: RouteLocation?
     var endLocation: RouteLocation?
+    var waypoints: [RouteLocation]? // 添加中间路径点
     var distance: Double? // 距离（米）
     var duration: TimeInterval? // 驾驶时长（秒）
     var status: DriveStatus
     var notes: String?
     
-    init(id: UUID = UUID(), startTime: Date = .now, endTime: Date? = nil, startLocation: RouteLocation? = nil, endLocation: RouteLocation? = nil, distance: Double? = nil, duration: TimeInterval? = nil, status: DriveStatus = .active, notes: String? = nil) {
+    init(id: UUID = UUID(), startTime: Date = .now, endTime: Date? = nil, startLocation: RouteLocation? = nil, endLocation: RouteLocation? = nil, waypoints: [RouteLocation]? = nil, distance: Double? = nil, duration: TimeInterval? = nil, status: DriveStatus = .active, notes: String? = nil) {
         self.id = id
         self.startTime = startTime
         self.endTime = endTime
         self.startLocation = startLocation
         self.endLocation = endLocation
+        self.waypoints = waypoints
         self.distance = distance
         self.duration = duration
         self.status = status

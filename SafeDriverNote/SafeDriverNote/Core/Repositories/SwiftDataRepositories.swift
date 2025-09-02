@@ -182,7 +182,7 @@ struct DriveRouteRepositorySwiftData: DriveRouteRepository {
         return routes.first { $0.status == .active }
     }
     
-    func endRoute(routeId: UUID, endLocation: RouteLocation?) throws {
+    func endRoute(routeId: UUID, endLocation: RouteLocation?, waypoints: [RouteLocation]? = nil) throws {
         let ctx = try context()
         let routes = try ctx.fetch(FetchDescriptor<DriveRoute>())
         guard let route = routes.first(where: { $0.id == routeId }) else {
@@ -193,11 +193,44 @@ struct DriveRouteRepositorySwiftData: DriveRouteRepository {
         route.endLocation = endLocation
         route.status = .completed
         
+        // 如果提供了路径点，则更新路径点
+        if let waypoints = waypoints, !waypoints.isEmpty {
+            route.waypoints = waypoints
+        }
+        
         // 计算驾驶时长
         route.duration = route.endTime!.timeIntervalSince(route.startTime)
         
-        // 如果有起始和结束位置，计算距离
-        if let start = route.startLocation, let end = endLocation {
+        // 计算距离
+        if let waypoints = route.waypoints, !waypoints.isEmpty {
+            // 如果有路径点，计算所有路径点之间的总距离
+            var totalDistance: Double = 0
+            
+            // 如果有起始点，先计算起始点到第一个路径点的距离
+            if let start = route.startLocation {
+                let startCLLocation = CLLocation(latitude: start.latitude, longitude: start.longitude)
+                let firstWaypointCLLocation = CLLocation(latitude: waypoints[0].latitude, longitude: waypoints[0].longitude)
+                totalDistance += startCLLocation.distance(from: firstWaypointCLLocation)
+            }
+            
+            // 计算路径点之间的距离
+            for i in 0..<waypoints.count-1 {
+                let location1 = CLLocation(latitude: waypoints[i].latitude, longitude: waypoints[i].longitude)
+                let location2 = CLLocation(latitude: waypoints[i+1].latitude, longitude: waypoints[i+1].longitude)
+                totalDistance += location1.distance(from: location2)
+            }
+            
+            // 如果有终点，再计算最后一个路径点到终点的距离
+            if let end = endLocation {
+                let lastWaypointCLLocation = CLLocation(latitude: waypoints.last!.latitude, longitude: waypoints.last!.longitude)
+                let endCLLocation = CLLocation(latitude: end.latitude, longitude: end.longitude)
+                totalDistance += lastWaypointCLLocation.distance(from: endCLLocation)
+            }
+            
+            route.distance = totalDistance
+            
+        } else if let start = route.startLocation, let end = endLocation {
+            // 如果没有路径点，但有起始和结束位置，则计算直线距离
             let startCLLocation = CLLocation(latitude: start.latitude, longitude: start.longitude)
             let endCLLocation = CLLocation(latitude: end.latitude, longitude: end.longitude)
             route.distance = startCLLocation.distance(from: endCLLocation)
