@@ -106,7 +106,7 @@ class DriveService: ObservableObject {
                 )
             }
             
-            // 结束路线记录
+            // 结束路线记录，并传递收集到的路径点
             try repository.endRoute(routeId: routeId, endLocation: endLocation, waypoints: currentWaypoints)
             
             // 更新状态

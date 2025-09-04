@@ -8,6 +8,8 @@ struct HomeView: View {
 	@State private var showingSafetyAlert = false
 	@State private var showingVoiceRecordingAlert = false
 	@State private var showingDriveConfirmation = false
+	@State private var currentLocationDescription = "获取位置中..."
+	@State private var isLocationUpdating = false
 	
 	var body: some View {
 		NavigationStack {
@@ -50,6 +52,8 @@ struct HomeView: View {
 			vm.reload() 
 			Task {
 				await vm.loadRecentRoutes()
+				// 获取当前位置
+				await updateCurrentLocation()
 			}
 		}
 		.sheet(isPresented: $showingLogEditor) {
@@ -177,6 +181,11 @@ struct HomeView: View {
 								Text("已驾驶 \(driveService.currentDrivingTime)")
 									.font(.bodySmall)
 									.foregroundColor(.white.opacity(0.8))
+							} else if !driveService.isDriving {
+								// 显示当前位置
+								Text(currentLocationDescription)
+									.font(.bodySmall)
+									.foregroundColor(.white.opacity(0.8))
 							}
 						}
 						
@@ -190,6 +199,12 @@ struct HomeView: View {
 			}
 			.buttonStyle(PlainButtonStyle())
 			.disabled(driveService.isStartingDrive || driveService.isEndingDrive)
+			.onTapGesture {
+				// 点击时更新位置
+				Task {
+					await updateCurrentLocation()
+				}
+			}
 			
 			// Secondary Actions
 			HStack(spacing: Spacing.lg) {
@@ -230,6 +245,31 @@ struct HomeView: View {
 					}
 				}
 				.buttonStyle(PlainButtonStyle())
+			}
+		}
+	}
+	
+	// MARK: - Update Current Location
+	private func updateCurrentLocation() async {
+		// 如果正在更新位置，则直接返回
+		guard !isLocationUpdating else { return }
+		
+		isLocationUpdating = true
+		defer { isLocationUpdating = false }
+		
+		// 更新位置显示为加载状态
+		currentLocationDescription = "获取位置中..."
+		
+		do {
+			// 获取位置服务实例
+			let locationService = LocationService.shared
+			let locationDescription = await locationService.getCurrentLocationDescription()
+			await MainActor.run {
+				self.currentLocationDescription = locationDescription
+			}
+		} catch {
+			await MainActor.run {
+				self.currentLocationDescription = "未知位置"
 			}
 		}
 	}
@@ -299,7 +339,7 @@ struct HomeView: View {
 				// Product Recommendation
 				ListItemCard(
 					leadingIcon: "cart",
-					leadingColor: .brandWarning500,
+					leadingColor: .brandPrimary500,
 					trailingContent: {
 						AnyView(
 							Image(systemName: "chevron.right")
@@ -309,11 +349,11 @@ struct HomeView: View {
 					}
 				) {
 					VStack(alignment: .leading, spacing: Spacing.xs) {
-						Text("盲区小圆镜推荐")
+						Text("小圆镜")
 							.font(.body)
 							.fontWeight(.medium)
 							.foregroundColor(.brandSecondary900)
-						Text("提升行车安全")
+						Text("消除盲区必备")
 							.font(.bodySmall)
 							.foregroundColor(.brandSecondary500)
 					}
@@ -329,60 +369,33 @@ struct HomeView: View {
 				.font(.title3)
 				.fontWeight(.semibold)
 				.foregroundColor(.brandSecondary900)
-				.frame(maxWidth: .infinity, alignment: .leading)
 			
-			if vm.recentActivities.isEmpty {
-				Card(backgroundColor: .white, shadow: false) {
-					VStack(spacing: Spacing.lg) {
-						Image(systemName: "car")
-							.font(.system(size: 48))
-							.foregroundColor(.brandSecondary300)
-						
-						Text("还没有活动记录")
-							.font(.bodyLarge)
-							.fontWeight(.medium)
-							.foregroundColor(.brandSecondary900)
-						
-						Text("开始记录你的安全驾驶之旅")
-							.font(.body)
-							.foregroundColor(.brandSecondary500)
-						
-						Button("开始记录") {
-							showingLogEditor = true
-						}
-						.font(.body)
-						.fontWeight(.medium)
-						.foregroundColor(.white)
-						.padding(.horizontal, Spacing.xl)
-						.padding(.vertical, Spacing.lg)
-						.background(Color.brandPrimary500)
-						.clipShape(RoundedRectangle(cornerRadius: CornerRadius.lg, style: .continuous))
-						.buttonStyle(PlainButtonStyle())
-					}
-					.frame(maxWidth: .infinity)
-					.padding(.vertical, Spacing.xxxl)
+			VStack(spacing: Spacing.md) {
+				ForEach(vm.recentActivities.prefix(3), id: \.id) { activity in
+					recentActivityItem(activity)
 				}
-			} else {
-				VStack(spacing: Spacing.md) {
-					ForEach(vm.recentActivities.prefix(3), id: \.id) { activity in
-						recentActivityItem(activity)
+				
+				if vm.recentActivities.count > 3 {
+					NavigationLink(destination: LogListView().environmentObject(AppDI.shared)) {
+						HStack {
+							Text("查看更多")
+								.font(.bodySmall)
+								.foregroundColor(.brandSecondary500)
+							
+							Spacer()
+							
+							Image(systemName: "chevron.right")
+								.font(.bodySmall)
+								.foregroundColor(.brandSecondary300)
+						}
+						.padding(.vertical, Spacing.sm)
 					}
-					
-					NavigationLink(destination: LogListView()) {
-						Text("查看更多")
-							.font(.body)
-							.fontWeight(.medium)
-							.foregroundColor(.brandPrimary500)
-							.frame(maxWidth: .infinity)
-							.padding(.vertical, Spacing.lg)
-					}
-					.buttonStyle(PlainButtonStyle())
 				}
 			}
 		}
 	}
 	
-	// MARK: - Helper Views
+	// MARK: - Knowledge Card View
 	private func knowledgeCardView(_ card: KnowledgeCardData) -> some View {
 		Card(backgroundColor: .white, shadow: true) {
 			VStack(alignment: .leading, spacing: Spacing.lg) {
