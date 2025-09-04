@@ -2,6 +2,10 @@ import Foundation
 import CoreLocation
 import Combine
 
+extension Notification.Name {
+    static let driveServiceError = Notification.Name("driveServiceError")
+}
+
 @MainActor
 class DriveService: ObservableObject {
     static let shared = DriveService()
@@ -94,9 +98,9 @@ class DriveService: ObservableObject {
         defer { isEndingDrive = false }
         
         do {
-            // 获取当前位置
-            let currentLocation = try await locationService.getCurrentLocation()
-            let address = await locationService.getCurrentLocationDescription()
+            // 获取当前位置（设置5秒超时）
+            let currentLocation = try await locationService.getCurrentLocation(timeout: 5.0)
+            let address = await locationService.getCurrentLocationDescription(timeout: 5.0)
             
             let endLocation = currentLocation.map { location in
                 RouteLocation(
@@ -118,6 +122,22 @@ class DriveService: ObservableObject {
             
         } catch {
             print("结束驾驶失败: \(error)")
+            // 检查是否是超时错误
+            var errorMessage = "结束驾驶时遇到问题"
+            if let locationError = error as? LocationError {
+                switch locationError {
+                case .timeout:
+                    errorMessage = "位置获取超时，请检查GPS信号"
+                case .permissionDenied:
+                    errorMessage = "位置权限被拒绝，请在设置中允许位置权限"
+                case .locationUnavailable:
+                    errorMessage = "无法获取位置信息，请检查GPS设置"
+                }
+            }
+            
+            // 发送通知显示错误信息
+            NotificationCenter.default.post(name: .driveServiceError, object: errorMessage)
+            
             // 即使位置获取失败，也允许结束驾驶
             do {
                 try repository.endRoute(routeId: routeId, endLocation: nil, waypoints: currentWaypoints)
@@ -128,6 +148,7 @@ class DriveService: ObservableObject {
                 stopDrivingTimer()
             } catch {
                 print("结束路线失败: \(error)")
+                NotificationCenter.default.post(name: .driveServiceError, object: "结束驾驶失败: \(error.localizedDescription)")
             }
         }
     }

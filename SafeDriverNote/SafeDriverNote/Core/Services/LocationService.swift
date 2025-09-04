@@ -15,6 +15,7 @@ class LocationService: NSObject, ObservableObject {
     @Published var isLocationUpdating = false
     
     private var locationContinuation: CheckedContinuation<CLLocation?, Error>?
+    private var locationTimeoutTask: Task<Void, Error>?
     
     override init() {
         super.init()
@@ -45,27 +46,56 @@ class LocationService: NSObject, ObservableObject {
     }
     
     /// 获取当前位置（一次性）
-    func getCurrentLocation() async throws -> CLLocation? {
+    func getCurrentLocation(timeout: TimeInterval = 10.0) async throws -> CLLocation? {
         guard authorizationStatus == .authorizedWhenInUse || authorizationStatus == .authorizedAlways else {
             throw LocationError.permissionDenied
         }
         
+        // 取消之前的超时任务
+        locationTimeoutTask?.cancel()
+        
         return try await withCheckedThrowingContinuation { continuation in
             self.locationContinuation = continuation
             self.isLocationUpdating = true
+            
+            // 设置超时机制
+            self.locationTimeoutTask = Task {
+                try await Task.sleep(nanoseconds: UInt64(timeout * 1_000_000_000))
+                if !Task.isCancelled {
+                    // 超时处理
+                    await MainActor.run {
+                        if let continuation = self.locationContinuation {
+                            continuation.resume(throwing: LocationError.timeout)
+                            self.locationContinuation = nil
+                            self.isLocationUpdating = false
+                        }
+                    }
+                }
+            }
+            
             locationManager.requestLocation()
         }
     }
     
     /// 获取当前位置的地址描述
-    func getCurrentLocationDescription() async -> String {
+    func getCurrentLocationDescription(timeout: TimeInterval = 10.0) async -> String {
         do {
-            guard let location = try await getCurrentLocation() else {
+            guard let location = try await getCurrentLocation(timeout: timeout) else {
                 return "未知位置"
             }
             
             return await getLocationDescription(from: location)
         } catch {
+            if let locationError = error as? LocationError {
+                switch locationError {
+                case .timeout:
+                    return "位置获取超时"
+                case .permissionDenied:
+                    return "位置权限被拒绝"
+                case .locationUnavailable:
+                    return "无法获取位置信息"
+                }
+            }
             return "未知位置"
         }
     }
@@ -129,6 +159,9 @@ class LocationService: NSObject, ObservableObject {
 extension LocationService: CLLocationManagerDelegate {
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         isLocationUpdating = false
+        // 取消超时任务
+        locationTimeoutTask?.cancel()
+        locationTimeoutTask = nil
         
         guard let location = locations.first else {
             locationContinuation?.resume(returning: nil)
@@ -143,6 +176,10 @@ extension LocationService: CLLocationManagerDelegate {
     
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
         isLocationUpdating = false
+        // 取消超时任务
+        locationTimeoutTask?.cancel()
+        locationTimeoutTask = nil
+        
         locationContinuation?.resume(throwing: error)
         locationContinuation = nil
     }

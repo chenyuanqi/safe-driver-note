@@ -10,6 +10,8 @@ struct HomeView: View {
 	@State private var showingDriveConfirmation = false
 	@State private var currentLocationDescription = "获取位置中..."
 	@State private var isLocationUpdating = false
+	@State private var showingDriveError = false
+	@State private var driveErrorMessage = ""
 	
 	var body: some View {
 		NavigationStack {
@@ -55,6 +57,22 @@ struct HomeView: View {
 				// 获取当前位置
 				await updateCurrentLocation()
 			}
+			
+			// 监听驾驶服务错误通知
+			NotificationCenter.default.addObserver(
+				forName: .driveServiceError,
+				object: nil,
+				queue: .main
+			) { notification in
+				if let errorMessage = notification.object as? String {
+					driveErrorMessage = errorMessage
+					showingDriveError = true
+				}
+			}
+		}
+		.onDisappear {
+			// 移除通知观察者
+			NotificationCenter.default.removeObserver(self)
 		}
 		.sheet(isPresented: $showingLogEditor) {
 			LogEditorView(entry: nil) { type, detail, location, scene, cause, improvement, tags, photos, audioFileName, transcript in
@@ -96,6 +114,11 @@ struct HomeView: View {
 			}
 		} message: {
 			Text("将记录您的驾驶路线和时间，帮助您更好地管理驾驶行为。道路千万条，安全第一条！")
+		}
+		.alert("驾驶服务错误", isPresented: $showingDriveError) {
+			Button("知道了") { }
+		} message: {
+			Text(driveErrorMessage)
 		}
 	}
 	
@@ -176,9 +199,14 @@ struct HomeView: View {
 								.font(.bodyLarge)
 								.fontWeight(.semibold)
 								.foregroundColor(.white)
-							
+								
 							if driveService.isDriving, let route = driveService.currentRoute {
 								Text("已驾驶 \(driveService.currentDrivingTime)")
+									.font(.bodySmall)
+									.foregroundColor(.white.opacity(0.8))
+								
+								// 显示当前位置
+								Text(currentLocationDescription)
 									.font(.bodySmall)
 									.foregroundColor(.white.opacity(0.8))
 							} else if !driveService.isDriving {
