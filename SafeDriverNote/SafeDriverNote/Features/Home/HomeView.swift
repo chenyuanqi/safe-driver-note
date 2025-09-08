@@ -12,6 +12,11 @@ struct HomeView: View {
 	@State private var isLocationUpdating = false
 	@State private var showingDriveError = false
 	@State private var driveErrorMessage = ""
+	@State private var manualLocationTries = 0
+	@State private var manualEndTries = 0
+	@State private var showingManualLocationSheet = false
+	@State private var manualAddress: String = ""
+	@State private var manualStartOrEnd: String = "start" // "start" or "end"
 	
 	var body: some View {
 		NavigationStack {
@@ -108,8 +113,24 @@ struct HomeView: View {
 			Button("取消", role: .cancel) { }
 			Button("开始") {
 				Task {
-					await driveService.startDriving()
-					await vm.loadRecentRoutes()
+					// 尝试定位，失败累计计数
+					let locationService = LocationService.shared
+					do {
+						try _ = await locationService.getCurrentLocation(timeout: 5.0)
+						await driveService.startDriving()
+						await vm.loadRecentRoutes()
+						manualLocationTries = 0
+					} catch {
+						manualLocationTries += 1
+						if manualLocationTries >= 3 {
+							manualStartOrEnd = "start"
+							showingManualLocationSheet = true
+						} else {
+							// 仍然允许开始驾驶，但无起点
+							await driveService.startDriving()
+							await vm.loadRecentRoutes()
+						}
+					}
 				}
 			}
 		} message: {
@@ -119,6 +140,60 @@ struct HomeView: View {
 			Button("知道了") { }
 		} message: {
 			Text(driveErrorMessage)
+		}
+	}
+	.sheet(isPresented: $showingManualLocationSheet) {
+		NavigationStack {
+			VStack(alignment: .leading, spacing: Spacing.lg) {
+				Text(manualStartOrEnd == "start" ? "输入起点位置" : "输入终点位置")
+					.font(.title3)
+					.fontWeight(.semibold)
+				TextField("如：上海市人民广场或经纬度 31.23,121.47", text: $manualAddress)
+					.textInputAutocapitalization(.never)
+					.autocorrectionDisabled(true)
+				Spacer()
+			}
+			.padding()
+			.toolbar {
+				ToolbarItem(placement: .cancellationAction) {
+					Button("取消") { showingManualLocationSheet = false }
+				}
+				ToolbarItem(placement: .confirmationAction) {
+					Button("保存") {
+						Task { @MainActor in
+							let ls = LocationService.shared
+							// 支持“lat,lon”直接输入
+							let trimmed = manualAddress.trimmingCharacters(in: .whitespacesAndNewlines)
+							var location: CLLocation?
+							if let comma = trimmed.firstIndex(of: ",") {
+								let latStr = String(trimmed[..<comma]).trimmingCharacters(in: .whitespaces)
+								let lonStr = String(trimmed[trimmed.index(after: comma)...]).trimmingCharacters(in: .whitespaces)
+								if let lat = Double(latStr), let lon = Double(lonStr) {
+									location = CLLocation(latitude: lat, longitude: lon)
+								}
+							}
+							if location == nil {
+								do { location = try await ls.geocodeAddress(trimmed) } catch { location = nil }
+							}
+							if let loc = location {
+								let address = await ls.getLocationDescription(from: loc)
+								let routeLoc = RouteLocation(latitude: loc.coordinate.latitude, longitude: loc.coordinate.longitude, address: address)
+								if manualStartOrEnd == "start" {
+									await driveService.startDriving(with: routeLoc)
+									await vm.loadRecentRoutes()
+								} else {
+									await driveService.endDriving(with: routeLoc)
+									manualEndTries = 0
+									await vm.loadRecentRoutes()
+								}
+							}
+							manualAddress = ""
+							showingManualLocationSheet = false
+						}
+					}
+					.disabled(manualAddress.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+				}
+			}
 		}
 	}
 	
@@ -172,10 +247,24 @@ struct HomeView: View {
 			// Primary Action - Start/End Driving
 			Button(action: {
 				if driveService.isDriving {
-					// 结束驾驶
+					// 结束驾驶（带三次失败后手动输入）
 					Task {
-						await driveService.endDriving()
-						await vm.loadRecentRoutes()
+						let locationService = LocationService.shared
+						do {
+							try _ = await locationService.getCurrentLocation(timeout: 5.0)
+							await driveService.endDriving()
+							await vm.loadRecentRoutes()
+							manualEndTries = 0
+						} catch {
+							manualEndTries += 1
+							if manualEndTries >= 3 {
+								manualStartOrEnd = "end"
+								showingManualLocationSheet = true
+							} else {
+								await driveService.endDriving()
+								await vm.loadRecentRoutes()
+							}
+						}
 					}
 				} else {
 					// 开始驾驶前显示确认对话框

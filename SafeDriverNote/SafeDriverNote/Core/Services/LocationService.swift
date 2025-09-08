@@ -8,6 +8,8 @@ class LocationService: NSObject, ObservableObject {
     
     private let locationManager = CLLocationManager()
     private let geocoder = CLGeocoder()
+    private let locationUpdateSubject = PassthroughSubject<CLLocation, Never>()
+    var locationPublisher: AnyPublisher<CLLocation, Never> { locationUpdateSubject.eraseToAnyPublisher() }
     
     @Published var authorizationStatus: CLAuthorizationStatus = .notDetermined
     @Published var currentLocation: CLLocation?
@@ -26,6 +28,7 @@ class LocationService: NSObject, ObservableObject {
         locationManager.delegate = self
         locationManager.desiredAccuracy = kCLLocationAccuracyBest
         locationManager.distanceFilter = 10.0 // 10米更新一次
+        locationManager.pausesLocationUpdatesAutomatically = true
         authorizationStatus = locationManager.authorizationStatus
     }
     
@@ -42,6 +45,36 @@ class LocationService: NSObject, ObservableObject {
             break
         @unknown default:
             break
+        }
+    }
+    
+    /// 后台连续定位：开始持续更新
+    func startContinuousUpdates(desiredAccuracy: CLLocationAccuracy = kCLLocationAccuracyBest, distanceFilter: CLLocationDistance = 30.0) {
+        locationManager.desiredAccuracy = desiredAccuracy
+        locationManager.distanceFilter = distanceFilter
+        // 开启后台定位并禁用系统自动暂停
+        locationManager.allowsBackgroundLocationUpdates = true
+        locationManager.pausesLocationUpdatesAutomatically = false
+        if #available(iOS 11.0, *) {
+            locationManager.showsBackgroundLocationIndicator = true
+        }
+        locationManager.startUpdatingLocation()
+    }
+    
+    /// 后台连续定位：停止持续更新
+    func stopContinuousUpdates() {
+        locationManager.stopUpdatingLocation()
+        if #available(iOS 11.0, *) {
+            locationManager.showsBackgroundLocationIndicator = false
+        }
+        locationManager.allowsBackgroundLocationUpdates = false
+        locationManager.pausesLocationUpdatesAutomatically = true
+    }
+    
+    /// 在已授权“使用期间”后，尝试申请“始终允许”权限
+    func requestAlwaysAuthorizationIfEligible() {
+        if authorizationStatus == .authorizedWhenInUse {
+            locationManager.requestAlwaysAuthorization()
         }
     }
     
@@ -97,6 +130,16 @@ class LocationService: NSObject, ObservableObject {
                 }
             }
             return "未知位置"
+        }
+    }
+    
+    /// 地址正向地理编码（将地址转为经纬度）
+    func geocodeAddress(_ address: String) async throws -> CLLocation {
+        let placemarks = try await geocoder.geocodeAddressString(address)
+        if let pm = placemarks.first, let loc = pm.location {
+            return loc
+        } else {
+            throw LocationError.locationUnavailable
         }
     }
     
@@ -170,6 +213,8 @@ extension LocationService: CLLocationManagerDelegate {
         }
         
         currentLocation = location
+        // 发布连续定位的更新
+        locationUpdateSubject.send(location)
         locationContinuation?.resume(returning: location)
         locationContinuation = nil
     }

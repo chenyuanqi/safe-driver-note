@@ -19,8 +19,9 @@ class DriveService: ObservableObject {
     private let repository: DriveRouteRepository
     private let locationService: LocationService
     private var drivingTimer: Timer?
-    private var locationTrackingTimer: Timer? // 位置跟踪定时器
+    private var locationTrackingTimer: Timer? // 位置跟踪定时器（兼容保留）
     private var currentWaypoints: [RouteLocation] = [] // 当前路径点集合
+    private var locationCancellable: AnyCancellable?
     
     /// 定时采集位置的时间间隔（秒）
     private let locationTrackingInterval: TimeInterval = 60 // 默认1分钟采集一次
@@ -52,26 +53,20 @@ class DriveService: ObservableObject {
         defer { isStartingDrive = false }
         
         do {
-            // 获取当前位置
+            // 获取当前位置（允许失败）
             let currentLocation = try await locationService.getCurrentLocation()
             let address = await locationService.getCurrentLocationDescription()
-            
-            let startLocation = currentLocation.map { location in
-                RouteLocation(
-                    latitude: location.coordinate.latitude,
-                    longitude: location.coordinate.longitude,
-                    address: address
-                )
+            let startLocation = currentLocation.map { loc in
+                RouteLocation(latitude: loc.coordinate.latitude, longitude: loc.coordinate.longitude, address: address)
             }
-            
-            // 创建新的路线记录
             let route = try repository.startRoute(startLocation: startLocation)
             
             // 更新状态
             self.currentRoute = route
             self.isDriving = true
             
-            // 启动定时器
+            // 升级为Always并启动连续定位
+            locationService.requestAlwaysAuthorizationIfEligible()
             startDrivingTimer()
             
         } catch {
@@ -82,11 +77,28 @@ class DriveService: ObservableObject {
                 self.currentRoute = route
                 self.isDriving = true
                 
-                // 启动定时器
+                // 启动连续定位
+                locationService.requestAlwaysAuthorizationIfEligible()
                 startDrivingTimer()
             } catch {
                 print("创建路线失败: \(error)")
             }
+        }
+    }
+    
+    /// 使用外部提供的起点位置启动驾驶（用于手动输入位置）
+    func startDriving(with startLocationOverride: RouteLocation?) async {
+        guard !isDriving else { return }
+        isStartingDrive = true
+        defer { isStartingDrive = false }
+        do {
+            let route = try repository.startRoute(startLocation: startLocationOverride)
+            self.currentRoute = route
+            self.isDriving = true
+            locationService.requestAlwaysAuthorizationIfEligible()
+            startDrivingTimer()
+        } catch {
+            print("创建路线失败: \(error)")
         }
     }
     
@@ -150,6 +162,22 @@ class DriveService: ObservableObject {
                 print("结束路线失败: \(error)")
                 NotificationCenter.default.post(name: .driveServiceError, object: "结束驾驶失败: \(error.localizedDescription)")
             }
+        }
+    }
+
+    /// 结束驾驶（手动终点覆盖）
+    func endDriving(with endLocationOverride: RouteLocation) async {
+        guard isDriving, let routeId = currentRoute?.id else { return }
+        isEndingDrive = true
+        defer { isEndingDrive = false }
+        do {
+            try repository.endRoute(routeId: routeId, endLocation: endLocationOverride, waypoints: currentWaypoints)
+            self.currentRoute = nil
+            self.isDriving = false
+            stopDrivingTimer()
+        } catch {
+            print("结束驾驶失败: \(error)")
+            NotificationCenter.default.post(name: .driveServiceError, object: "结束驾驶失败: \(error.localizedDescription)")
         }
     }
     
@@ -236,26 +264,39 @@ class DriveService: ObservableObject {
     
     /// 启动位置跟踪
     private func startLocationTracking() {
-        stopLocationTracking() // 确保旧的定时器停止
-        
-        // 清空当前路径点集合
+        stopLocationTracking()
         currentWaypoints = []
         
-        // 立即采集一次位置
+        // 启动连续定位
+        locationService.startContinuousUpdates(desiredAccuracy: kCLLocationAccuracyBest, distanceFilter: 30)
+        
+        // 立即采集一次
         captureCurrentLocation()
         
-        // 启动定时器，按设定的时间间隔采集位置
-        locationTrackingTimer = Timer.scheduledTimer(withTimeInterval: locationTrackingInterval, repeats: true) { [weak self] _ in
-            Task { @MainActor in
-                self?.captureCurrentLocation()
+        // 订阅连续定位
+        locationCancellable = locationService.locationPublisher
+            .sink { [weak self] location in
+                guard let self = self else { return }
+                Task { @MainActor in
+                    let address = await self.locationService.getLocationDescription(from: location)
+                    let waypoint = RouteLocation(latitude: location.coordinate.latitude, longitude: location.coordinate.longitude, address: address)
+                    self.currentWaypoints.append(waypoint)
+                    if let route = self.currentRoute {
+                        try? self.repository.updateRoute(route) { r in
+                            r.waypoints = self.currentWaypoints
+                        }
+                    }
+                }
             }
-        }
     }
     
     /// 停止位置跟踪
     private func stopLocationTracking() {
         locationTrackingTimer?.invalidate()
         locationTrackingTimer = nil
+        locationCancellable?.cancel()
+        locationCancellable = nil
+        locationService.stopContinuousUpdates()
     }
     
     /// 采集当前位置并保存到路径点集合
