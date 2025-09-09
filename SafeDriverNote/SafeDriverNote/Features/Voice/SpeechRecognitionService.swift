@@ -14,6 +14,7 @@ final class SpeechRecognitionService: ObservableObject {
 	private let audioEngine = AVAudioEngine()
 	private var request: SFSpeechAudioBufferRecognitionRequest?
 	private var task: SFSpeechRecognitionTask?
+	private var baseTextAtStart: String = ""
 
 	func requestPermissions() async {
 		// 语音识别
@@ -37,7 +38,8 @@ final class SpeechRecognitionService: ObservableObject {
 
 	func start() {
 		guard recognitionAuthorized, micAuthorized, !isRecording else { return }
-		// 不清空已识别内容，允许继续在末尾累积
+		// 保留已有文本，新的识别快照将叠加在其后
+		baseTextAtStart = transcript.isEmpty ? "" : (transcript + " ")
 		let request = SFSpeechAudioBufferRecognitionRequest()
 		request.shouldReportPartialResults = true
 		request.requiresOnDeviceRecognition = true
@@ -59,13 +61,7 @@ final class SpeechRecognitionService: ObservableObject {
 			if let result = result {
 				let newest = result.bestTranscription.formattedString
 				Task { @MainActor in
-					if newest.hasPrefix(self.transcript) {
-						let delta = String(newest.dropFirst(self.transcript.count))
-						self.transcript += delta
-					} else {
-						let merged = Self.merge(old: self.transcript, new: newest)
-						self.transcript = merged
-					}
+					self.transcript = self.baseTextAtStart + newest
 				}
 			}
 			// 仅在出错时停止；正常识别过程中，即便出现 isFinal 也持续收音，直到用户点击“停止”
@@ -85,15 +81,6 @@ final class SpeechRecognitionService: ObservableObject {
 		task = nil
 		request = nil
 		try? AVAudioSession.sharedInstance().setActive(false)
-	}
-
-	private static func merge(old: String, new: String) -> String {
-		let a = Array(old)
-		let b = Array(new)
-		var i = 0
-		while i < a.count && i < b.count && a[i] == b[i] { i += 1 }
-		let suffix = String(b.dropFirst(i))
-		return old + suffix
 	}
 }
 
