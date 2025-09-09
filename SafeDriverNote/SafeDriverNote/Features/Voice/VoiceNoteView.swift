@@ -27,6 +27,8 @@ struct VoiceNoteView: View {
 							.foregroundColor(.brandSecondary900)
 						Spacer()
 					}
+					.contentShape(Rectangle())
+					.onTapGesture { if !speech.isRecording { speech.start() } }
 					Divider()
 					ScrollView {
 						Text(speech.transcript.isEmpty ? "转写内容会显示在这里…" : speech.transcript)

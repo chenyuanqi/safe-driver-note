@@ -59,7 +59,8 @@ final class SpeechRecognitionService: ObservableObject {
 			if let result = result {
 				Task { @MainActor in self.transcript = result.bestTranscription.formattedString }
 			}
-			if error != nil || (result?.isFinal ?? false) {
+			// 仅在出错时停止；正常识别过程中，即便出现 isFinal 也持续收音，直到用户点击“停止”
+			if error != nil {
 				self.stop()
 			}
 		}
