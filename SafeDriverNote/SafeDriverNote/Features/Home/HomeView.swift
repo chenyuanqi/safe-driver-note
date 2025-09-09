@@ -257,22 +257,9 @@ struct HomeView: View {
 				if driveService.isDriving {
 					// 结束驾驶（带三次失败后手动输入）
 					Task {
-						let locationService = LocationService.shared
-						do {
-							try _ = await locationService.getCurrentLocation(timeout: 5.0)
-							await driveService.endDriving()
-							await vm.loadRecentRoutes()
-							manualEndTries = 0
-						} catch {
-							manualEndTries += 1
-							if manualEndTries >= 3 {
-								manualStartOrEnd = "end"
-								showingManualLocationSheet = true
-							} else {
-								await driveService.endDriving()
-								await vm.loadRecentRoutes()
-							}
-						}
+						// 使用带重试和超时的结束流程
+						await driveService.endDrivingWithRetries(maxAttempts: 3, perAttemptTimeout: 5)
+						await vm.loadRecentRoutes()
 					}
 				} else {
 					// 权限引导：如果仅使用期间或被拒绝，先弹权限引导页

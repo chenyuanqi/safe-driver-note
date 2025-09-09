@@ -98,11 +98,13 @@ class DriveService: ObservableObject {
         defer { isEndingDrive = false }
         
         do {
-            // 使用最近一次已知位置作为终点
+            // 使用最近一次已知位置作为终点（不做网络反向地理编码，避免弱网阻塞）
             var endLocation: RouteLocation? = nil
             if let loc = locationService.currentLocation {
-                let address = await locationService.getLocationDescription(from: loc)
-                endLocation = RouteLocation(latitude: loc.coordinate.latitude, longitude: loc.coordinate.longitude, address: address)
+                let lat = loc.coordinate.latitude
+                let lon = loc.coordinate.longitude
+                let address = String(format: "%.5f,%.5f", lat, lon)
+                endLocation = RouteLocation(latitude: lat, longitude: lon, address: address)
             }
             
             // 结束路线记录，并传递收集到的路径点
@@ -135,6 +137,39 @@ class DriveService: ObservableObject {
             print("结束驾驶失败: \(error)")
             NotificationCenter.default.post(name: .driveServiceError, object: "结束驾驶失败: \(error.localizedDescription)")
         }
+    }
+
+    /// 在信号不佳时的结束驾驶：重试 x 次 + 超时控制；失败则提示或交给用户手动输入
+    func endDrivingWithRetries(maxAttempts: Int = 3, perAttemptTimeout: TimeInterval = 5.0) async {
+        guard isDriving else { return }
+        var attempt = 0
+        while attempt < maxAttempts {
+            attempt += 1
+            // 为每次尝试设置超时：优先使用最近位置；若没有，再等待一次性定位（带超时）
+            if let loc = locationService.currentLocation {
+                await endDrivingUsing(location: loc)
+                return
+            }
+            do {
+                let loc = try await locationService.getCurrentLocation(timeout: perAttemptTimeout)
+                if let loc = loc {
+                    await endDrivingUsing(location: loc)
+                    return
+                }
+            } catch {
+                // ignore and retry
+            }
+        }
+        // 三次失败：发通知由界面弹出手动输入
+        NotificationCenter.default.post(name: .driveServiceError, object: "结束驾驶定位超时，请手动输入终点位置")
+    }
+
+    private func endDrivingUsing(location: CLLocation) async {
+        let lat = location.coordinate.latitude
+        let lon = location.coordinate.longitude
+        let address = String(format: "%.5f,%.5f", lat, lon)
+        let endLoc = RouteLocation(latitude: lat, longitude: lon, address: address)
+        await endDriving(with: endLoc)
     }
     
     /// 取消当前驾驶
