@@ -16,6 +16,7 @@ struct HomeView: View {
 	@State private var manualLocationTries = 0
 	@State private var manualEndTries = 0
 	@State private var showingManualLocationSheet = false
+	@State private var showingPermissionGuide = false
 	@State private var manualAddress: String = ""
 	@State private var manualStartOrEnd: String = "start" // "start" or "end"
 	
@@ -198,6 +199,9 @@ struct HomeView: View {
 				}
 			}
 		}
+		.sheet(isPresented: $showingPermissionGuide) {
+			LocationPermissionGuideView()
+		}
 	}
 	/* duplicate manualLocation sheet removed */
 	
@@ -271,8 +275,14 @@ struct HomeView: View {
 						}
 					}
 				} else {
-					// 开始驾驶前显示确认对话框
-					showingDriveConfirmation = true
+					// 权限引导：如果仅使用期间或被拒绝，先弹权限引导页
+					let status = LocationService.shared.authorizationStatus
+					if status == .denied || status == .restricted || status == .notDetermined || status == .authorizedWhenInUse {
+						showingPermissionGuide = true
+					} else {
+						// 开始驾驶前显示确认对话框
+						showingDriveConfirmation = true
+					}
 				}
 			}) {
 				Card(backgroundColor: driveService.isDriving ? .brandDanger500 : .brandPrimary500, shadow: true) {

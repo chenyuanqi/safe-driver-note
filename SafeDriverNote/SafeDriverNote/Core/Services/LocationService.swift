@@ -52,11 +52,13 @@ class LocationService: NSObject, ObservableObject {
     func startContinuousUpdates(desiredAccuracy: CLLocationAccuracy = kCLLocationAccuracyBest, distanceFilter: CLLocationDistance = 30.0) {
         locationManager.desiredAccuracy = desiredAccuracy
         locationManager.distanceFilter = distanceFilter
-        // 开启后台定位并禁用系统自动暂停
-        locationManager.allowsBackgroundLocationUpdates = true
+        // 仅当 Info.plist 开启了 Background Modes -> location 时，才允许后台定位
+        let backgroundModes = Bundle.main.object(forInfoDictionaryKey: "UIBackgroundModes") as? [String] ?? []
+        let canBackgroundLocation = backgroundModes.contains("location")
+        locationManager.allowsBackgroundLocationUpdates = canBackgroundLocation
         locationManager.pausesLocationUpdatesAutomatically = false
         if #available(iOS 11.0, *) {
-            locationManager.showsBackgroundLocationIndicator = true
+            locationManager.showsBackgroundLocationIndicator = canBackgroundLocation
         }
         locationManager.startUpdatingLocation()
     }
@@ -67,6 +69,7 @@ class LocationService: NSObject, ObservableObject {
         if #available(iOS 11.0, *) {
             locationManager.showsBackgroundLocationIndicator = false
         }
+        // 恢复为默认（前台）模式
         locationManager.allowsBackgroundLocationUpdates = false
         locationManager.pausesLocationUpdatesAutomatically = true
     }
