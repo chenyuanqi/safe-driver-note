@@ -400,11 +400,9 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "安全驾驶日记";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "我们需要位置权限来为您的驾驶日志和打卡记录自动标记地点，帮助您更好地记录驾驶经历。";
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "为保证行程记录的完整性，我们会在后台持续记录行驶路线位置。";
-				INFOPLIST_KEY_UIBackgroundModes = (
-					location,
-				);
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "我们需要位置权限来为您的驾驶日志和打卡记录自动标记地点，帮助您更好地记录驾驶经历。";
+				INFOPLIST_KEY_UIBackgroundModes = location;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
@@ -433,11 +431,9 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "安全驾驶日记";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "我们需要位置权限来为您的驾驶日志和打卡记录自动标记地点，帮助您更好地记录驾驶经历。";
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "为保证行程记录的完整性，我们会在后台持续记录行驶路线位置。";
-				INFOPLIST_KEY_UIBackgroundModes = (
-					location,
-				);
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "我们需要位置权限来为您的驾驶日志和打卡记录自动标记地点，帮助您更好地记录驾驶经历。";
+				INFOPLIST_KEY_UIBackgroundModes = location;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
