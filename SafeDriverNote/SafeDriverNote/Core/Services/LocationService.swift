@@ -18,6 +18,7 @@ class LocationService: NSObject, ObservableObject {
     
     private var locationContinuation: CheckedContinuation<CLLocation?, Error>?
     private var locationTimeoutTask: Task<Void, Error>?
+    private var isContinuousMode: Bool = false
     
     override init() {
         super.init()
@@ -61,6 +62,7 @@ class LocationService: NSObject, ObservableObject {
             locationManager.showsBackgroundLocationIndicator = canBackgroundLocation
         }
         locationManager.startUpdatingLocation()
+        isContinuousMode = true
     }
     
     /// 后台连续定位：停止持续更新
@@ -72,6 +74,7 @@ class LocationService: NSObject, ObservableObject {
         // 恢复为默认（前台）模式
         locationManager.allowsBackgroundLocationUpdates = false
         locationManager.pausesLocationUpdatesAutomatically = true
+        isContinuousMode = false
     }
     
     /// 在已授权“使用期间”后，尝试申请“始终允许”权限
@@ -81,14 +84,25 @@ class LocationService: NSObject, ObservableObject {
         }
     }
     
-    /// 获取当前位置（一次性）
-    func getCurrentLocation(timeout: TimeInterval = 10.0) async throws -> CLLocation? {
+    /// 获取当前位置（一次性，尽快返回）：
+    /// - 优先返回系统缓存的最近位置（若在 staleThreshold 内）
+    /// - 否则短暂开启 startUpdatingLocation，加速首次定位
+    func getCurrentLocation(timeout: TimeInterval = 8.0, staleThreshold: TimeInterval = 120.0) async throws -> CLLocation? {
         guard authorizationStatus == .authorizedWhenInUse || authorizationStatus == .authorizedAlways else {
             throw LocationError.permissionDenied
         }
         
         // 取消之前的超时任务
         locationTimeoutTask?.cancel()
+        
+        // 快速返回系统最近一次位置（可能来自系统缓存或其他App），提升首帧体验
+        if let quick = locationManager.location {
+            let age = Date().timeIntervalSince(quick.timestamp)
+            if age <= staleThreshold {
+                await MainActor.run { self.currentLocation = quick }
+                return quick
+            }
+        }
         
         return try await withCheckedThrowingContinuation { continuation in
             self.locationContinuation = continuation
@@ -104,12 +118,16 @@ class LocationService: NSObject, ObservableObject {
                             continuation.resume(throwing: LocationError.timeout)
                             self.locationContinuation = nil
                             self.isLocationUpdating = false
+                            // 仅在非连续模式下停止一次性更新
+                            if !self.isContinuousMode { self.locationManager.stopUpdatingLocation() }
                         }
                     }
                 }
             }
             
-            locationManager.requestLocation()
+            // 为加速首次定位，临时开启连续更新；收到第一次回调后会在代理中结束（若非连续模式）
+            self.locationManager.desiredAccuracy = kCLLocationAccuracyNearestTenMeters
+            self.locationManager.startUpdatingLocation()
         }
     }
     
@@ -220,6 +238,10 @@ extension LocationService: CLLocationManagerDelegate {
         locationUpdateSubject.send(location)
         locationContinuation?.resume(returning: location)
         locationContinuation = nil
+        // 如果当前不是连续模式（一次性定位），拿到首个结果后立即停止
+        if !isContinuousMode {
+            manager.stopUpdatingLocation()
+        }
     }
     
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
