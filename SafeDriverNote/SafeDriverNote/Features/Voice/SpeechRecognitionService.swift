@@ -1,6 +1,7 @@
 import Foundation
 import AVFoundation
 import Speech
+import AVFAudio
 
 @MainActor
 final class SpeechRecognitionService: ObservableObject {
@@ -23,7 +24,7 @@ final class SpeechRecognitionService: ObservableObject {
 		// 麦克风
 		if #available(iOS 17.0, *) {
 			let granted = await withCheckedContinuation { (cont: CheckedContinuation<Bool, Never>) in
-				AVAudioApplication.shared.requestRecordPermission { cont.resume(returning: $0) }
+				AVAudioApplication.requestRecordPermission { cont.resume(returning: $0) }
 			}
 			micAuthorized = granted
 		} else {
