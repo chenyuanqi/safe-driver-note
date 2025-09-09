@@ -15,6 +15,7 @@ final class SpeechRecognitionService: ObservableObject {
 	private var request: SFSpeechAudioBufferRecognitionRequest?
 	private var task: SFSpeechRecognitionTask?
 	private var baseTextAtStart: String = ""
+	private var accumulatedText: String = ""
 
 	func requestPermissions() async {
 		// 语音识别
@@ -38,11 +39,14 @@ final class SpeechRecognitionService: ObservableObject {
 
 	func start() {
 		guard recognitionAuthorized, micAuthorized, !isRecording else { return }
-		// 保留已有文本，新的识别快照将叠加在其后
+		// 记录启动时已有文本，后续快照基于它叠加；同时保存累计文本
 		baseTextAtStart = transcript.isEmpty ? "" : (transcript + " ")
+		accumulatedText = transcript
 		let request = SFSpeechAudioBufferRecognitionRequest()
 		request.shouldReportPartialResults = true
-		request.requiresOnDeviceRecognition = true
+		// 为更好的标点效果，允许云端并提示口述场景
+		request.requiresOnDeviceRecognition = false
+		request.taskHint = .dictation
 		self.request = request
 		let audioSession = AVAudioSession.sharedInstance()
 		try? audioSession.setCategory(.record, mode: .measurement, options: .duckOthers)
@@ -59,9 +63,17 @@ final class SpeechRecognitionService: ObservableObject {
 		task = speechRecognizer?.recognitionTask(with: request) { [weak self] result, error in
 			guard let self = self else { return }
 			if let result = result {
-				let newest = result.bestTranscription.formattedString
+				let snapshot = result.bestTranscription.formattedString
 				Task { @MainActor in
-					self.transcript = self.baseTextAtStart + newest
+					if result.isFinal {
+						// 句子完成：累加并更新基线
+						self.accumulatedText = self.baseTextAtStart + snapshot
+						self.transcript = self.accumulatedText
+						self.baseTextAtStart = self.accumulatedText + " "
+					} else {
+						// 进行中：显示累计 + 当前快照
+						self.transcript = self.baseTextAtStart + snapshot
+					}
 				}
 			}
 			// 仅在出错时停止；正常识别过程中，即便出现 isFinal 也持续收音，直到用户点击“停止”
@@ -81,6 +93,7 @@ final class SpeechRecognitionService: ObservableObject {
 		task = nil
 		request = nil
 		try? AVAudioSession.sharedInstance().setActive(false)
+		// 停止后保留 transcript 内容（不清空）
 	}
 }
 
