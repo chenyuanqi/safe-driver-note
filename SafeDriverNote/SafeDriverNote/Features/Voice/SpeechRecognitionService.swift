@@ -96,8 +96,10 @@ final class SpeechRecognitionService: ObservableObject {
 		try? AVAudioSession.sharedInstance().setActive(false)
 		// 停止后保留 transcript 内容（不清空）
 		// 确保 transcript 内容被保留并优化标点
-		accumulatedText = transcript
-		transcript = improvePunctuation(transcript)
+		if !transcript.isEmpty {
+			accumulatedText = transcript
+			transcript = improvePunctuation(transcript)
+		}
 	}
 	
 	// 改进标点符号的智能处理
@@ -196,6 +198,25 @@ final class SpeechRecognitionService: ObservableObject {
 			}
 		}
 		
+		// 处理不以疑问词开头但可能是疑问句的情况
+		let questionPatterns = [
+			"([^？?。.！!]{5,})[，,]$",  // 长句子以逗号结尾可能是疑问句
+			"(.*[吗呢吧啊么嘛])[，,]$",   // 以疑问语气词结尾的句子
+		]
+		
+		for pattern in questionPatterns {
+			let regex = try? NSRegularExpression(pattern: pattern)
+			let range = NSRange(location: 0, length: result.utf16.count)
+			
+			if let match = regex?.firstMatch(in: result, range: range) {
+				let matchRange = Range(match.range, in: result)!
+				let matchText = String(result[matchRange])
+				// 将结尾的逗号替换为问号
+				let newtext = matchText.replacingOccurrences(of: "[，,]$", with: "？", options: .regularExpression)
+				result.replaceSubrange(matchRange, with: newtext)
+			}
+		}
+		
 		return result
 	}
 	
@@ -208,6 +229,24 @@ final class SpeechRecognitionService: ObservableObject {
 		
 		for word in exclamationWords {
 			let pattern = "\(word)[^！!。.]*[，,]"
+			let regex = try? NSRegularExpression(pattern: pattern)
+			let range = NSRange(location: 0, length: result.utf16.count)
+			
+			if let match = regex?.firstMatch(in: result, range: range) {
+				let matchRange = Range(match.range, in: result)!
+				let matchText = String(result[matchRange])
+				// 将结尾的逗号替换为感叹号
+				let newtext = matchText.replacingOccurrences(of: "[，,]$", with: "！", options: .regularExpression)
+				result.replaceSubrange(matchRange, with: newtext)
+			}
+		}
+		
+		// 处理感叹语气词
+		let exclamationPatterns = [
+			"(.*[啊呀哇哦嘿])[，,]$",  // 以感叹语气词结尾的句子
+		]
+		
+		for pattern in exclamationPatterns {
 			let regex = try? NSRegularExpression(pattern: pattern)
 			let range = NSRange(location: 0, length: result.utf16.count)
 			
@@ -240,5 +279,12 @@ final class SpeechRecognitionService: ObservableObject {
 		}
 		
 		return result
+	}
+	
+	// 清空 transcript 内容
+	func clearTranscript() {
+		transcript = ""
+		accumulatedText = ""
+		baseTextAtStart = ""
 	}
 }
