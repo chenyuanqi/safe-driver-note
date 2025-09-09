@@ -53,11 +53,11 @@ class DriveService: ObservableObject {
         defer { isStartingDrive = false }
         
         do {
-            // 获取当前位置（允许失败）
-            let currentLocation = try await locationService.getCurrentLocation()
-            let address = await locationService.getCurrentLocationDescription()
-            let startLocation = currentLocation.map { loc in
-                RouteLocation(latitude: loc.coordinate.latitude, longitude: loc.coordinate.longitude, address: address)
+            // 使用最近一次已知位置，避免并发一次性定位造成挂起
+            var startLocation: RouteLocation? = nil
+            if let loc = locationService.currentLocation {
+                let address = await locationService.getLocationDescription(from: loc)
+                startLocation = RouteLocation(latitude: loc.coordinate.latitude, longitude: loc.coordinate.longitude, address: address)
             }
             let route = try repository.startRoute(startLocation: startLocation)
             
@@ -70,19 +70,7 @@ class DriveService: ObservableObject {
             startDrivingTimer()
             
         } catch {
-            print("开始驾驶失败: \(error)")
-            // 即使位置获取失败，也允许开始驾驶
-            do {
-                let route = try repository.startRoute(startLocation: nil)
-                self.currentRoute = route
-                self.isDriving = true
-                
-                // 启动连续定位
-                locationService.requestAlwaysAuthorizationIfEligible()
-                startDrivingTimer()
-            } catch {
-                print("创建路线失败: \(error)")
-            }
+            print("创建路线失败: \(error)")
         }
     }
     
@@ -110,16 +98,11 @@ class DriveService: ObservableObject {
         defer { isEndingDrive = false }
         
         do {
-            // 获取当前位置（设置5秒超时）
-            let currentLocation = try await locationService.getCurrentLocation(timeout: 5.0)
-            let address = await locationService.getCurrentLocationDescription(timeout: 5.0)
-            
-            let endLocation = currentLocation.map { location in
-                RouteLocation(
-                    latitude: location.coordinate.latitude,
-                    longitude: location.coordinate.longitude,
-                    address: address
-                )
+            // 使用最近一次已知位置作为终点
+            var endLocation: RouteLocation? = nil
+            if let loc = locationService.currentLocation {
+                let address = await locationService.getLocationDescription(from: loc)
+                endLocation = RouteLocation(latitude: loc.coordinate.latitude, longitude: loc.coordinate.longitude, address: address)
             }
             
             // 结束路线记录，并传递收集到的路径点
@@ -133,35 +116,8 @@ class DriveService: ObservableObject {
             stopDrivingTimer()
             
         } catch {
-            print("结束驾驶失败: \(error)")
-            // 检查是否是超时错误
-            var errorMessage = "结束驾驶时遇到问题"
-            if let locationError = error as? LocationError {
-                switch locationError {
-                case .timeout:
-                    errorMessage = "位置获取超时，请检查GPS信号"
-                case .permissionDenied:
-                    errorMessage = "位置权限被拒绝，请在设置中允许位置权限"
-                case .locationUnavailable:
-                    errorMessage = "无法获取位置信息，请检查GPS设置"
-                }
-            }
-            
-            // 发送通知显示错误信息
-            NotificationCenter.default.post(name: .driveServiceError, object: errorMessage)
-            
-            // 即使位置获取失败，也允许结束驾驶
-            do {
-                try repository.endRoute(routeId: routeId, endLocation: nil, waypoints: currentWaypoints)
-                self.currentRoute = nil
-                self.isDriving = false
-                
-                // 停止定时器
-                stopDrivingTimer()
-            } catch {
-                print("结束路线失败: \(error)")
-                NotificationCenter.default.post(name: .driveServiceError, object: "结束驾驶失败: \(error.localizedDescription)")
-            }
+            print("结束路线失败: \(error)")
+            NotificationCenter.default.post(name: .driveServiceError, object: "结束驾驶失败: \(error.localizedDescription)")
         }
     }
 

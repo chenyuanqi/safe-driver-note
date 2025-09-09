@@ -58,9 +58,11 @@ struct HomeView: View {
 		}
 		.onAppear { 
 			vm.reload() 
+			// 先请求位置权限，避免交互中触发系统弹窗导致等待
+			LocationService.shared.requestLocationPermission()
 			Task {
 				await vm.loadRecentRoutes()
-				// 获取当前位置
+				// 获取当前位置（一次性，不并发重复调用）
 				await updateCurrentLocation()
 			}
 			
@@ -318,12 +320,7 @@ struct HomeView: View {
 			}
 			.buttonStyle(PlainButtonStyle())
 			.disabled(driveService.isStartingDrive || driveService.isEndingDrive)
-			.onTapGesture {
-				// 点击时更新位置
-				Task {
-					await updateCurrentLocation()
-				}
-			}
+			// 移除额外的 onTapGesture，避免并发位置请求
 			
 			// Secondary Actions
 			HStack(spacing: Spacing.lg) {
