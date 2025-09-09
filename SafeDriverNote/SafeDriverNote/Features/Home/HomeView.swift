@@ -1,4 +1,5 @@
 import SwiftUI
+import CoreLocation
 
 struct HomeView: View {
 	@StateObject private var vm = HomeViewModel()
@@ -196,60 +197,7 @@ struct HomeView: View {
 			}
 		}
 	}
-	.sheet(isPresented: $showingManualLocationSheet) {
-		NavigationStack {
-			VStack(alignment: .leading, spacing: Spacing.lg) {
-				Text(manualStartOrEnd == "start" ? "输入起点位置" : "输入终点位置")
-					.font(.title3)
-					.fontWeight(.semibold)
-				TextField("如：上海市人民广场或经纬度 31.23,121.47", text: $manualAddress)
-					.textInputAutocapitalization(.never)
-					.autocorrectionDisabled(true)
-				Spacer()
-			}
-			.padding()
-			.toolbar {
-				ToolbarItem(placement: .cancellationAction) {
-					Button("取消") { showingManualLocationSheet = false }
-				}
-				ToolbarItem(placement: .confirmationAction) {
-					Button("保存") {
-						Task { @MainActor in
-							let ls = LocationService.shared
-							// 支持“lat,lon”直接输入
-							let trimmed = manualAddress.trimmingCharacters(in: .whitespacesAndNewlines)
-							var location: CLLocation?
-							if let comma = trimmed.firstIndex(of: ",") {
-								let latStr = String(trimmed[..<comma]).trimmingCharacters(in: .whitespaces)
-								let lonStr = String(trimmed[trimmed.index(after: comma)...]).trimmingCharacters(in: .whitespaces)
-								if let lat = Double(latStr), let lon = Double(lonStr) {
-									location = CLLocation(latitude: lat, longitude: lon)
-								}
-							}
-							if location == nil {
-								do { location = try await ls.geocodeAddress(trimmed) } catch { location = nil }
-							}
-							if let loc = location {
-								let address = await ls.getLocationDescription(from: loc)
-								let routeLoc = RouteLocation(latitude: loc.coordinate.latitude, longitude: loc.coordinate.longitude, address: address)
-								if manualStartOrEnd == "start" {
-									await driveService.startDriving(with: routeLoc)
-									await vm.loadRecentRoutes()
-								} else {
-									await driveService.endDriving(with: routeLoc)
-									manualEndTries = 0
-									await vm.loadRecentRoutes()
-								}
-							}
-							manualAddress = ""
-							showingManualLocationSheet = false
-						}
-					}
-					.disabled(manualAddress.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-				}
-			}
-		}
-	}
+	/* duplicate manualLocation sheet removed */
 	
 	// MARK: - Status Panel
 	private var statusPanel: some View {
