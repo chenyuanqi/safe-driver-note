@@ -8,6 +8,7 @@ struct VoiceNoteView: View {
 	@State private var isSaving = false
 	@State private var showError = false
 	@State private var errorMessage = ""
+	@State private var isEditingTranscript = false
 
 	var body: some View {
 		VStack(spacing: Spacing.lg) {
@@ -30,20 +31,41 @@ struct VoiceNoteView: View {
 					.contentShape(Rectangle())
 					.onTapGesture { if !speech.isRecording { speech.start() } }
 					Divider()
-					ScrollView {
-						Text(speech.transcript.isEmpty ? "转写内容会显示在这里…" : speech.transcript)
+					
+					// 可编辑的文本区域
+					if isEditingTranscript || speech.isRecording {
+						TextEditor(text: $speech.transcript)
 							.font(.body)
 							.foregroundColor(.brandSecondary700)
-							.frame(maxWidth: .infinity, alignment: .leading)
+							.frame(minHeight: 180)
+							.disabled(speech.isRecording) // 录音时禁用编辑
+					} else {
+						VStack(alignment: .leading, spacing: Spacing.sm) {
+							Text(speech.transcript.isEmpty ? "转写内容会显示在这里…" : speech.transcript)
+								.font(.body)
+								.foregroundColor(.brandSecondary700)
+								.frame(maxWidth: .infinity, alignment: .leading)
+							
+							Button("编辑内容") {
+								isEditingTranscript = true
+							}
+							.compactStyle()
+						}
+						.frame(minHeight: 180)
 					}
-					.frame(minHeight: 180)
 				}
 			}
 
 			HStack(spacing: Spacing.lg) {
-				Button(speech.isRecording ? "停止" : "开始") { toggleRecording() }
-					.primaryStyle()
-					.disabled(!speech.recognitionAuthorized || !speech.micAuthorized)
+				if speech.isRecording {
+					Button("停止") { toggleRecording() }
+						.dangerStyle()
+						.disabled(!speech.recognitionAuthorized || !speech.micAuthorized)
+				} else {
+					Button("开始") { toggleRecording() }
+						.primaryStyle()
+						.disabled(!speech.recognitionAuthorized || !speech.micAuthorized)
+				}
 
 				Button("保存为日志") { Task { await saveToLog() } }
 					.secondaryStyle()
@@ -54,14 +76,24 @@ struct VoiceNoteView: View {
 		}
 		.padding(Spacing.pagePadding)
 		.background(Color.brandSecondary50)
-		.onAppear { Task { await speech.requestPermissions() } }
+		.onAppear { 
+			Task { await speech.requestPermissions() }
+		}
 		.alert("错误", isPresented: $showError) {
 			Button("知道了") { }
 		} message: { Text(errorMessage) }
 	}
 
 	private func toggleRecording() {
-		if speech.isRecording { speech.stop() } else { speech.start() }
+		if speech.isRecording { 
+			speech.stop() 
+			// 停止录音后允许编辑
+			isEditingTranscript = true
+		} else { 
+			speech.start() 
+			// 开始录音时禁用编辑
+			isEditingTranscript = false
+		}
 	}
 
 	private func saveToLog() async {
@@ -134,5 +166,3 @@ private enum Summarizer {
 		return Array(freq.sorted{ $0.value > $1.value }.prefix(5).map{ $0.key })
 	}
 }
-
-
