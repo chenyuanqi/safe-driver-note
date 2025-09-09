@@ -339,9 +339,7 @@ struct HomeView: View {
 				}
 				.buttonStyle(PlainButtonStyle())
 				
-				Button(action: {
-					showingVoiceRecordingAlert = true
-				}) {
+				NavigationLink(destination: VoiceNoteView()) {
 					Card(backgroundColor: Color.brandWarning500.opacity(0.12), shadow: false) {
 						HStack(spacing: Spacing.md) {
 							Image(systemName: "mic")
