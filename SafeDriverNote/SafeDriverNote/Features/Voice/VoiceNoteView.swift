@@ -1,24 +1,13 @@
 import SwiftUI
 import AVFoundation
-import Speech
 
 struct VoiceNoteView: View {
 	@Environment(\.dismiss) private var dismiss
 
-	@State private var isRecording = false
-	@State private var transcript: String = ""
-	@State private var recognitionAuthorized = false
-	@State private var micAuthorized = false
+	@StateObject private var speech = SpeechRecognitionService()
 	@State private var isSaving = false
 	@State private var showError = false
 	@State private var errorMessage = ""
-
-	private let speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: "zh-CN"))
-	private let audioEngine = AVAudioEngine()
-	private var inputNode: AVAudioInputNode? { audioEngine.inputNode }
-	private var recordingFormat: AVAudioFormat? { audioEngine.inputNode.outputFormat(forBus: 0) }
-	private var request = SFSpeechAudioBufferRecognitionRequest()
-	private var task: SFSpeechRecognitionTask?
 
 	var body: some View {
 		VStack(spacing: Spacing.lg) {
@@ -30,19 +19,19 @@ struct VoiceNoteView: View {
 			Card(backgroundColor: .white, shadow: true) {
 				VStack(alignment: .leading, spacing: Spacing.md) {
 					HStack(spacing: Spacing.md) {
-						Image(systemName: isRecording ? "mic.fill" : "mic")
+						Image(systemName: speech.isRecording ? "mic.fill" : "mic")
 							.font(.title2)
-							.foregroundColor(isRecording ? .brandDanger500 : .brandPrimary500)
-						Text(isRecording ? "正在录音与识别…" : "点击开始录音")
+							.foregroundColor(speech.isRecording ? .brandDanger500 : .brandPrimary500)
+						Text(speech.isRecording ? "正在录音与识别…" : "点击开始录音")
 							.font(.bodyLarge)
 							.foregroundColor(.brandSecondary900)
 						Spacer()
 					}
 					Divider()
 					ScrollView {
-						Text(transcript.isEmpty ? "转写内容会显示在这里…" : transcript)
+						Text(speech.transcript.isEmpty ? "转写内容会显示在这里…" : speech.transcript)
 							.font(.body)
-							.foregroundColor(.brandSecondary800)
+							.foregroundColor(.brandSecondary700)
 							.frame(maxWidth: .infinity, alignment: .leading)
 					}
 					.frame(minHeight: 180)
@@ -50,85 +39,34 @@ struct VoiceNoteView: View {
 			}
 
 			HStack(spacing: Spacing.lg) {
-				Button(isRecording ? "停止" : "开始") { toggleRecording() }
+				Button(speech.isRecording ? "停止" : "开始") { toggleRecording() }
 					.primaryStyle()
-					.disabled(!recognitionAuthorized || !micAuthorized)
+					.disabled(!speech.recognitionAuthorized || !speech.micAuthorized)
 
 				Button("保存为日志") { Task { await saveToLog() } }
 					.secondaryStyle()
-					.disabled(transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSaving)
+					.disabled(speech.transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSaving)
 			}
 
 			Spacer()
 		}
 		.padding(Spacing.pagePadding)
 		.background(Color.brandSecondary50)
-		.onAppear { Task { await requestPermissions() } }
+		.onAppear { Task { await speech.requestPermissions() } }
 		.alert("错误", isPresented: $showError) {
 			Button("知道了") { }
 		} message: { Text(errorMessage) }
 	}
 
-	private func requestPermissions() async {
-		// 语音识别权限
-		let speechAuth = await withCheckedContinuation { (cont: CheckedContinuation<SFSpeechRecognizerAuthorizationStatus, Never>) in
-			SFSpeechRecognizer.requestAuthorization { cont.resume(returning: $0) }
-		}
-		recognitionAuthorized = speechAuth == .authorized
-		// 麦克风权限
-		let mic = await withCheckedContinuation { (cont: CheckedContinuation<Bool, Never>) in
-			AVAudioSession.sharedInstance().requestRecordPermission { cont.resume(returning: $0) }
-		}
-		micAuthorized = mic
-	}
-
 	private func toggleRecording() {
-		if isRecording { stopRecording() } else { startRecording() }
-	}
-
-	private func startRecording() {
-		guard recognitionAuthorized, micAuthorized else { return }
-		transcript = ""
-		request = SFSpeechAudioBufferRecognitionRequest()
-		request.shouldReportPartialResults = true
-		request.requiresOnDeviceRecognition = true
-		let audioSession = AVAudioSession.sharedInstance()
-		try? audioSession.setCategory(.record, mode: .measurement, options: .duckOthers)
-		try? audioSession.setActive(true, options: .notifyOthersOnDeactivation)
-		let input = inputNode
-		guard let format = recordingFormat, let input = input else { return }
-		audioEngine.inputNode.removeTap(onBus: 0)
-		input.installTap(onBus: 0, bufferSize: 1024, format: format) { buffer, _ in
-			self.request.append(buffer)
-		}
-		audioEngine.prepare()
-		try? audioEngine.start()
-		isRecording = true
-		task = speechRecognizer?.recognitionTask(with: request) { result, error in
-			if let result = result {
-				DispatchQueue.main.async { self.transcript = result.bestTranscription.formattedString }
-			}
-			if error != nil || (result?.isFinal ?? false) {
-				stopRecording()
-			}
-		}
-	}
-
-	private func stopRecording() {
-		isRecording = false
-		audioEngine.stop()
-		audioEngine.inputNode.removeTap(onBus: 0)
-		request.endAudio()
-		task?.cancel()
-		task = nil
-		try? AVAudioSession.sharedInstance().setActive(false)
+		if speech.isRecording { speech.stop() } else { speech.start() }
 	}
 
 	private func saveToLog() async {
-		guard !transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+		guard !speech.transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
 		isSaving = true
 		defer { isSaving = false }
-		let fields = Summarizer.summarize(transcript: transcript)
+		let fields = Summarizer.summarize(transcript: speech.transcript)
 		let locationNote = await LocationService.shared.getCurrentLocationDescription()
 		let tags = fields.tags
 		let entry = LogEntry(
@@ -141,7 +79,7 @@ struct VoiceNoteView: View {
 			tags: tags,
 			photoLocalIds: [],
 			audioFileName: nil,
-			transcript: transcript
+			transcript: speech.transcript
 		)
 		try? AppDI.shared.logRepository.add(entry)
 		dismiss()
@@ -151,7 +89,6 @@ struct VoiceNoteView: View {
 private enum Summarizer {
 	static func summarize(transcript: String) -> (type: LogType, scene: String, detail: String, cause: String?, improvement: String?, tags: [String]) {
 		let text = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
-		let lower = text.lowercased()
 		let isMistake = ["失误","碰撞","刮擦","违章","危险","险些","差点","不小心"].contains{ text.contains($0) }
 		let type: LogType = isMistake ? .mistake : .success
 		let scene = extractScene(from: text)
@@ -163,22 +100,22 @@ private enum Summarizer {
 	}
 
 	private static func extractScene(from text: String) -> String {
-		if let firstStop = text.firstIndex(where: { "。！？!?.".contains($0) }) {
+		if let firstStop = text.firstIndex(where: { "。！？!? .".contains($0) }) {
 			return String(text[..<firstStop])
 		}
 		return String(text.prefix(30))
 	}
 
 	private static func extractCause(from text: String) -> String? {
-		if let range = text.range(of: "因为") { return String(text[range.upperBound...]).split(whereSeparator: { "。！？!?.".contains($0) }).first.map(String.init) }
-		if let range = text.range(of: "由于") { return String(text[range.upperBound...]).split(whereSeparator: { "。！？!?.".contains($0) }).first.map(String.init) }
+		if let range = text.range(of: "因为") { return String(text[range.upperBound...]).split(whereSeparator: { "。！？!? .".contains($0) }).first.map(String.init) }
+		if let range = text.range(of: "由于") { return String(text[range.upperBound...]).split(whereSeparator: { "。！？!? .".contains($0) }).first.map(String.init) }
 		return nil
 	}
 
 	private static func extractImprovement(from text: String) -> String? {
-		if let r = text.range(of: "改进") { return String(text[r.upperBound...]).split(whereSeparator: { "。！？!?.".contains($0) }).first.map(String.init) }
-		if let r = text.range(of: "下次") { return String(text[r.lowerBound...]).split(whereSeparator: { "。！？!?.".contains($0) }).first.map(String.init) }
-		if let r = text.range(of: "以后") { return String(text[r.lowerBound...]).split(whereSeparator: { "。！？!?.".contains($0) }).first.map(String.init) }
+		if let r = text.range(of: "改进") { return String(text[r.upperBound...]).split(whereSeparator: { "。！？!? .".contains($0) }).first.map(String.init) }
+		if let r = text.range(of: "下次") { return String(text[r.lowerBound...]).split(whereSeparator: { "。！？!? .".contains($0) }).first.map(String.init) }
+		if let r = text.range(of: "以后") { return String(text[r.lowerBound...]).split(whereSeparator: { "。！？!? .".contains($0) }).first.map(String.init) }
 		return nil
 	}
 
