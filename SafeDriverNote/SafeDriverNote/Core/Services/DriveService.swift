@@ -24,7 +24,7 @@ class DriveService: ObservableObject {
     private var locationCancellable: AnyCancellable?
     
     /// 定时采集位置的时间间隔（秒）
-    private let locationTrackingInterval: TimeInterval = 60 // 默认1分钟采集一次
+    private let locationTrackingInterval: TimeInterval = 30 // 从1分钟改为30秒采集一次，提高精度
     
     @MainActor
     init(repository: DriveRouteRepository? = nil,
@@ -98,12 +98,13 @@ class DriveService: ObservableObject {
         defer { isEndingDrive = false }
         
         do {
-            // 使用最近一次已知位置作为终点（不做网络反向地理编码，避免弱网阻塞）
+            // 使用最近一次已知位置作为终点（获取实际地址而不是坐标）
             var endLocation: RouteLocation? = nil
             if let loc = locationService.currentLocation {
                 let lat = loc.coordinate.latitude
                 let lon = loc.coordinate.longitude
-                let address = String(format: "%.5f,%.5f", lat, lon)
+                // 获取实际地址描述而不是坐标字符串
+                let address = await locationService.getLocationDescription(from: loc)
                 endLocation = RouteLocation(latitude: lat, longitude: lon, address: address)
             }
             
@@ -167,7 +168,8 @@ class DriveService: ObservableObject {
     private func endDrivingUsing(location: CLLocation) async {
         let lat = location.coordinate.latitude
         let lon = location.coordinate.longitude
-        let address = String(format: "%.5f,%.5f", lat, lon)
+        // 获取实际地址描述而不是坐标字符串
+        let address = await locationService.getLocationDescription(from: location)
         let endLoc = RouteLocation(latitude: lat, longitude: lon, address: address)
         await endDriving(with: endLoc)
     }
@@ -258,8 +260,8 @@ class DriveService: ObservableObject {
         stopLocationTracking()
         currentWaypoints = []
         
-        // 启动连续定位
-        locationService.startContinuousUpdates(desiredAccuracy: kCLLocationAccuracyBest, distanceFilter: 30)
+        // 启动连续定位，设置更灵敏的距离过滤器
+        locationService.startContinuousUpdates(desiredAccuracy: kCLLocationAccuracyBest, distanceFilter: 10) // 10米更新一次
         
         // 立即采集一次
         captureCurrentLocation()

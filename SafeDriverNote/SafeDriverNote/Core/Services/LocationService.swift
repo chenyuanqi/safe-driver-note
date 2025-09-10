@@ -28,7 +28,7 @@ class LocationService: NSObject, ObservableObject {
     private func setupLocationManager() {
         locationManager.delegate = self
         locationManager.desiredAccuracy = kCLLocationAccuracyBest
-        locationManager.distanceFilter = 10.0 // 10米更新一次
+        locationManager.distanceFilter = 10.0 // 保持10米更新一次
         locationManager.pausesLocationUpdatesAutomatically = true
         authorizationStatus = locationManager.authorizationStatus
     }
@@ -50,9 +50,9 @@ class LocationService: NSObject, ObservableObject {
     }
     
     /// 后台连续定位：开始持续更新
-    func startContinuousUpdates(desiredAccuracy: CLLocationAccuracy = kCLLocationAccuracyBest, distanceFilter: CLLocationDistance = 30.0) {
+    func startContinuousUpdates(desiredAccuracy: CLLocationAccuracy = kCLLocationAccuracyBest, distanceFilter: CLLocationDistance = 10.0) {
         locationManager.desiredAccuracy = desiredAccuracy
-        locationManager.distanceFilter = distanceFilter
+        locationManager.distanceFilter = distanceFilter // 使用传入的参数，默认为10米
         // 仅当 Info.plist 开启了 Background Modes -> location 时，才允许后台定位
         let backgroundModes = Bundle.main.object(forInfoDictionaryKey: "UIBackgroundModes") as? [String] ?? []
         let canBackgroundLocation = backgroundModes.contains("location")
