@@ -8,7 +8,6 @@ struct VoiceNoteView: View {
 	@State private var isSaving = false
 	@State private var showError = false
 	@State private var errorMessage = ""
-	@State private var isEditingTranscript = false
 
 	var body: some View {
 		VStack(spacing: Spacing.lg) {
@@ -23,50 +22,25 @@ struct VoiceNoteView: View {
 						Image(systemName: speech.isRecording ? "mic.fill" : "mic")
 							.font(.title2)
 							.foregroundColor(speech.isRecording ? .brandDanger500 : .brandPrimary500)
-						Text(speech.isRecording ? "正在录音与识别…" : "点击开始录音")
+						Text(speech.isRecording ? "点击停止录音" : "点击开始录音")
 							.font(.bodyLarge)
 							.foregroundColor(.brandSecondary900)
 						Spacer()
 					}
 					.contentShape(Rectangle())
-					.onTapGesture { if !speech.isRecording { speech.start() } }
+					.onTapGesture { toggleRecording() }
 					Divider()
 					
 					// 可编辑的文本区域
-					if isEditingTranscript || speech.isRecording {
-						TextEditor(text: $speech.transcript)
-							.font(.body)
-							.foregroundColor(.brandSecondary700)
-							.frame(minHeight: 180)
-							.disabled(speech.isRecording) // 录音时禁用编辑
-					} else {
-						VStack(alignment: .leading, spacing: Spacing.sm) {
-							Text(speech.transcript.isEmpty ? "转写内容会显示在这里…" : speech.transcript)
-								.font(.body)
-								.foregroundColor(.brandSecondary700)
-								.frame(maxWidth: .infinity, alignment: .leading)
-							
-							Button("编辑内容") {
-								isEditingTranscript = true
-							}
-							.compactStyle()
-						}
+					TextEditor(text: $speech.transcript)
+						.font(.body)
+						.foregroundColor(.brandSecondary700)
 						.frame(minHeight: 180)
-					}
+						.disabled(speech.isRecording) // 录音时禁用编辑
 				}
 			}
 
 			HStack(spacing: Spacing.lg) {
-				if speech.isRecording {
-					Button("停止") { toggleRecording() }
-						.dangerStyle()
-						.disabled(!speech.recognitionAuthorized || !speech.micAuthorized)
-				} else {
-					Button("开始") { toggleRecording() }
-						.primaryStyle()
-						.disabled(!speech.recognitionAuthorized || !speech.micAuthorized)
-				}
-
 				Button("保存为日志") { Task { await saveToLog() } }
 					.secondaryStyle()
 					.disabled(speech.transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSaving)
@@ -87,12 +61,8 @@ struct VoiceNoteView: View {
 	private func toggleRecording() {
 		if speech.isRecording { 
 			speech.stop() 
-			// 停止录音后允许编辑
-			isEditingTranscript = true
 		} else { 
 			speech.start() 
-			// 开始录音时禁用编辑
-			isEditingTranscript = false
 		}
 	}
 
