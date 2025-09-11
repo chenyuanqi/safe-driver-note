@@ -53,12 +53,14 @@ struct StatusCard: View {
     let value: String
     let color: Color
     let icon: String?
+    let onTap: (() -> Void)?  // 添加点击回调
     
-    init(title: String, value: String, color: Color, icon: String? = nil) {
+    init(title: String, value: String, color: Color, icon: String? = nil, onTap: (() -> Void)? = nil) {
         self.title = title
         self.value = value
         self.color = color
         self.icon = icon
+        self.onTap = onTap
     }
     
     var body: some View {
@@ -83,6 +85,9 @@ struct StatusCard: View {
                     .fontWeight(.semibold)
                     .foregroundColor(.brandSecondary900)
             }
+        }
+        .onTapGesture {
+            onTap?()
         }
     }
 }

@@ -59,6 +59,13 @@ struct RootTabView: View {
                 KnowledgeTodayView()
             }
             .tabItem { Label("知识", systemImage: "book") }
+            
+            #if DEBUG
+            NavigationStack {
+                WeakNetworkTestView()
+            }
+            .tabItem { Label("测试", systemImage: "testtube.2") }
+            #endif
         }
     }
 }

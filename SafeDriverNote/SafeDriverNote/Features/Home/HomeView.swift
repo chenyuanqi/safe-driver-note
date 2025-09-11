@@ -20,6 +20,11 @@ struct HomeView: View {
 	@State private var manualAddress: String = ""
 	@State private var manualStartOrEnd: String = "start" // "start" or "end"
 	
+	// 添加状态说明弹框相关属性
+	@State private var showingStatusExplanation = false
+	@State private var statusExplanationTitle = ""
+	@State private var statusExplanationContent = ""
+	
 	var body: some View {
 		NavigationStack {
 		VStack(spacing: 0) {
@@ -225,22 +230,42 @@ struct HomeView: View {
 					value: vm.safetyScore,
 					color: .brandPrimary500,
 					icon: "shield.checkered"
-				)
+				) {
+					// 安全评分说明
+					statusExplanationTitle = "安全评分"
+					statusExplanationContent = "基于您本月的驾驶记录计算得出。满分100分，每有一次失误记录会扣减相应分数。持续保持良好的驾驶习惯可以提高安全评分。"
+					showingStatusExplanation = true
+				}
 				
 				StatusCard(
 					title: "连续天数",
 					value: "\(vm.consecutiveDays)天",
 					color: .brandInfo500,
 					icon: "calendar"
-				)
+				) {
+					// 连续天数说明
+					statusExplanationTitle = "连续天数"
+					statusExplanationContent = "连续记录驾驶日志的天数。只要当天有创建驾驶日志或完成检查清单，就算作有效记录。连续记录有助于培养良好的驾驶习惯。"
+					showingStatusExplanation = true
+				}
 				
 				StatusCard(
 					title: "今日完成",
 					value: vm.todayCompletionRate,
 					color: .brandPrimary500,
 					icon: "checkmark.circle"
-				)
+				) {
+					// 今日完成说明
+					statusExplanationTitle = "今日完成"
+					statusExplanationContent = "今日任务完成度，包括行前检查、行后检查和知识学习。完成所有三项任务可获得100%的完成度。每天坚持完成任务有助于提升驾驶技能。"
+					showingStatusExplanation = true
+				}
 			}
+		}
+		.alert(statusExplanationTitle, isPresented: $showingStatusExplanation) {
+			Button("知道了") { }
+		} message: {
+			Text(statusExplanationContent)
 		}
 	}
 	

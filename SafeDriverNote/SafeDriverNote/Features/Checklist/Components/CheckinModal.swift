@@ -214,11 +214,21 @@ struct CheckinModal: View {
             
             Button("保存打卡") {
                 // 检查网络状态
+                #if DEBUG
+                // 在测试模式下检查模拟的网络状态
+                if networkMonitor.simulatedNetworkStatus == .disconnected {
+                    // 显示网络错误提示
+                    viewModel.showRetryAlert = true
+                    return
+                }
+                #else
+                // 在生产模式下检查真实的网络状态
                 if !networkMonitor.isConnected {
                     // 显示网络错误提示
                     viewModel.showRetryAlert = true
                     return
                 }
+                #endif
                 
                 let locationNote = currentLocationText == "获取位置中..." ? nil : currentLocationText
                 viewModel.saveCheckin(mode: mode, locationNote: locationNote) { punch in
