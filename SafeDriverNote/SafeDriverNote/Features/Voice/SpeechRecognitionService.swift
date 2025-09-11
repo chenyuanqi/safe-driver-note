@@ -96,10 +96,8 @@ final class SpeechRecognitionService: ObservableObject {
 		try? AVAudioSession.sharedInstance().setActive(false)
 		// 停止后保留 transcript 内容（不清空）
 		// 确保 transcript 内容被保留并优化标点
-		if !transcript.isEmpty {
-			accumulatedText = transcript
-			transcript = improvePunctuation(transcript)
-		}
+		accumulatedText = transcript
+		transcript = improvePunctuation(transcript)
 	}
 	
 	// 改进标点符号的智能处理
