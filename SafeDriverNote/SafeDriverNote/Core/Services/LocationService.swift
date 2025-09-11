@@ -80,6 +80,7 @@ class LocationService: NSObject, ObservableObject {
     /// 在已授权“使用期间”后，尝试申请“始终允许”权限
     func requestAlwaysAuthorizationIfEligible() {
         if authorizationStatus == .authorizedWhenInUse {
+            print("请求始终允许权限")
             locationManager.requestAlwaysAuthorization()
         }
     }

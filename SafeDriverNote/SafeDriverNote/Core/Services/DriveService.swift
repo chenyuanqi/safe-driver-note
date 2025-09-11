@@ -24,7 +24,7 @@ class DriveService: ObservableObject {
     private var locationCancellable: AnyCancellable?
     
     /// 定时采集位置的时间间隔（秒）
-    private let locationTrackingInterval: TimeInterval = 30 // 从1分钟改为30秒采集一次，提高精度
+    private let locationTrackingInterval: TimeInterval = 60 // 每60秒采集一次位置，符合设计要求
     
     @MainActor
     init(repository: DriveRouteRepository? = nil,
@@ -67,6 +67,8 @@ class DriveService: ObservableObject {
             
             // 升级为Always并启动连续定位
             locationService.requestAlwaysAuthorizationIfEligible()
+            // 等待一小段时间确保权限申请完成
+            try? await Task.sleep(nanoseconds: 100_000_000) // 0.1秒
             startDrivingTimer()
             
         } catch {
@@ -234,14 +236,14 @@ class DriveService: ObservableObject {
         // 立即更新一次
         updateDrivingTime()
         
-        // 启动定时器，每60秒更新一次
+        // 启动定时器，每60秒更新一次驾驶时间
         drivingTimer = Timer.scheduledTimer(withTimeInterval: 60.0, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 self?.updateDrivingTime()
             }
         }
         
-        // 启动位置跟踪定时器
+        // 启动位置跟踪（使用连续定位而不是定时器）
         startLocationTracking()
     }
     
@@ -274,6 +276,8 @@ class DriveService: ObservableObject {
                     let address = await self.locationService.getLocationDescription(from: location)
                     let waypoint = RouteLocation(latitude: location.coordinate.latitude, longitude: location.coordinate.longitude, address: address)
                     self.currentWaypoints.append(waypoint)
+                    print("添加路径点: \(waypoint.latitude), \(waypoint.longitude)")
+                    // 实时更新路线的路径点
                     if let route = self.currentRoute {
                         try? self.repository.updateRoute(route) { r in
                             r.waypoints = self.currentWaypoints
@@ -310,6 +314,7 @@ class DriveService: ObservableObject {
                 
                 // 添加到路径点集合
                 currentWaypoints.append(routeLocation)
+                print("立即采集路径点: \(routeLocation.latitude), \(routeLocation.longitude)")
                 
                 // 更新当前路线的路径点
                 if let route = currentRoute {
