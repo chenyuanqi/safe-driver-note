@@ -288,14 +288,20 @@ struct ChecklistView: View {
     
     // 事件处理方法
     private func handlePunchSave(_ punch: ChecklistPunch) {
-        // 保存打卡记录到ViewModel
-        vm.savePunch(punch)
-        // 记录得分以便显示
-        lastPunchScore = punch.score
-        // 显示成功提示
-        showPunchSuccessAlert = true
-        // 重新加载今日记录摘要
-        loadDailySummary()
+        do {
+            // 保存打卡记录到ViewModel
+            try vm.savePunch(punch)
+            // 记录得分以便显示
+            lastPunchScore = punch.score
+            // 显示成功提示
+            showPunchSuccessAlert = true
+            // 重新加载今日记录摘要
+            loadDailySummary()
+        } catch {
+            // 处理保存失败的情况
+            print("保存打卡记录失败: \(error)")
+            // 可以在这里添加用户提示
+        }
     }
     
     private func handleManagementSave(_ items: [ChecklistItem]) {

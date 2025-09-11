@@ -136,8 +136,8 @@ final class ChecklistViewModel: ObservableObject {
     // MARK: - New Methods for Enhanced Functionality
     
     /// Save a punch record
-    func savePunch(_ punch: ChecklistPunch) {
-        try? repository.addPunch(
+    func savePunch(_ punch: ChecklistPunch) throws {
+        try repository.addPunch(
             mode: punch.mode, 
             checkedItemIds: punch.checkedItemIds,
             isQuickComplete: punch.isQuickComplete,

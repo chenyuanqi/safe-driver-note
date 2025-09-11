@@ -4,7 +4,13 @@ import Foundation
 @MainActor
 final class CheckinModalViewModel: ObservableObject {
     @Published var selectedItemIds = Set<UUID>()
+    @Published var isSaving = false
+    @Published var saveError: Error? = nil
+    @Published var showRetryAlert = false
+    
     private let items: [ChecklistItem]
+    private var pendingPunch: ChecklistPunch?
+    private var pendingCompletion: ((ChecklistPunch) -> Void)?
     
     init(items: [ChecklistItem]) {
         self.items = items
@@ -34,7 +40,44 @@ final class CheckinModalViewModel: ObservableObject {
             locationNote: locationNote
         )
         
-        onComplete(punch)
+        // 保存待处理的打卡记录和完成回调
+        self.pendingPunch = punch
+        self.pendingCompletion = onComplete
+        
+        // 开始保存过程
+        savePunchInternal()
+    }
+    
+    private func savePunchInternal() {
+        guard let punch = pendingPunch, let completion = pendingCompletion else { return }
+        
+        isSaving = true
+        saveError = nil
+        
+        // 在实际应用中，这里会调用真正的保存逻辑
+        // 目前我们简化处理，直接完成保存
+        Task {
+            // 模拟网络延迟
+            try? await Task.sleep(nanoseconds: 500_000_000) // 0.5秒
+            
+            await MainActor.run {
+                isSaving = false
+                completion(punch)
+            }
+        }
+    }
+    
+    func retrySave() {
+        if pendingPunch != nil && pendingCompletion != nil {
+            savePunchInternal()
+        }
+    }
+    
+    func cancelSave() {
+        isSaving = false
+        saveError = nil
+        pendingPunch = nil
+        pendingCompletion = nil
     }
     
     private func calculateScore() -> Int {

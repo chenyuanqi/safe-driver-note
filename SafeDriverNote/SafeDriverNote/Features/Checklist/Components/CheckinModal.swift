@@ -3,6 +3,7 @@ import SwiftUI
 struct CheckinModal: View {
     @StateObject private var viewModel: CheckinModalViewModel
     @StateObject private var locationService = LocationService.shared
+    @StateObject private var networkMonitor = NetworkMonitor.shared
     @Binding var isPresented: Bool
     let mode: ChecklistViewModel.Mode
     let items: [ChecklistItem]
@@ -53,6 +54,17 @@ struct CheckinModal: View {
         .animation(.easeInOut(duration: 0.3), value: viewModel.selectedItemIds)
         .onAppear {
             getCurrentLocation()
+        }
+        .alert("网络错误", isPresented: $viewModel.showRetryAlert) {
+            Button("取消") {
+                viewModel.cancelSave()
+                isPresented = false
+            }
+            Button("重试") {
+                viewModel.retrySave()
+            }
+        } message: {
+            Text("保存打卡记录时遇到网络问题，请检查网络连接后重试。")
         }
     }
     
@@ -201,18 +213,33 @@ struct CheckinModal: View {
             .cornerRadius(CornerRadius.md)
             
             Button("保存打卡") {
+                // 检查网络状态
+                if !networkMonitor.isConnected {
+                    // 显示网络错误提示
+                    viewModel.showRetryAlert = true
+                    return
+                }
+                
                 let locationNote = currentLocationText == "获取位置中..." ? nil : currentLocationText
                 viewModel.saveCheckin(mode: mode, locationNote: locationNote) { punch in
                     onSave(punch)
                     isPresented = false
                 }
             }
+            .overlay(
+                Group {
+                    if viewModel.isSaving {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                    }
+                }
+            )
             .frame(maxWidth: .infinity)
             .padding(.vertical, Spacing.md)
             .background(viewModel.selectedItemIds.isEmpty ? Color.brandSecondary200 : Color.brandPrimary500)
             .foregroundColor(viewModel.selectedItemIds.isEmpty ? .brandSecondary400 : .white)
             .cornerRadius(CornerRadius.md)
-            .disabled(viewModel.selectedItemIds.isEmpty)
+            .disabled(viewModel.selectedItemIds.isEmpty || viewModel.isSaving)
         }
     }
 }
