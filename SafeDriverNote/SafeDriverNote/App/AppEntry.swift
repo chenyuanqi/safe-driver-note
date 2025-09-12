@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import UserNotifications
 
 // 创建并共享一个 SwiftData ModelContainer（MVP 简化处理）
 let sharedModelContainer: ModelContainer = {
@@ -28,12 +29,27 @@ struct SafeDriverNoteApp: App {
         // 首次启动播种知识卡
         DataSeeder.seedIfNeeded(context: sharedModelContainer.mainContext)
     }
+    
     var body: some Scene {
         WindowGroup {
             RootTabView()
                 .environmentObject(AppDI.shared)
+                .onAppear {
+                    // 应用启动时设置通知
+                    Task {
+                        await setupNotifications()
+                    }
+                }
         }
         .modelContainer(sharedModelContainer)
+    }
+    
+    /// 设置通知权限和每日提醒
+    private func setupNotifications() async {
+        let permissionGranted = await NotificationService.shared.requestPermission()
+        if permissionGranted {
+            await NotificationService.shared.scheduleDailyKnowledgeReminder()
+        }
     }
 }
 

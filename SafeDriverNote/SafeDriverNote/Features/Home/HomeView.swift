@@ -32,6 +32,9 @@ struct HomeView: View {
     // 添加自动轮播定时器
     @State private var carouselTimer: Timer?
     
+    // 添加设置页面相关属性
+    @State private var showingSettings = false
+    
     var body: some View {
         NavigationStack {
         VStack(spacing: 0) {
@@ -40,8 +43,9 @@ struct HomeView: View {
                 title: "安全驾驶",
                 showBackButton: false,
                 trailingButtons: [
-                    StandardNavigationBar.NavBarButton(icon: "bell") {
-                        // Handle notifications
+                    StandardNavigationBar.NavBarButton(icon: "gear") {
+                        // 跳转到设置页面
+                        showingSettings = true
                     }
                 ]
             )
@@ -70,6 +74,9 @@ struct HomeView: View {
         }
         .navigationDestination(isPresented: $showingKnowledgeView) {
             KnowledgeTodayView()
+        }
+        .navigationDestination(isPresented: $showingSettings) {
+            SettingsView()
         }
         }
         .onAppear { 
