@@ -39,9 +39,18 @@ final class SpeechRecognitionService: ObservableObject {
 
 	func start() {
 		guard recognitionAuthorized, micAuthorized, !isRecording else { return }
+		print("Starting recording. Current transcript: '\(transcript)'")
+		
+		// 保存当前 transcript 内容，防止在初始化过程中被清空
+		let savedTranscript = transcript
+		print("Saved transcript: '\(savedTranscript)'")
+		
 		// 记录启动时已有文本，后续快照基于它叠加；同时保存累计文本
-		baseTextAtStart = transcript.isEmpty ? "" : (transcript + " ")
-		accumulatedText = transcript
+		// 确保 baseTextAtStart 始终包含当前 transcript 内容
+		baseTextAtStart = savedTranscript.isEmpty ? "" : (savedTranscript + " ")
+		accumulatedText = savedTranscript
+		print("Set baseTextAtStart: '\(baseTextAtStart)', accumulatedText: '\(accumulatedText)'")
+		
 		let request = SFSpeechAudioBufferRecognitionRequest()
 		request.shouldReportPartialResults = true
 		// 为更好的标点效果，允许云端并提示口述场景
@@ -63,22 +72,57 @@ final class SpeechRecognitionService: ObservableObject {
 		isRecording = true
 		task = speechRecognizer?.recognitionTask(with: request) { [weak self] result, error in
 			guard let self = self else { return }
+			print("Recognition task callback. isFinal: \(result?.isFinal ?? false), hasError: \(error != nil)")
+			
 			if let result = result {
 				let snapshot = result.bestTranscription.formattedString
+				print("Received snapshot: '\(snapshot)'")
+				
 				Task { @MainActor in
+					// 保存当前 transcript 内容
+					let previousTranscript = self.transcript
+					print("Previous transcript: '\(previousTranscript)'")
+					
 					if result.isFinal {
 						// 句子完成：累加并更新基线
-						self.accumulatedText = self.baseTextAtStart + snapshot
-						self.transcript = self.improvePunctuation(self.accumulatedText)
-						self.baseTextAtStart = self.transcript + " "
+						// 只有当快照不为空时才更新 accumulatedText
+						if !snapshot.isEmpty {
+							self.accumulatedText = self.baseTextAtStart + snapshot
+							print("Final result. Base text: '\(self.baseTextAtStart)', snapshot: '\(snapshot)', accumulated: '\(self.accumulatedText)'")
+						} else {
+							// 如果快照为空，保留之前的 accumulatedText
+							print("Final result but empty snapshot. Keeping accumulatedText: '\(self.accumulatedText)'")
+						}
+						
+						// 使用 accumulatedText 更新 transcript
+						if !self.accumulatedText.isEmpty {
+							self.transcript = self.improvePunctuation(self.accumulatedText)
+							self.baseTextAtStart = self.transcript + " "
+							print("Updated transcript to: '\(self.transcript)'")
+						} else {
+							// 如果 accumulatedText 也为空，保留之前的 transcript
+							print("Keeping previous transcript as both snapshot and accumulatedText are empty")
+						}
 					} else {
 						// 进行中：显示累计 + 当前快照
-						self.transcript = self.improvePunctuation(self.baseTextAtStart + snapshot)
+						let newText = self.baseTextAtStart + snapshot
+						print("Partial result. Base text: '\(self.baseTextAtStart)', snapshot: '\(snapshot)', new text: '\(newText)'")
+						
+						// 只有当新文本不为空时才更新 transcript
+						if !newText.isEmpty {
+							self.transcript = self.improvePunctuation(newText)
+							print("Updated transcript to: '\(self.transcript)'")
+						} else {
+							// 如果新文本为空，保留之前的 transcript
+							print("Skipped update - new text is empty, keeping previous transcript: '\(self.transcript)'")
+						}
 					}
 				}
 			}
-			// 仅在出错时停止；正常识别过程中，即便出现 isFinal 也持续收音，直到用户点击“停止”
+			
+			// 仅在出错时停止；正常识别过程中，即便出现 isFinal 也持续收音，直到用户点击"停止"
 			if error != nil {
+				print("Recognition error: \(error!.localizedDescription)")
 				self.stop()
 			}
 		}
@@ -96,14 +140,48 @@ final class SpeechRecognitionService: ObservableObject {
 		try? AVAudioSession.sharedInstance().setActive(false)
 		// 停止后保留 transcript 内容（不清空）
 		// 确保 transcript 内容被保留并优化标点
-		accumulatedText = transcript
-		transcript = improvePunctuation(transcript)
+		// 保存当前 transcript 内容，以防后续处理中被清空
+		let currentTranscript = transcript
+		print("Stopping recording. Current transcript: '\(currentTranscript)'")
+		
+		// 只有当 transcript 不为空时才更新 accumulatedText
+		if !currentTranscript.isEmpty {
+			accumulatedText = currentTranscript
+			print("Updated accumulatedText: '\(accumulatedText)'")
+		}
+		
+		// 对 transcript 进行标点优化，但不改变其内容
+		let improvedTranscript = improvePunctuation(currentTranscript)
+		print("Improved transcript: '\(improvedTranscript)'")
+		
+		// 确保即使优化后的文本也不为空时才更新
+		if !improvedTranscript.isEmpty {
+			transcript = improvedTranscript
+			print("Set transcript to improved version")
+		}
+		// 如果 transcript 为空但 accumulatedText 不为空，恢复 accumulatedText
+		else if currentTranscript.isEmpty && !accumulatedText.isEmpty {
+			transcript = accumulatedText
+			print("Restored transcript from accumulatedText")
+		}
+		// 如果当前 transcript 不为空但优化后为空，保留当前 transcript
+		else if !currentTranscript.isEmpty && improvedTranscript.isEmpty {
+			transcript = currentTranscript
+			print("Kept original transcript as improved version was empty")
+		}
+		
+		print("Final transcript: '\(transcript)'")
 	}
 	
 	// 改进标点符号的智能处理
 	private func improvePunctuation(_ text: String) -> String {
-		// 如果文本为空，直接返回
-		guard !text.isEmpty else { return text }
+		print("Improving punctuation for text: '\(text)'")
+		
+		// 如果文本为空，直接返回原文本
+		guard !text.isEmpty else { 
+			print("Text is empty, returning as is")
+			return text 
+		}
 		
 		var result = text
 		
@@ -123,6 +201,7 @@ final class SpeechRecognitionService: ObservableObject {
 		// 5. 清理多余的标点符号
 		result = cleanExtraPunctuation(result)
 		
+		print("Improved punctuation result: '\(result)'")
 		return result
 	}
 	
