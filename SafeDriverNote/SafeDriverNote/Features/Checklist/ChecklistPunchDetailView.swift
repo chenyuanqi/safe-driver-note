@@ -104,10 +104,27 @@ struct ChecklistPunchDetailView: View {
     private var currentStats: Stats { period == .week ? weekStats : monthStats }
 }
 
+// 添加便利初始化器，支持从ChecklistPunchSummary创建
+extension ChecklistPunchDetailView {
+    init(punch: ChecklistPunchSummary) {
+        // 创建一个临时的ChecklistPunch对象
+        let checklistPunch = ChecklistPunch(
+            id: punch.id,
+            createdAt: punch.createdAt,
+            mode: punch.mode,
+            checkedItemIds: punch.checkedItemIds,
+            isQuickComplete: punch.isQuickComplete,
+            score: punch.score,
+            locationNote: punch.locationNote
+        )
+        
+        self.init(punch: checklistPunch)
+    }
+}
+
 #Preview {
     NavigationStack {
         // 占位预览
         Text("选择一条记录")
     }
 }
-

@@ -70,20 +70,18 @@ struct DailyCheckinSummaryView: View {
     
     private var recordsList: some View {
         LazyVStack(spacing: Spacing.md) {
-            ForEach(summary.prePunches, id: \.id) { punch in
-                checkinRecordRow(punch: punch, mode: .pre)
-                    .transition(.asymmetric(
-                        insertion: .opacity.combined(with: .slide),
-                        removal: .opacity
-                    ))
-            }
+            // 合并所有打卡记录并按时间倒序排列
+            let allPunches = (summary.prePunches + summary.postPunches).sorted { $0.createdAt > $1.createdAt }
             
-            ForEach(summary.postPunches, id: \.id) { punch in
-                checkinRecordRow(punch: punch, mode: .post)
-                    .transition(.asymmetric(
-                        insertion: .opacity.combined(with: .slide),
-                        removal: .opacity
-                    ))
+            ForEach(allPunches, id: \.id) { punch in
+                NavigationLink(destination: ChecklistPunchDetailView(punch: punch)) {
+                    checkinRecordRow(punch: punch, mode: punch.mode)
+                }
+                .buttonStyle(PlainButtonStyle())
+                .transition(.asymmetric(
+                    insertion: .opacity.combined(with: .slide),
+                    removal: .opacity
+                ))
             }
         }
         .animation(.easeInOut(duration: 0.3), value: summary.prePunches.count + summary.postPunches.count)
@@ -190,7 +188,7 @@ extension DateFormatter {
         prePunches: [
             ChecklistPunchSummary(
                 id: UUID(),
-                createdAt: Date(),
+                createdAt: Date().addingTimeInterval(-3600), // 1小时前
                 mode: .pre,
                 checkedItemIds: [sampleItems[0].id, sampleItems[1].id],
                 isQuickComplete: true,
@@ -198,9 +196,21 @@ extension DateFormatter {
                 locationNote: "测试位置"
             )
         ],
-        postPunches: []
+        postPunches: [
+            ChecklistPunchSummary(
+                id: UUID(),
+                createdAt: Date(), // 现在
+                mode: .post,
+                checkedItemIds: [sampleItems[2].id],
+                isQuickComplete: false,
+                score: 80,
+                locationNote: "停车场"
+            )
+        ]
     )
     
-    DailyCheckinSummaryView(summary: sampleSummary, items: sampleItems)
-        .padding()
+    NavigationStack {
+        DailyCheckinSummaryView(summary: sampleSummary, items: sampleItems)
+            .padding()
+    }
 }
