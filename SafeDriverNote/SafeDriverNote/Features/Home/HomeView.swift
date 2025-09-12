@@ -1,48 +1,55 @@
 import SwiftUI
 import CoreLocation
+import Foundation
 
 struct HomeView: View {
-	@StateObject private var vm = HomeViewModel()
-	@StateObject private var driveService = AppDI.shared.driveService
-	@State private var selectedKnowledgeIndex = 0
-	@State private var showingLogEditor = false
-	@State private var showingSafetyAlert = false
-	@State private var showingVoiceRecordingAlert = false
-	@State private var showingDriveConfirmation = false
-	@State private var currentLocationDescription = "获取位置中..."
-	@State private var isLocationUpdating = false
-	@State private var showingDriveError = false
-	@State private var driveErrorMessage = ""
-	@State private var manualLocationTries = 0
-	@State private var manualEndTries = 0
-	@State private var showingManualLocationSheet = false
-	@State private var showingPermissionGuide = false
-	@State private var manualAddress: String = ""
-	@State private var manualStartOrEnd: String = "start" // "start" or "end"
-	
-	// 添加状态说明弹框相关属性
-	@State private var showingStatusExplanation = false
-	@State private var statusExplanationTitle = ""
-	@State private var statusExplanationContent = ""
-	
-	var body: some View {
-		NavigationStack {
-		VStack(spacing: 0) {
-			// Custom Navigation Bar
-			StandardNavigationBar(
-					title: "安全驾驶",
-				showBackButton: false,
-				trailingButtons: [
-					StandardNavigationBar.NavBarButton(icon: "bell") {
-						// Handle notifications
-					}
-				]
-			)
-			
-			ScrollView {
-				VStack(spacing: Spacing.xxxl) {
-					// Status Panel
-					statusPanel
+    @StateObject private var vm = HomeViewModel()
+    @StateObject private var driveService = AppDI.shared.driveService
+    @State private var selectedKnowledgeIndex = 0
+    @State private var showingLogEditor = false
+    @State private var showingSafetyAlert = false
+    @State private var showingVoiceRecordingAlert = false
+    @State private var showingDriveConfirmation = false
+    @State private var currentLocationDescription = "获取位置中..."
+    @State private var isLocationUpdating = false
+    @State private var showingDriveError = false
+    @State private var driveErrorMessage = ""
+    @State private var manualLocationTries = 0
+    @State private var manualEndTries = 0
+    @State private var showingManualLocationSheet = false
+    @State private var showingPermissionGuide = false
+    @State private var manualAddress: String = ""
+    @State private var manualStartOrEnd: String = "start" // "start" or "end"
+    
+    // 添加状态说明弹框相关属性
+    @State private var showingStatusExplanation = false
+    @State private var statusExplanationTitle = ""
+    @State private var statusExplanationContent = ""
+    
+    // 添加知识页导航相关属性
+    @State private var showingKnowledgeView = false
+    
+    // 添加自动轮播定时器
+    @State private var carouselTimer: Timer?
+    
+    var body: some View {
+        NavigationStack {
+        VStack(spacing: 0) {
+            // Custom Navigation Bar
+            StandardNavigationBar(
+                    title: "安全驾驶",
+                showBackButton: false,
+                trailingButtons: [
+                    StandardNavigationBar.NavBarButton(icon: "bell") {
+                        // Handle notifications
+                    }
+                ]
+            )
+            
+            ScrollView {
+                VStack(spacing: Spacing.xxxl) {
+                    // Status Panel
+                    statusPanel
 					
 					// Quick Actions
 					quickActionsSection
@@ -60,6 +67,9 @@ struct HomeView: View {
 				.padding(.vertical, Spacing.lg)
 			}
 			.background(Color.brandSecondary50)
+		}
+		.navigationDestination(isPresented: $showingKnowledgeView) {
+			KnowledgeTodayView()
 		}
 		}
 		.onAppear { 
@@ -87,6 +97,8 @@ struct HomeView: View {
 		.onDisappear {
 			// 移除通知观察者
 			NotificationCenter.default.removeObserver(self)
+			// 停止自动轮播定时器
+			stopAutoCarousel()
 		}
 		.sheet(isPresented: $showingLogEditor) {
 			LogEditorView(entry: nil) { type, detail, location, scene, cause, improvement, tags, photos, audioFileName, transcript in
@@ -208,7 +220,6 @@ struct HomeView: View {
 			LocationPermissionGuideView()
 		}
 	}
-	/* duplicate manualLocation sheet removed */
 	
 	// MARK: - Status Panel
 	private var statusPanel: some View {
@@ -412,32 +423,115 @@ struct HomeView: View {
 	
 	// MARK: - Today Learning Section
 	private var todayLearningSection: some View {
-		VStack(alignment: .leading, spacing: Spacing.lg) {
-			HStack {
-				Label("今日学习", systemImage: "book")
-					.font(.title3)
-					.fontWeight(.semibold)
-					.foregroundColor(.brandSecondary900)
-				
-				Spacer()
-				
-				Text("2/3")
-					.font(.bodySmall)
-					.foregroundColor(.brandSecondary500)
-			}
-			
-			// Knowledge Cards Carousel
-			TabView(selection: $selectedKnowledgeIndex) {
-				ForEach(0..<vm.todayKnowledgeCards.count, id: \.self) { index in
-					let card = vm.todayKnowledgeCards[index]
-					knowledgeCardView(card)
-						.tag(index)
-				}
-			}
-			.tabViewStyle(PageTabViewStyle(indexDisplayMode: .always))
-			.frame(height: 200)
-			.indexViewStyle(PageIndexViewStyle(backgroundDisplayMode: .always))
-		}
+	    VStack(alignment: .leading, spacing: Spacing.lg) {
+	        HStack {
+	            Label("今日学习", systemImage: "book")
+	                .font(.title3)
+	                .fontWeight(.semibold)
+	                .foregroundColor(.brandSecondary900)
+	            
+	            Spacer()
+	            
+	            Text("2/3")
+	                .font(.bodySmall)
+	                .foregroundColor(.brandSecondary500)
+	        }
+	        
+	        // 使用ZStack和手动控制页面切换，避免手势冲突
+	        ZStack {
+	            ForEach(0..<vm.todayKnowledgeCards.count, id: \.self) { index in
+	                let card = vm.todayKnowledgeCards[index]
+	                knowledgeCardView(card, index: index)
+	                    .opacity(index == selectedKnowledgeIndex ? 1.0 : 0.0)
+	                    .zIndex(index == selectedKnowledgeIndex ? 1.0 : 0.0)
+	            }
+	        }
+	        .frame(height: 200)
+	        .onAppear {
+	            // 启动自动轮播定时器
+	            startAutoCarousel()
+	        }
+	        .onDisappear {
+	            // 视图消失时停止定时器
+	            stopAutoCarousel()
+	        }
+	        
+	        // 手动添加页面指示器并居中显示
+	        HStack(spacing: 8) {
+	            ForEach(0..<vm.todayKnowledgeCards.count, id: \.self) { index in
+	                Circle()
+	                    .fill(index == selectedKnowledgeIndex ? Color.brandPrimary500 : Color.brandSecondary300)
+	                    .frame(width: 8, height: 8)
+	                    .onTapGesture {
+	                        withAnimation {
+	                            selectedKnowledgeIndex = index
+	                            // 用户手动切换时重置定时器
+	                            resetAutoCarousel()
+	                        }
+	                    }
+	            }
+	        }
+	        .frame(maxWidth: .infinity)
+	        .padding(.top, Spacing.md)
+	    }
+	}
+
+	// MARK: - Knowledge Card View
+	private func knowledgeCardView(_ card: KnowledgeCardData, index: Int) -> some View {
+	    Card(backgroundColor: .white, shadow: true) {
+	        VStack(alignment: .leading, spacing: Spacing.lg) {
+	            Text(card.title)
+	                .font(.bodyLarge)
+	                .fontWeight(.semibold)
+	                .foregroundColor(.brandSecondary900)
+	                .multilineTextAlignment(.leading)
+	            
+	            Text(card.content)
+	                .font(.body)
+	                .foregroundColor(.brandSecondary700)
+	                .lineLimit(3)
+	                .multilineTextAlignment(.leading)
+	            
+	            Spacer()
+	            
+	            HStack {
+	                Spacer()
+	                
+	                if card.isLearned {
+	                    Text("已学习")
+	                        .tagStyle(.success)
+	                } else {
+	                    Button("开始学习") {
+	                        // 使用状态变量来控制导航
+	                        showingKnowledgeView = true
+	                    }
+	                    .compactStyle(color: .brandPrimary500)
+	                }
+	            }
+	        }
+	    }
+	    .onTapGesture {
+	        // 点击卡片时切换到该卡片
+	        withAnimation {
+	            selectedKnowledgeIndex = index
+	        }
+	    }
+	    .gesture(
+	        DragGesture(minimumDistance: 50)
+	            .onEnded { value in
+	                if value.translation.width > 50 {
+	                    // 右滑，切换到上一张卡片
+	                    withAnimation {
+	                        selectedKnowledgeIndex = max(0, selectedKnowledgeIndex - 1)
+	                    }
+	                } else if value.translation.width < -50 {
+	                    // 左滑，切换到下一张卡片
+	                    withAnimation {
+	                        selectedKnowledgeIndex = min(vm.todayKnowledgeCards.count - 1, selectedKnowledgeIndex + 1)
+	                    }
+	                }
+	            }
+	    )
 	}
 	
 	// MARK: - Smart Recommendations Section
@@ -531,41 +625,6 @@ struct HomeView: View {
 		}
 	}
 	
-	// MARK: - Knowledge Card View
-	private func knowledgeCardView(_ card: KnowledgeCardData) -> some View {
-		Card(backgroundColor: .white, shadow: true) {
-			VStack(alignment: .leading, spacing: Spacing.lg) {
-				Text(card.title)
-					.font(.bodyLarge)
-					.fontWeight(.semibold)
-					.foregroundColor(.brandSecondary900)
-					.multilineTextAlignment(.leading)
-				
-				Text(card.content)
-					.font(.body)
-					.foregroundColor(.brandSecondary700)
-					.lineLimit(3)
-					.multilineTextAlignment(.leading)
-				
-				Spacer()
-				
-				HStack {
-					Spacer()
-					
-					if card.isLearned {
-						Text("已学习")
-							.tagStyle(.success)
-					} else {
-						Button("开始学习") {
-							// Handle learning action
-						}
-						.compactStyle(color: .brandPrimary500)
-					}
-				}
-			}
-		}
-	}
-	
 	private func recentActivityItem(_ activity: RecentActivity) -> some View {
 		Group {
 			if activity.activityType == .logEntry, let logId = activity.relatedId {
@@ -623,15 +682,47 @@ struct HomeView: View {
 		}
 	}
 	
-
+	// MARK: - Auto Carousel Methods
+    private func startAutoCarousel() {
+        // 每5秒自动切换到下一张卡片
+        carouselTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { _ in
+            DispatchQueue.main.async {
+                withAnimation {
+                    selectedKnowledgeIndex = (selectedKnowledgeIndex + 1) % vm.todayKnowledgeCards.count
+                }
+            }
+        }
+    }
+    
+    private func stopAutoCarousel() {
+        carouselTimer?.invalidate()
+        carouselTimer = nil
+    }
+    
+    private func resetAutoCarousel() {
+        // 重置定时器：先停止再重新启动
+        stopAutoCarousel()
+        startAutoCarousel()
+    }
 }
 
 // MARK: - Knowledge Card Data
 struct KnowledgeCardData: Identifiable {
-	let id = UUID()
-	let title: String
-	let content: String
-	let isLearned: Bool
+    let id = UUID()
+    let title: String
+    let content: String
+    let isLearned: Bool
+}
+
+// 修改为使用KnowledgeCard模型
+extension KnowledgeCardData {
+    init(from knowledgeCard: KnowledgeCard) {
+        self.init(
+            title: knowledgeCard.title,
+            content: knowledgeCard.what,
+            isLearned: false
+        )
+    }
 }
 
 // MARK: - Recent Activity Data
@@ -655,143 +746,155 @@ struct RecentActivity: Identifiable {
 
 @MainActor
 final class HomeViewModel: ObservableObject {
-	@Published private(set) var allLogs: [LogEntry] = []
-	@Published private(set) var recentLogs: [LogEntry] = []
-	@Published private(set) var recentRoutes: [DriveRoute] = []
-	@Published private(set) var recentActivities: [RecentActivity] = []
-	@Published private(set) var todayPreCount: Int = 0
-	@Published private(set) var todayPostCount: Int = 0
-	@Published private(set) var todayKnowledgeCards: [KnowledgeCardData] = []
+    @Published private(set) var allLogs: [LogEntry] = []
+    @Published private(set) var recentLogs: [LogEntry] = []
+    @Published private(set) var recentRoutes: [DriveRoute] = []
+    @Published private(set) var recentActivities: [RecentActivity] = []
+    @Published private(set) var todayPreCount: Int = 0
+    @Published private(set) var todayPostCount: Int = 0
+    @Published private(set) var todayKnowledgeCards: [KnowledgeCardData] = []
+        
+    init() { reload() }
+    
+    func reload() {
+        if let list = try? AppDI.shared.logRepository.fetchAll() {
+            let sorted = list.sorted { $0.createdAt > $1.createdAt }
+            self.allLogs = sorted
+            self.recentLogs = Array(sorted.prefix(3))
+        }
+        // Checklist today
+        let today = Date()
+        let repo = AppDI.shared.checklistRepository
+        let pre = (try? repo.fetchPunches(on: today, mode: .pre)) ?? []
+        let post = (try? repo.fetchPunches(on: today, mode: .post)) ?? []
+        self.todayPreCount = pre.count
+        self.todayPostCount = post.count
+        
+        // Load today's knowledge cards
+        loadTodayKnowledgeCards()
+        
+        // Load recent activities (combine logs and routes)
+        updateRecentActivities()
+    }
+    
+    func loadRecentRoutes() async {
+        let routeService = AppDI.shared.driveService
+        self.recentRoutes = routeService.getRecentRoutes(limit: 5)
+        updateRecentActivities()
+    }
+    
+    private func updateRecentActivities() {
+        var activities: [RecentActivity] = []
+        
+        // Add log entries
+        for log in recentLogs {
+            let activity = RecentActivity(
+                date: log.createdAt,
+                type: log.type == .mistake ? "失误" : "成功",
+                title: title(for: log),
+                subtitle: log.locationNote.isEmpty ? nil : log.locationNote,
+                icon: log.type == .mistake ? "exclamationmark.triangle.fill" : "checkmark.circle.fill",
+                color: log.type == .mistake ? .brandDanger500 : .brandPrimary500,
+                tagStyle: log.type == .mistake ? .error : .success,
+                activityType: .logEntry,
+                relatedId: log.id
+            )
+            activities.append(activity)
+        }
+        
+        // Add drive routes
+        for route in recentRoutes {
+            let duration = AppDI.shared.driveService.formatDuration(route.duration)
+            let distance = AppDI.shared.driveService.formatDistance(route.distance)
+            
+            let subtitle: String
+            if let dur = route.duration, let dist = route.distance {
+                subtitle = "\(duration) · \(distance)"
+            } else if route.duration != nil {
+                subtitle = duration
+            } else if route.distance != nil {
+                subtitle = distance
+            } else {
+                subtitle = "驾驶记录"
+            }
+            
+            let activity = RecentActivity(
+                date: route.endTime ?? route.startTime,
+                type: "驾驶",
+                title: formatRouteTitle(route),
+                subtitle: subtitle,
+                icon: "car.fill",
+                color: .brandPrimary500,
+                tagStyle: .primary,
+                activityType: .driveRoute,
+                relatedId: route.id
+            )
+            activities.append(activity)
+        }
+        
+        // Sort by date and take recent ones
+        self.recentActivities = activities
+            .sorted { $0.date > $1.date }
+            .prefix(5)
+            .map { $0 }
+    }
+    
+    private func formatRouteTitle(_ route: DriveRoute) -> String {
+        if let start = route.startLocation?.address, let end = route.endLocation?.address {
+            return "\(start) → \(end)"
+        } else if let start = route.startLocation?.address {
+            return "从 \(start) 出发"
+        } else if let end = route.endLocation?.address {
+            return "抵达 \(end)"
+        } else {
+            return "驾驶记录"
+        }
+    }
+    
+    func formatDrivingTime(from startTime: Date) -> String {
+        let elapsed = Date().timeIntervalSince(startTime)
+        let hours = Int(elapsed) / 3600
+        let minutes = (Int(elapsed) % 3600) / 60
 		
-	init() { reload() }
-	
-	func reload() {
-		if let list = try? AppDI.shared.logRepository.fetchAll() {
-			let sorted = list.sorted { $0.createdAt > $1.createdAt }
-			self.allLogs = sorted
-			self.recentLogs = Array(sorted.prefix(3))
-		}
-		// Checklist today
-		let today = Date()
-		let repo = AppDI.shared.checklistRepository
-		let pre = (try? repo.fetchPunches(on: today, mode: .pre)) ?? []
-		let post = (try? repo.fetchPunches(on: today, mode: .post)) ?? []
-		self.todayPreCount = pre.count
-		self.todayPostCount = post.count
-		
-		// Load today's knowledge cards
-		loadTodayKnowledgeCards()
-		
-		// Load recent activities (combine logs and routes)
-		updateRecentActivities()
-	}
-	
-	func loadRecentRoutes() async {
-		let routeService = AppDI.shared.driveService
-		self.recentRoutes = routeService.getRecentRoutes(limit: 5)
-		updateRecentActivities()
-	}
-	
-	private func updateRecentActivities() {
-		var activities: [RecentActivity] = []
-		
-		// Add log entries
-		for log in recentLogs {
-			let activity = RecentActivity(
-				date: log.createdAt,
-				type: log.type == .mistake ? "失误" : "成功",
-				title: title(for: log),
-				subtitle: log.locationNote.isEmpty ? nil : log.locationNote,
-				icon: log.type == .mistake ? "exclamationmark.triangle.fill" : "checkmark.circle.fill",
-				color: log.type == .mistake ? .brandDanger500 : .brandPrimary500,
-				tagStyle: log.type == .mistake ? .error : .success,
-				activityType: .logEntry,
-				relatedId: log.id
-			)
-			activities.append(activity)
-		}
-		
-		// Add drive routes
-		for route in recentRoutes {
-			let duration = AppDI.shared.driveService.formatDuration(route.duration)
-			let distance = AppDI.shared.driveService.formatDistance(route.distance)
-			
-			let subtitle: String
-			if let dur = route.duration, let dist = route.distance {
-				subtitle = "\(duration) · \(distance)"
-			} else if route.duration != nil {
-				subtitle = duration
-			} else if route.distance != nil {
-				subtitle = distance
-			} else {
-				subtitle = "驾驶记录"
-			}
-			
-			let activity = RecentActivity(
-				date: route.endTime ?? route.startTime,
-				type: "驾驶",
-				title: formatRouteTitle(route),
-				subtitle: subtitle,
-				icon: "car.fill",
-				color: .brandPrimary500,
-				tagStyle: .primary,
-				activityType: .driveRoute,
-				relatedId: route.id
-			)
-			activities.append(activity)
-		}
-		
-		// Sort by date and take recent ones
-		self.recentActivities = activities
-			.sorted { $0.date > $1.date }
-			.prefix(5)
-			.map { $0 }
-	}
-	
-	private func formatRouteTitle(_ route: DriveRoute) -> String {
-		if let start = route.startLocation?.address, let end = route.endLocation?.address {
-			return "\(start) → \(end)"
-		} else if let start = route.startLocation?.address {
-			return "从 \(start) 出发"
-		} else if let end = route.endLocation?.address {
-			return "抵达 \(end)"
-		} else {
-			return "驾驶记录"
-		}
-	}
-	
-	func formatDrivingTime(from startTime: Date) -> String {
-		let elapsed = Date().timeIntervalSince(startTime)
-		let hours = Int(elapsed) / 3600
-		let minutes = (Int(elapsed) % 3600) / 60
-		
-		if hours > 0 {
-			return "\(hours)小时\(minutes)分钟"
-		} else {
-			return "\(minutes)分钟"
-		}
-	}
-	
-	private func loadTodayKnowledgeCards() {
-		// Mock knowledge cards for today
-		todayKnowledgeCards = [
-			KnowledgeCardData(
-				title: "安全跟车距离",
-				content: "保持3秒车距原则，在高速公路上应保持更长的跟车距离，确保有足够的反应时间。",
-				isLearned: false
-			),
-			KnowledgeCardData(
-				title: "雨天驾驶技巧",
-				content: "雨天路面湿滑，要降低车速，保持更大的跟车距离，避免急刹车和急转弯。",
-				isLearned: true
-			),
-			KnowledgeCardData(
-				title: "停车技巧",
-				content: "倒车入库时要多观察后视镜，利用参照物判断车位，耐心慢速操作。",
-				isLearned: false
-			)
-		]
-	}
+        if hours > 0 {
+            return "\(hours)小时\(minutes)分钟"
+        } else {
+            return "\(minutes)分钟"
+        }
+    }
+    
+    private func loadTodayKnowledgeCards() {
+        // 从知识库获取今日学习卡片数据
+        let knowledgeRepo = AppDI.shared.knowledgeRepository
+        if let knowledgeCards = try? knowledgeRepo.todayCards(limit: 3) {
+            self.todayKnowledgeCards = knowledgeCards.map { card in
+                KnowledgeCardData(
+                    title: card.title,
+                    content: card.what,
+                    isLearned: false
+                )
+            }
+        } else {
+            // 如果获取失败，使用模拟数据
+            todayKnowledgeCards = [
+                KnowledgeCardData(
+                    title: "安全跟车距离",
+                    content: "保持3秒车距原则，在高速公路上应保持更长的跟车距离，确保有足够的反应时间。",
+                    isLearned: false
+                ),
+                KnowledgeCardData(
+                    title: "雨天驾驶技巧",
+                    content: "雨天路面湿滑，要降低车速，保持更大的跟车距离，避免急刹车和急转弯。",
+                    isLearned: true
+                ),
+                KnowledgeCardData(
+                    title: "停车技巧",
+                    content: "倒车入库时要多观察后视镜，利用参照物判断车位，耐心慢速操作。",
+                    isLearned: false
+                )
+            ]
+        }
+    }
 	
 	var monthLogs: [LogEntry] {
 		let cal = Calendar(identifier: .gregorian)
