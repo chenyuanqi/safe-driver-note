@@ -1,6 +1,7 @@
 import SwiftUI
 import CoreLocation
 import Foundation
+import UserNotifications
 
 struct HomeView: View {
     @StateObject private var vm = HomeViewModel()
@@ -34,6 +35,10 @@ struct HomeView: View {
     
     // 添加设置页面相关属性
     @State private var showingSettings = false
+    
+    // 添加通知权限弹框相关属性
+    @State private var showingNotificationPermissionAlert = false
+    @State private var notificationPermissionGranted: Bool? = nil
     
     var body: some View {
         NavigationStack {
@@ -87,6 +92,9 @@ struct HomeView: View {
                 await vm.loadRecentRoutes()
                 // 获取当前位置（一次性，不并发重复调用）
                 await updateCurrentLocation()
+                
+                // 检查通知权限状态
+                await checkNotificationPermission()
             }
             
             // 监听驾驶服务错误通知
@@ -225,6 +233,16 @@ struct HomeView: View {
         }
         .sheet(isPresented: $showingPermissionGuide) {
             LocationPermissionGuideView()
+        }
+        .alert("通知权限", isPresented: $showingNotificationPermissionAlert) {
+            Button("暂不开启") { 
+                showingNotificationPermissionAlert = false
+            }
+            Button("去开启") { 
+                requestNotificationPermission()
+            }
+        } message: {
+            Text("开启通知权限，您将每天收到安全驾驶提醒，祝您今天开车安全第一！")
         }
     }
 	
@@ -710,6 +728,37 @@ struct HomeView: View {
         // 重置定时器：先停止再重新启动
         stopAutoCarousel()
         startAutoCarousel()
+    }
+    
+    /// 检查通知权限状态并在未授予权限时显示弹框
+    private func checkNotificationPermission() async {
+        let settings = await UNUserNotificationCenter.current().notificationSettings()
+        await MainActor.run {
+            notificationPermissionGranted = settings.alertSetting == .enabled
+            
+            // 如果通知权限未授予，显示权限请求弹框
+            if notificationPermissionGranted != true {
+                showingNotificationPermissionAlert = true
+            }
+        }
+    }
+    
+    /// 请求通知权限
+    private func requestNotificationPermission() {
+        Task {
+            let granted = await NotificationService.shared.requestPermission()
+            await MainActor.run {
+                notificationPermissionGranted = granted
+                showingNotificationPermissionAlert = false
+                
+                // 如果权限被授予，设置每日提醒
+                if granted {
+                    Task {
+                        await NotificationService.shared.scheduleDailyKnowledgeReminder()
+                    }
+                }
+            }
+        }
     }
 }
 
