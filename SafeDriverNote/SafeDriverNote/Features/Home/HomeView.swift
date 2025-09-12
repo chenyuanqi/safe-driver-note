@@ -606,11 +606,11 @@ struct HomeView: View {
 				}
 				
 				if vm.recentActivities.count > 3 {
-					NavigationLink(destination: LogListView().environmentObject(AppDI.shared)) {
+					NavigationLink(destination: LogListView(defaultTab: .driveRoute).environmentObject(AppDI.shared)) {
 						HStack {
 							Text("查看更多")
 								.font(.bodySmall)
-							.foregroundColor(.brandSecondary500)
+								.foregroundColor(.brandSecondary500)
 						
 							Spacer()
 							

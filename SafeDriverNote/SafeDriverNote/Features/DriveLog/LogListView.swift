@@ -6,12 +6,20 @@ struct LogListView: View {
     @State private var searchText: String = ""
     @State private var selectedSegment: Segment = .all
     @State private var showingStats = false
+    
+    // 添加初始化参数，用于指定默认选中的tab
+    var defaultTab: Segment?
 
-    private enum Segment: String, CaseIterable {
+    // 将枚举改为public，以便外部可以访问
+    public enum Segment: String, CaseIterable {
         case all = "全部"
         case mistake = "失误"
         case success = "成功"
         case driveRoute = "行驶记录"
+    }
+    
+    init(defaultTab: Segment? = nil) {
+        self.defaultTab = defaultTab
     }
 
     var body: some View {
@@ -92,6 +100,13 @@ struct LogListView: View {
             NavigationStack {
                 LogStatsView(logs: vm.logs)
                     .navigationTitle("数据统计")
+            }
+        }
+        .onAppear {
+            // 如果有默认tab，则设置选中状态
+            if let defaultTab = defaultTab {
+                selectedSegment = defaultTab
+                updateFilter(for: defaultTab)
             }
         }
     }
