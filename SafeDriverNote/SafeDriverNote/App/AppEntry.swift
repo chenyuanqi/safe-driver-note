@@ -60,12 +60,15 @@ struct RootTabView: View {
             }
             .tabItem { Label("知识", systemImage: "book") }
             
+            // 测试页 (暂时隐藏)
+            /*
             #if DEBUG
             NavigationStack {
                 WeakNetworkTestView()
             }
             .tabItem { Label("测试", systemImage: "testtube.2") }
             #endif
+            */
         }
     }
 }

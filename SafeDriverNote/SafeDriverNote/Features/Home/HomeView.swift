@@ -37,7 +37,7 @@ struct HomeView: View {
         VStack(spacing: 0) {
             // Custom Navigation Bar
             StandardNavigationBar(
-                    title: "安全驾驶",
+                title: "安全驾驶",
                 showBackButton: false,
                 trailingButtons: [
                     StandardNavigationBar.NavBarButton(icon: "bell") {
@@ -50,176 +50,176 @@ struct HomeView: View {
                 VStack(spacing: Spacing.xxxl) {
                     // Status Panel
                     statusPanel
-					
-					// Quick Actions
-					quickActionsSection
-					
-					// Today Learning
-					todayLearningSection
-					
-					// Smart Recommendations
-					smartRecommendationsSection
-					
-					// Recent Activity
-					recentActivitySection
-				}
-				.padding(.horizontal, Spacing.pagePadding)
-				.padding(.vertical, Spacing.lg)
-			}
-			.background(Color.brandSecondary50)
-		}
-		.navigationDestination(isPresented: $showingKnowledgeView) {
-			KnowledgeTodayView()
-		}
-		}
-		.onAppear { 
-			vm.reload() 
-			// 先请求位置权限，避免交互中触发系统弹窗导致等待
-			LocationService.shared.requestLocationPermission()
-			Task {
-				await vm.loadRecentRoutes()
-				// 获取当前位置（一次性，不并发重复调用）
-				await updateCurrentLocation()
-			}
-			
-			// 监听驾驶服务错误通知
-			NotificationCenter.default.addObserver(
-				forName: .driveServiceError,
-				object: nil,
-				queue: .main
-			) { notification in
-				if let errorMessage = notification.object as? String {
-					driveErrorMessage = errorMessage
-					showingDriveError = true
-				}
-			}
-		}
-		.onDisappear {
-			// 移除通知观察者
-			NotificationCenter.default.removeObserver(self)
-			// 停止自动轮播定时器
-			stopAutoCarousel()
-		}
-		.sheet(isPresented: $showingLogEditor) {
-			LogEditorView(entry: nil) { type, detail, location, scene, cause, improvement, tags, photos, audioFileName, transcript in
-				// 创建新的驾驶日志
-				let newEntry = LogEntry(
-					type: type,
-					locationNote: location,
-					scene: scene,
-					detail: detail,
-					cause: cause,
-					improvement: improvement,
-					tags: tags.isEmpty ? [] : tags.components(separatedBy: ",").map { $0.trimmingCharacters(in: .whitespaces) },
-					photoLocalIds: photos,
-					audioFileName: audioFileName,
-					transcript: transcript
-				)
-				try? AppDI.shared.logRepository.add(newEntry)
-				// 重新加载数据
-				vm.reload()
-			}
-		}
-		.alert("安全提醒", isPresented: $showingSafetyAlert) {
-			Button("知道了") { }
-		} message: {
-			Text("道路千万条，安全第一条！平安抵达目的地才是唯一目的！")
-		}
-		.alert("功能开发中", isPresented: $showingVoiceRecordingAlert) {
-			Button("知道了") { }
-		} message: {
-			Text("语音记录功能正在开发中，敬请期待！")
-		}
-		.alert("开始驾驶", isPresented: $showingDriveConfirmation) {
-			Button("取消", role: .cancel) { }
-			Button("开始") {
-				Task {
-					// 尝试定位，失败累计计数
-					let locationService = LocationService.shared
-					do {
-						try _ = await locationService.getCurrentLocation(timeout: 5.0)
-						await driveService.startDriving()
-						await vm.loadRecentRoutes()
-						manualLocationTries = 0
-					} catch {
-						manualLocationTries += 1
-						if manualLocationTries >= 3 {
-							manualStartOrEnd = "start"
-							showingManualLocationSheet = true
-						} else {
-							// 仍然允许开始驾驶，但无起点
-							await driveService.startDriving()
-							await vm.loadRecentRoutes()
-						}
-					}
-				}
-			}
-		} message: {
-			Text("将记录您的驾驶路线和时间，帮助您更好地管理驾驶行为。道路千万条，安全第一条！")
-		}
-		.alert("驾驶服务错误", isPresented: $showingDriveError) {
-			Button("知道了") { }
-		} message: {
-			Text(driveErrorMessage)
-		}
-		.sheet(isPresented: $showingManualLocationSheet) {
-			NavigationStack {
-				VStack(alignment: .leading, spacing: Spacing.lg) {
-					Text(manualStartOrEnd == "start" ? "输入起点位置" : "输入终点位置")
-						.font(.title3)
-						.fontWeight(.semibold)
-					TextField("如：上海市人民广场或经纬度 31.23,121.47", text: $manualAddress)
-						.textInputAutocapitalization(.never)
-						.autocorrectionDisabled(true)
-					Spacer()
-				}
-				.padding()
-				.toolbar {
-					ToolbarItem(placement: .cancellationAction) {
-						Button("取消") { showingManualLocationSheet = false }
-					}
-					ToolbarItem(placement: .confirmationAction) {
-						Button("保存") {
-							Task { @MainActor in
-								let ls = LocationService.shared
-								// 支持“lat,lon”直接输入
-								let trimmed = manualAddress.trimmingCharacters(in: .whitespacesAndNewlines)
-								var location: CLLocation?
-								if let comma = trimmed.firstIndex(of: ",") {
-									let latStr = String(trimmed[..<comma]).trimmingCharacters(in: .whitespaces)
-									let lonStr = String(trimmed[trimmed.index(after: comma)...]).trimmingCharacters(in: .whitespaces)
-									if let lat = Double(latStr), let lon = Double(lonStr) {
-										location = CLLocation(latitude: lat, longitude: lon)
-									}
-								}
-								if location == nil {
-									do { location = try await ls.geocodeAddress(trimmed) } catch { location = nil }
-								}
-								if let loc = location {
-									let address = await ls.getLocationDescription(from: loc)
-									let routeLoc = RouteLocation(latitude: loc.coordinate.latitude, longitude: loc.coordinate.longitude, address: address)
-									if manualStartOrEnd == "start" {
-										await driveService.startDriving(with: routeLoc)
-										await vm.loadRecentRoutes()
-									} else {
-										await driveService.endDriving(with: routeLoc)
-										manualEndTries = 0
-										await vm.loadRecentRoutes()
-									}
-								}
-								manualAddress = ""
-								showingManualLocationSheet = false
-							}
-						}
-						.disabled(manualAddress.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-					}
-				}
-			}
-		}
-		.sheet(isPresented: $showingPermissionGuide) {
-			LocationPermissionGuideView()
-		}
-	}
+                    
+                    // Quick Actions
+                    quickActionsSection
+                    
+                    // Today Learning
+                    todayLearningSection
+                    
+                    // Smart Recommendations (暂时隐藏)
+                    // smartRecommendationsSection
+                    
+                    // Recent Activity
+                    recentActivitySection
+                }
+                .padding(.horizontal, Spacing.pagePadding)
+                .padding(.vertical, Spacing.lg)
+            }
+            .background(Color.brandSecondary50)
+        }
+        .navigationDestination(isPresented: $showingKnowledgeView) {
+            KnowledgeTodayView()
+        }
+        }
+        .onAppear { 
+            vm.reload() 
+            // 先请求位置权限，避免交互中触发系统弹窗导致等待
+            LocationService.shared.requestLocationPermission()
+            Task {
+                await vm.loadRecentRoutes()
+                // 获取当前位置（一次性，不并发重复调用）
+                await updateCurrentLocation()
+            }
+            
+            // 监听驾驶服务错误通知
+            NotificationCenter.default.addObserver(
+                forName: .driveServiceError,
+                object: nil,
+                queue: .main
+            ) { notification in
+                if let errorMessage = notification.object as? String {
+                    driveErrorMessage = errorMessage
+                    showingDriveError = true
+                }
+            }
+        }
+        .onDisappear {
+            // 移除通知观察者
+            NotificationCenter.default.removeObserver(self)
+            // 停止自动轮播定时器
+            stopAutoCarousel()
+        }
+        .sheet(isPresented: $showingLogEditor) {
+            LogEditorView(entry: nil) { type, detail, location, scene, cause, improvement, tags, photos, audioFileName, transcript in
+                // 创建新的驾驶日志
+                let newEntry = LogEntry(
+                    type: type,
+                    locationNote: location,
+                    scene: scene,
+                    detail: detail,
+                    cause: cause,
+                    improvement: improvement,
+                    tags: tags.isEmpty ? [] : tags.components(separatedBy: ",").map { $0.trimmingCharacters(in: .whitespaces) },
+                    photoLocalIds: photos,
+                    audioFileName: audioFileName,
+                    transcript: transcript
+                )
+                try? AppDI.shared.logRepository.add(newEntry)
+                // 重新加载数据
+                vm.reload()
+            }
+        }
+        .alert("安全提醒", isPresented: $showingSafetyAlert) {
+            Button("知道了") { }
+        } message: {
+            Text("道路千万条，安全第一条！平安抵达目的地才是唯一目的！")
+        }
+        .alert("功能开发中", isPresented: $showingVoiceRecordingAlert) {
+            Button("知道了") { }
+        } message: {
+            Text("语音记录功能正在开发中，敬请期待！")
+        }
+        .alert("开始驾驶", isPresented: $showingDriveConfirmation) {
+            Button("取消", role: .cancel) { }
+            Button("开始") {
+                Task {
+                    // 尝试定位，失败累计计数
+                    let locationService = LocationService.shared
+                    do {
+                        try _ = await locationService.getCurrentLocation(timeout: 5.0)
+                        await driveService.startDriving()
+                        await vm.loadRecentRoutes()
+                        manualLocationTries = 0
+                    } catch {
+                        manualLocationTries += 1
+                        if manualLocationTries >= 3 {
+                            manualStartOrEnd = "start"
+                            showingManualLocationSheet = true
+                        } else {
+                            // 仍然允许开始驾驶，但无起点
+                            await driveService.startDriving()
+                            await vm.loadRecentRoutes()
+                        }
+                    }
+                }
+            }
+        } message: {
+            Text("将记录您的驾驶路线和时间，帮助您更好地管理驾驶行为。道路千万条，安全第一条！")
+        }
+        .alert("驾驶服务错误", isPresented: $showingDriveError) {
+            Button("知道了") { }
+        } message: {
+            Text(driveErrorMessage)
+        }
+        .sheet(isPresented: $showingManualLocationSheet) {
+            NavigationStack {
+                VStack(alignment: .leading, spacing: Spacing.lg) {
+                    Text(manualStartOrEnd == "start" ? "输入起点位置" : "输入终点位置")
+                        .font(.title3)
+                        .fontWeight(.semibold)
+                    TextField("如：上海市人民广场或经纬度 31.23,121.47", text: $manualAddress)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled(true)
+                    Spacer()
+                }
+                .padding()
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("取消") { showingManualLocationSheet = false }
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("保存") {
+                            Task { @MainActor in
+                                let ls = LocationService.shared
+                                // 支持“lat,lon”直接输入
+                                let trimmed = manualAddress.trimmingCharacters(in: .whitespacesAndNewlines)
+                                var location: CLLocation?
+                                if let comma = trimmed.firstIndex(of: ",") {
+                                    let latStr = String(trimmed[..<comma]).trimmingCharacters(in: .whitespaces)
+                                    let lonStr = String(trimmed[trimmed.index(after: comma)...]).trimmingCharacters(in: .whitespaces)
+                                    if let lat = Double(latStr), let lon = Double(lonStr) {
+                                        location = CLLocation(latitude: lat, longitude: lon)
+                                    }
+                                }
+                                if location == nil {
+                                    do { location = try await ls.geocodeAddress(trimmed) } catch { location = nil }
+                                }
+                                if let loc = location {
+                                    let address = await ls.getLocationDescription(from: loc)
+                                    let routeLoc = RouteLocation(latitude: loc.coordinate.latitude, longitude: loc.coordinate.longitude, address: address)
+                                    if manualStartOrEnd == "start" {
+                                        await driveService.startDriving(with: routeLoc)
+                                        await vm.loadRecentRoutes()
+                                    } else {
+                                        await driveService.endDriving(with: routeLoc)
+                                        manualEndTries = 0
+                                        await vm.loadRecentRoutes()
+                                    }
+                                }
+                                manualAddress = ""
+                                showingManualLocationSheet = false
+                            }
+                        }
+                        .disabled(manualAddress.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    }
+                }
+            }
+        }
+        .sheet(isPresented: $showingPermissionGuide) {
+            LocationPermissionGuideView()
+        }
+    }
 	
 	// MARK: - Status Panel
 	private var statusPanel: some View {
