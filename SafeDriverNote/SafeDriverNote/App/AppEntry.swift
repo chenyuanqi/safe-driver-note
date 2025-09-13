@@ -39,6 +39,10 @@ struct SafeDriverNoteApp: App {
                     Task {
                         await setupNotifications()
                     }
+                    // 应用启动时清除通知红点
+                    Task {
+                        await clearNotificationBadges()
+                    }
                 }
         }
         .modelContainer(sharedModelContainer)
@@ -50,6 +54,11 @@ struct SafeDriverNoteApp: App {
         if permissionGranted {
             await NotificationService.shared.scheduleDailyKnowledgeReminder()
         }
+    }
+    
+    /// 清除通知红点
+    private func clearNotificationBadges() async {
+        await NotificationService.shared.clearBadges()
     }
 }
 

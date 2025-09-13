@@ -75,4 +75,13 @@ final class NotificationService: ObservableObject {
         UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: [identifier])
         UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: [identifier])
     }
+    
+    /// 清除应用图标上的通知红点
+    func clearBadges() async {
+        do {
+            try await UNUserNotificationCenter.current().setBadgeCount(0)
+        } catch {
+            print("Failed to clear badges: \(error)")
+        }
+    }
 }

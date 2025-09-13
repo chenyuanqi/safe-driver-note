@@ -100,6 +100,11 @@ struct HomeView: View {
             
             // 添加通知监听
             setupNotificationObservers()
+            
+            // 清除通知红点
+            Task {
+                await clearNotificationBadges()
+            }
         }
         .onDisappear {
             // 移除通知观察者
@@ -781,6 +786,11 @@ struct HomeView: View {
                 }
             }
         }
+    }
+    
+    /// 清除通知红点
+    private func clearNotificationBadges() async {
+        await NotificationService.shared.clearBadges()
     }
 }
 
