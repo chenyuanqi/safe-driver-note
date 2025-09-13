@@ -2,6 +2,7 @@ import SwiftUI
 import CoreLocation
 import Foundation
 import UserNotifications
+import SwiftData
 
 struct HomeView: View {
     @StateObject private var vm = HomeViewModel()
@@ -97,21 +98,12 @@ struct HomeView: View {
                 await checkNotificationPermission()
             }
             
-            // 监听驾驶服务错误通知
-            NotificationCenter.default.addObserver(
-                forName: .driveServiceError,
-                object: nil,
-                queue: .main
-            ) { notification in
-                if let errorMessage = notification.object as? String {
-                    driveErrorMessage = errorMessage
-                    showingDriveError = true
-                }
-            }
+            // 添加通知监听
+            setupNotificationObservers()
         }
         .onDisappear {
             // 移除通知观察者
-            NotificationCenter.default.removeObserver(self)
+            removeNotificationObservers()
             // 停止自动轮播定时器
             stopAutoCarousel()
         }
@@ -244,6 +236,36 @@ struct HomeView: View {
         } message: {
             Text("开启通知权限，您将每天收到安全驾驶提醒，祝您今天开车安全第一！")
         }
+    }
+    
+    // 添加通知监听
+    private func setupNotificationObservers() {
+        // 监听驾驶服务错误通知
+        NotificationCenter.default.addObserver(
+            forName: .driveServiceError,
+            object: nil,
+            queue: .main
+        ) { notification in
+            if let errorMessage = notification.object as? String {
+                driveErrorMessage = errorMessage
+                showingDriveError = true
+            }
+        }
+        
+        // 监听知识卡片标记通知
+        NotificationCenter.default.addObserver(
+            forName: .knowledgeCardMarked,
+            object: nil,
+            queue: .main
+        ) { _ in
+            // 重新加载今日学习卡片
+            vm.loadTodayKnowledgeCards()
+        }
+    }
+    
+    // 移除通知监听
+    private func removeNotificationObservers() {
+        NotificationCenter.default.removeObserver(self)
     }
 	
 	// MARK: - Status Panel
@@ -919,15 +941,30 @@ final class HomeViewModel: ObservableObject {
         }
     }
     
-    private func loadTodayKnowledgeCards() {
+    func loadTodayKnowledgeCards() {
         // 从知识库获取今日学习卡片数据
         let knowledgeRepo = AppDI.shared.knowledgeRepository
         if let knowledgeCards = try? knowledgeRepo.todayCards(limit: 3) {
+            // 获取今日的学习进度
+            let ctx = try? GlobalModelContext.context
+            let progresses = (try? ctx?.fetch(FetchDescriptor<KnowledgeProgress>())) ?? []
+            
+            // 获取今天的日期（用于检查是否已学习）
+            let today = Calendar.current.startOfDay(for: Date())
+            
             self.todayKnowledgeCards = knowledgeCards.map { card in
-                KnowledgeCardData(
+                // 检查该卡片今天是否已学习
+                let isLearned = progresses.contains { progress in
+                    progress.cardId == card.id && 
+                    progress.markedDates.contains { date in
+                        Calendar.current.isDate(date, inSameDayAs: today)
+                    }
+                }
+                
+                return KnowledgeCardData(
                     title: card.title,
                     content: card.what,
-                    isLearned: false
+                    isLearned: isLearned
                 )
             }
         } else {
@@ -941,7 +978,7 @@ final class HomeViewModel: ObservableObject {
                 KnowledgeCardData(
                     title: "雨天驾驶技巧",
                     content: "雨天路面湿滑，要降低车速，保持更大的跟车距离，避免急刹车和急转弯。",
-                    isLearned: true
+                    isLearned: false
                 ),
                 KnowledgeCardData(
                     title: "停车技巧",
@@ -999,7 +1036,7 @@ final class HomeViewModel: ObservableObject {
 	
 	var todayCompletionRate: String {
 		let totalTasks = 3 // Assume 3 daily tasks (checklist pre, post, learning)
-		let completed = min(1, todayPreCount) + min(1, todayPostCount) + (todayKnowledgeCards.filter(\.isLearned).count > 0 ? 1 : 0)
+		let completed = min(1, todayPreCount) + min(1, todayPostCount) + (todayKnowledgeCards.allSatisfy(\.isLearned) && !todayKnowledgeCards.isEmpty ? 1 : 0)
 		let rate = totalTasks > 0 ? (Double(completed) / Double(totalTasks) * 100) : 0
 		return String(format: "%.0f%%", rate)
 	}

@@ -18,6 +18,9 @@ final class KnowledgeViewModel: ObservableObject {
     func mark(card: KnowledgeCard) {
         try? repository.mark(cardId: card.id)
         today.removeAll { $0.id == card.id }
+        
+        // 发送通知，告知首页更新学习进度
+        NotificationCenter.default.post(name: .knowledgeCardMarked, object: nil)
     }
 
     func snooze(card: KnowledgeCard) {
@@ -32,4 +35,9 @@ final class KnowledgeViewModel: ObservableObject {
             // 简单忽略错误，实际可加入用户提示
         }
     }
+}
+
+// 扩展Notification.Name以添加自定义通知
+extension Notification.Name {
+    static let knowledgeCardMarked = Notification.Name("knowledgeCardMarked")
 }
