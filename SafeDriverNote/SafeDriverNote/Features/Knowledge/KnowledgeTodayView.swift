@@ -162,17 +162,6 @@ struct KnowledgeTodayView: View {
         }
     }
         
-    // 增加滑动过的卡片计数，并在达到3个时发送通知
-    private func incrementSwipedCardsCount() {
-        swipedCardsCount += 1
-        // 检查是否已经滑动了3个卡片且还没有发送过通知
-        if swipedCardsCount >= 3 && !hasSentCompletionNotification {
-            // 发送通知，告知首页更新学习进度
-            NotificationCenter.default.post(name: .knowledgeCardMarked, object: nil)
-            hasSentCompletionNotification = true
-        }
-    }
-        
     private func resetCardState() {
         withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
             dragOffset = 0
