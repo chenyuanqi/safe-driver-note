@@ -22,12 +22,18 @@ struct KnowledgeTodayView: View {
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                // 背景
-                Color.brandSecondary50
-                    .ignoresSafeArea()
-                
-                Group {
+            ScrollView {
+                LazyVStack {
+                    // 内容占满全屏高度
+                    Color.clear
+                        .frame(height: UIScreen.main.bounds.height)
+                        .overlay(
+                            ZStack {
+                                // 背景
+                                Color.brandSecondary50
+                                    .ignoresSafeArea()
+
+                                Group {
                     if showDrivingRules {
                         DrivingRulesView(onDismiss: {
                             withAnimation {
@@ -98,7 +104,13 @@ struct KnowledgeTodayView: View {
                     } else {
                         emptyState
                     }
+                                }
+                            }
+                        )
                 }
+            }
+            .refreshable {
+                await refreshKnowledgeData()
             }
             .navigationBarHidden(true)
             .overlay(alignment: .top) {
@@ -309,6 +321,15 @@ struct KnowledgeTodayView: View {
             Spacer()
         }
         .padding(Spacing.pagePadding)
+    }
+
+    // MARK: - Pull to Refresh
+    private func refreshKnowledgeData() async {
+        // 重新加载今日知识卡片
+        vm.loadToday()
+
+        // 添加轻微延迟以提供更好的用户体验
+        try? await Task.sleep(nanoseconds: 500_000_000) // 0.5秒
     }
 }
 

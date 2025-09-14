@@ -50,6 +50,9 @@ struct ChecklistView: View {
                     .padding(.horizontal, Spacing.pagePadding)
                     .padding(.vertical, Spacing.lg)
                 }
+                .refreshable {
+                    await refreshChecklistData()
+                }
                 .background(Color.brandSecondary50)
             }
             
@@ -349,6 +352,16 @@ struct ChecklistView: View {
             .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
         }
         .buttonStyle(PlainButtonStyle())
+    }
+
+    // MARK: - Pull to Refresh
+    private func refreshChecklistData() async {
+        // 重新加载清单数据
+        vm.reloadItems()
+        vm.reloadPunchesToday()
+
+        // 添加轻微延迟以提供更好的用户体验
+        try? await Task.sleep(nanoseconds: 500_000_000) // 0.5秒
     }
 }
 

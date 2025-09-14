@@ -41,10 +41,10 @@ struct LogListView: View {
                 VStack(spacing: Spacing.xxxl) {
                     // Tab Bar
                     tabBarSection
-                    
+
                     // Filter Bar
                     filterBarSection
-                    
+
                     // Content
                     Group {
                         if selectedSegment == .driveRoute {
@@ -64,6 +64,9 @@ struct LogListView: View {
                 }
                 .padding(.horizontal, Spacing.pagePadding)
                 .padding(.vertical, Spacing.lg)
+            }
+            .refreshable {
+                await refreshLogData()
             }
             .background(Color.brandSecondary50)
         }
@@ -784,6 +787,15 @@ struct LogListView: View {
         f.dateFormat = "yyyy年M月d日 HH:mm" // 示例：2025年8月18日 16:37
         return f
     }()
+
+    // MARK: - Pull to Refresh
+    private func refreshLogData() async {
+        // 重新加载日志数据
+        vm.load()
+
+        // 添加轻微延迟以提供更好的用户体验
+        try? await Task.sleep(nanoseconds: 500_000_000) // 0.5秒
+    }
 }
 
 #Preview { LogListView() }

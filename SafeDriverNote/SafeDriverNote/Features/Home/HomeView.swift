@@ -60,21 +60,24 @@ struct HomeView: View {
                 VStack(spacing: Spacing.xxxl) {
                     // Status Panel
                     statusPanel
-                    
+
                     // Quick Actions
                     quickActionsSection
-                    
+
                     // Today Learning
                     todayLearningSection
-                    
+
                     // Smart Recommendations (暂时隐藏)
                     // smartRecommendationsSection
-                    
+
                     // Recent Activity
                     recentActivitySection
                 }
                 .padding(.horizontal, Spacing.pagePadding)
                 .padding(.vertical, Spacing.lg)
+            }
+            .refreshable {
+                await refreshHomeData()
             }
             .background(Color.brandSecondary50)
         }
@@ -791,6 +794,24 @@ struct HomeView: View {
     /// 清除通知红点
     private func clearNotificationBadges() async {
         await NotificationService.shared.clearBadges()
+    }
+
+    // MARK: - Pull to Refresh
+    private func refreshHomeData() async {
+        // 重新加载主页数据
+        vm.reload()
+
+        // 重新加载路线数据
+        await vm.loadRecentRoutes()
+
+        // 更新当前位置
+        await updateCurrentLocation()
+
+        // 检查通知权限状态
+        await checkNotificationPermission()
+
+        // 添加轻微延迟以提供更好的用户体验
+        try? await Task.sleep(nanoseconds: 500_000_000) // 0.5秒
     }
 }
 
