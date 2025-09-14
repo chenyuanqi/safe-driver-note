@@ -59,6 +59,9 @@ final class NotificationService: ObservableObject {
         do {
             try await UNUserNotificationCenter.current().add(request)
             print("Daily knowledge reminder scheduled for \(notificationHour):\(String(format: "%02d", notificationMinute))")
+
+            // 记录通知注册时间（用于延时提醒判断）
+            UserDefaults.standard.set(Date(), forKey: "lastNotificationDate")
         } catch {
             print("Failed to schedule daily knowledge reminder: \(error)")
         }

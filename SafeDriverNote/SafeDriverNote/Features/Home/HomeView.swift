@@ -40,6 +40,11 @@ struct HomeView: View {
     // 添加通知权限弹框相关属性
     @State private var showingNotificationPermissionAlert = false
     @State private var notificationPermissionGranted: Bool? = nil
+
+    // 添加通知详情相关属性
+    @State private var showingNotificationDetail = false
+    @State private var notificationDetailTitle = ""
+    @State private var notificationDetailContent = ""
     
     var body: some View {
         NavigationStack {
@@ -49,6 +54,11 @@ struct HomeView: View {
                 title: "安全驾驶",
                 showBackButton: false,
                 trailingButtons: [
+                    StandardNavigationBar.NavBarButton(
+                        icon: notificationPermissionGranted == true ? "bell.fill" : "bell.slash"
+                    ) {
+                        toggleNotificationQuickly()
+                    },
                     StandardNavigationBar.NavBarButton(icon: "gear") {
                         // 跳转到设置页面
                         showingSettings = true
@@ -243,6 +253,11 @@ struct HomeView: View {
             }
         } message: {
             Text("开启通知权限，您将每天收到安全驾驶提醒，祝您今天开车安全第一！")
+        }
+        .alert(notificationDetailTitle, isPresented: $showingNotificationDetail) {
+            Button("知道了") { }
+        } message: {
+            Text(notificationDetailContent)
         }
     }
     
@@ -794,6 +809,49 @@ struct HomeView: View {
     /// 清除通知红点
     private func clearNotificationBadges() async {
         await NotificationService.shared.clearBadges()
+    }
+
+    /// 快速切换通知状态
+    private func toggleNotificationQuickly() {
+        if notificationPermissionGranted == true {
+            // 如果已开启，则关闭通知
+            Task {
+                await NotificationService.shared.cancelAllNotifications()
+                await MainActor.run {
+                    notificationPermissionGranted = false
+                }
+            }
+        } else {
+            // 如果未开启，直接尝试开启通知
+            Task {
+                let granted = await NotificationService.shared.requestPermission()
+                await MainActor.run {
+                    notificationPermissionGranted = granted
+                    if granted {
+                        // 如果权限被授予，设置每日提醒
+                        Task {
+                            await NotificationService.shared.scheduleDailyKnowledgeReminder()
+                        }
+                        // 显示成功提示
+                        notificationDetailTitle = "通知已开启"
+                        notificationDetailContent = "您将每天收到安全驾驶提醒。祝您今天开车安全第一！"
+                        showingNotificationDetail = true
+                    } else {
+                        // 如果权限被拒绝，显示引导信息
+                        notificationDetailTitle = "无法开启通知"
+                        notificationDetailContent = "请在系统设置中允许安全驾驶助手发送通知，这样您就能每天收到安全驾驶提醒了。"
+                        showingNotificationDetail = true
+                    }
+                }
+            }
+        }
+    }
+
+    /// 处理系统通知点击事件
+    private func handleNotificationTap() {
+        notificationDetailTitle = "今日安全驾驶提醒"
+        notificationDetailContent = "祝您今天开车安全第一！您可以在首页查看今日的安全驾驶知识，学习新的驾驶技巧。记住：道路千万条，安全第一条！"
+        showingNotificationDetail = true
     }
 
     // MARK: - Pull to Refresh
