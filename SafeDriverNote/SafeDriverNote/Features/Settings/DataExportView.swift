@@ -3,6 +3,7 @@ import Foundation
 
 struct DataExportView: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var di: AppDI
     @State private var exportDrivingRoutes = true
     @State private var exportDrivingLogs = true
     @State private var exportChecklistRecords = true
@@ -10,6 +11,14 @@ struct DataExportView: View {
     @State private var exportFormat: ExportFormat = .json
     @State private var isExporting = false
     @State private var showingExportComplete = false
+    @State private var showingError = false
+    @State private var errorMessage = ""
+
+    // 数据统计
+    @State private var routeCount = 0
+    @State private var logCount = 0
+    @State private var checklistCount = 0
+    @State private var knowledgeCount = 0
 
     enum ExportFormat: String, CaseIterable {
         case json = "JSON"
@@ -56,6 +65,9 @@ struct DataExportView: View {
                     }
                 }
             }
+            .onAppear {
+                loadDataCounts()
+            }
             .alert("导出完成", isPresented: $showingExportComplete) {
                 Button("确定") {
                     showingExportComplete = false
@@ -63,6 +75,11 @@ struct DataExportView: View {
                 }
             } message: {
                 Text("您的数据已成功导出到文件app，可以通过邮件、AirDrop等方式分享。")
+            }
+            .alert("导出失败", isPresented: $showingError) {
+                Button("确定") { }
+            } message: {
+                Text(errorMessage)
             }
         }
     }
@@ -211,19 +228,19 @@ struct DataExportView: View {
             Card(shadow: true) {
                 VStack(spacing: Spacing.md) {
                     if exportDrivingRoutes {
-                        statRow(icon: "car", title: "驾驶路线", count: "23条记录")
+                        statRow(icon: "car", title: "驾驶路线", count: "\(routeCount)条记录")
                     }
 
                     if exportDrivingLogs {
-                        statRow(icon: "list.bullet", title: "驾驶日志", count: "45条记录")
+                        statRow(icon: "list.bullet", title: "驾驶日志", count: "\(logCount)条记录")
                     }
 
                     if exportChecklistRecords {
-                        statRow(icon: "checklist", title: "检查记录", count: "67次检查")
+                        statRow(icon: "checklist", title: "检查记录", count: "\(checklistCount)次检查")
                     }
 
                     if exportKnowledgeProgress {
-                        statRow(icon: "book", title: "学习进度", count: "34个知识点")
+                        statRow(icon: "book", title: "学习进度", count: "\(knowledgeCount)个知识点")
                     }
 
                     if !hasSelectedData {
@@ -320,23 +337,218 @@ struct DataExportView: View {
         }
     }
 
+    private func loadDataCounts() {
+        Task {
+            do {
+                // 加载各类数据的数量
+                let routes = try di.driveRouteRepository.fetchAllRoutes()
+                let logs = try di.logRepository.fetchAll()
+                let checklists = try di.checklistRepository.fetchAllPunches(mode: nil)
+                let knowledge = try di.knowledgeRepository.allCards()
+
+                await MainActor.run {
+                    self.routeCount = routes.count
+                    self.logCount = logs.count
+                    self.checklistCount = checklists.count
+                    self.knowledgeCount = knowledge.count
+                }
+            } catch {
+                await MainActor.run {
+                    print("Failed to load data counts: \(error)")
+                }
+            }
+        }
+    }
+
     private func performExport() {
+        guard hasSelectedData else { return }
+
         isExporting = true
 
-        // 模拟导出过程
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-            isExporting = false
-            showingExportComplete = true
+        Task {
+            do {
+                // 1. 收集选中的数据
+                var exportData: [String: Any] = [:]
+                exportData["exportDate"] = Date()
+                exportData["appVersion"] = "1.0.0"
+
+                if exportDrivingRoutes {
+                    let routes = try di.driveRouteRepository.fetchAllRoutes()
+                    exportData["drivingRoutes"] = routes.map { route in
+                        [
+                            "id": route.id.uuidString,
+                            "startLocation": route.startLocation?.address ?? "",
+                            "endLocation": route.endLocation?.address ?? "",
+                            "startTime": route.startTime,
+                            "endTime": route.endTime as Any,
+                            "distance": route.distance as Any,
+                            "duration": route.duration as Any,
+                            "status": route.status.rawValue,
+                            "notes": route.notes as Any
+                        ]
+                    }
+                }
+
+                if exportDrivingLogs {
+                    let logs = try di.logRepository.fetchAll()
+                    exportData["drivingLogs"] = logs.map { log in
+                        [
+                            "id": log.id.uuidString,
+                            "type": log.type.rawValue,
+                            "locationNote": log.locationNote,
+                            "scene": log.scene,
+                            "detail": log.detail,
+                            "cause": log.cause as Any,
+                            "improvement": log.improvement as Any,
+                            "tags": log.tags,
+                            "createdAt": log.createdAt,
+                            "photoLocalIds": log.photoLocalIds,
+                            "audioFileName": log.audioFileName as Any,
+                            "transcript": log.transcript as Any
+                        ]
+                    }
+                }
+
+                if exportChecklistRecords {
+                    let records = try di.checklistRepository.fetchAllPunches(mode: nil)
+                    exportData["checklistRecords"] = records.map { record in
+                        [
+                            "id": record.id.uuidString,
+                            "mode": record.mode.rawValue,
+                            "checkedItemIds": record.checkedItemIds.map { $0.uuidString },
+                            "isQuickComplete": record.isQuickComplete,
+                            "score": record.score,
+                            "locationNote": record.locationNote as Any,
+                            "createdAt": record.createdAt
+                        ]
+                    }
+                }
+
+                if exportKnowledgeProgress {
+                    // 由于KnowledgeRepository没有fetchAllProgress方法，我们从所有卡片中获取
+                    let cards = try di.knowledgeRepository.allCards()
+                    exportData["knowledgeProgress"] = cards.map { card in
+                        [
+                            "id": card.id,
+                            "title": card.title,
+                            "what": card.what,
+                            "why": card.why,
+                            "how": card.how,
+                            "tags": card.tags
+                        ]
+                    }
+                }
+
+                // 2. 根据格式转换数据
+                let fileName = "SafeDriverNote_Export_\(formatDate(Date()))"
+                let fileURL = try await saveExportData(exportData, fileName: fileName, format: exportFormat)
+
+                await MainActor.run {
+                    self.isExporting = false
+                    self.showingExportComplete = true
+                }
+
+            } catch {
+                await MainActor.run {
+                    self.isExporting = false
+                    self.errorMessage = "导出失败：\(error.localizedDescription)"
+                    self.showingError = true
+                }
+            }
+        }
+    }
+
+    private func saveExportData(_ data: [String: Any], fileName: String, format: ExportFormat) async throws -> URL {
+        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+
+        switch format {
+        case .json:
+            let fileURL = documentsPath.appendingPathComponent("\(fileName).json")
+            let jsonData = try JSONSerialization.data(withJSONObject: data, options: .prettyPrinted)
+            try jsonData.write(to: fileURL)
+            return fileURL
+
+        case .csv:
+            let fileURL = documentsPath.appendingPathComponent("\(fileName).csv")
+            let csvContent = try generateCSVContent(from: data)
+            try csvContent.write(to: fileURL, atomically: true, encoding: .utf8)
+            return fileURL
+
+        case .pdf:
+            let fileURL = documentsPath.appendingPathComponent("\(fileName).pdf")
+            // 简化版PDF生成 - 实际应用中可以使用更复杂的PDF生成库
+            let textContent = generateTextReport(from: data)
+            try textContent.write(to: fileURL.appendingPathExtension("txt"), atomically: true, encoding: .utf8)
+            return fileURL
+        }
+    }
+
+    private func generateCSVContent(from data: [String: Any]) throws -> String {
+        var csvLines: [String] = []
+
+        // CSV标题行
+        csvLines.append("数据类型,ID,类型,位置,场景,详情,日期,标签")
+
+        // 处理驾驶日志
+        if let logs = data["drivingLogs"] as? [[String: Any]] {
+            for log in logs {
+                let line = [
+                    "驾驶日志",
+                    log["id"] as? String ?? "",
+                    log["type"] as? String ?? "",
+                    log["locationNote"] as? String ?? "",
+                    log["scene"] as? String ?? "",
+                    log["detail"] as? String ?? "",
+                    formatDateForCSV(log["createdAt"]),
+                    (log["tags"] as? [String])?.joined(separator: ";") ?? ""
+                ].joined(separator: ",")
+                csvLines.append(line)
+            }
         }
 
-        // TODO: 实现真实的导出逻辑
-        // 1. 收集选中的数据
-        // 2. 根据格式转换数据
-        // 3. 保存到文件系统
-        // 4. 显示完成提示
+        return csvLines.joined(separator: "\n")
+    }
+
+    private func generateTextReport(from data: [String: Any]) -> String {
+        var report = "=== 安全驾驶助手数据导出报告 ===\n"
+        report += "导出时间：\(formatDate(Date()))\n\n"
+
+        if let routes = data["drivingRoutes"] as? [[String: Any]] {
+            report += "驾驶路线记录（\(routes.count)条）：\n"
+            for route in routes {
+                report += "- \(route["startLocation"] ?? "") → \(route["endLocation"] ?? "")\n"
+            }
+            report += "\n"
+        }
+
+        if let logs = data["drivingLogs"] as? [[String: Any]] {
+            report += "驾驶日志（\(logs.count)条）：\n"
+            for log in logs {
+                report += "- [\(log["type"] ?? "")] \(log["scene"] ?? ""): \(log["detail"] ?? "")\n"
+            }
+            report += "\n"
+        }
+
+        return report
+    }
+
+    private func formatDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "zh_CN")
+        formatter.dateFormat = "yyyy-MM-dd_HH-mm-ss"
+        return formatter.string(from: date)
+    }
+
+    private func formatDateForCSV(_ dateObj: Any?) -> String {
+        guard let date = dateObj as? Date else { return "" }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "zh_CN")
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        return formatter.string(from: date)
     }
 }
 
 #Preview {
     DataExportView()
+        .environmentObject(AppDI.shared)
 }

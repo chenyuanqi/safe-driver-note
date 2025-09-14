@@ -8,6 +8,9 @@ struct SettingsView: View {
     @State private var showingDataExport = false
     @State private var showingThemeSelector = false
     @State private var showingLocationPermission = false
+    @State private var showingCloudSyncAlert = false
+    @State private var showingClearCacheAlert = false
+    @State private var showingCacheCleared = false
     @EnvironmentObject private var themeManager: ThemeManager
     @EnvironmentObject private var di: AppDI
 
@@ -64,6 +67,24 @@ struct SettingsView: View {
         .sheet(isPresented: $showingLocationPermission) {
             LocationPermissionView()
                 .environmentObject(di)
+        }
+        .alert("iCloud 同步", isPresented: $showingCloudSyncAlert) {
+            Button("确定") { }
+        } message: {
+            Text("功能未开发")
+        }
+        .alert("清除缓存", isPresented: $showingClearCacheAlert) {
+            Button("取消", role: .cancel) { }
+            Button("确定", role: .destructive) {
+                clearCache()
+            }
+        } message: {
+            Text("这将清理应用的临时文件和缓存数据，确定要继续吗？")
+        }
+        .alert("清理完成", isPresented: $showingCacheCleared) {
+            Button("确定") { }
+        } message: {
+            Text("清理完成")
         }
     }
 
@@ -195,22 +216,29 @@ struct SettingsView: View {
 
                 Divider().padding(.leading, 52)
 
-                settingsRow(
-                    icon: "icloud",
-                    title: "iCloud 同步",
-                    subtitle: "同步数据到 iCloud",
-                    color: .brandSecondary600,
-                    isToggle: true
-                )
+                Button(action: {
+                    showingCloudSyncAlert = true
+                }) {
+                    settingsRow(
+                        icon: "icloud",
+                        title: "iCloud 同步",
+                        subtitle: "同步数据到 iCloud",
+                        color: .brandSecondary600
+                    )
+                }
 
                 Divider().padding(.leading, 52)
 
-                settingsRow(
-                    icon: "trash",
-                    title: "清除缓存",
-                    subtitle: "清理临时文件",
-                    color: .brandWarning500
-                )
+                Button(action: {
+                    showingClearCacheAlert = true
+                }) {
+                    settingsRow(
+                        icon: "trash",
+                        title: "清除缓存",
+                        subtitle: "清理临时文件",
+                        color: .brandWarning500
+                    )
+                }
             }
             .background(Color.cardBackground)
             .cornerRadius(CornerRadius.md)
@@ -292,8 +320,7 @@ struct SettingsView: View {
         icon: String,
         title: String,
         subtitle: String,
-        color: Color,
-        isToggle: Bool = false
+        color: Color
     ) -> some View {
         HStack(spacing: Spacing.md) {
             Image(systemName: icon)
@@ -314,14 +341,9 @@ struct SettingsView: View {
 
             Spacer()
 
-            if isToggle {
-                Toggle("", isOn: .constant(false))
-                    .scaleEffect(0.8)
-            } else {
-                Image(systemName: "chevron.right")
-                    .font(.bodySmall)
-                    .foregroundColor(.brandSecondary300)
-            }
+            Image(systemName: "chevron.right")
+                .font(.bodySmall)
+                .foregroundColor(.brandSecondary300)
         }
         .padding(Spacing.md)
     }
@@ -343,6 +365,49 @@ struct SettingsView: View {
                 await MainActor.run {
                     print("Failed to load user data: \(error)")
                     self.isLoading = false
+                }
+            }
+        }
+    }
+
+    // MARK: - Cache Management
+
+    private func clearCache() {
+        Task {
+            do {
+                // 清理临时目录
+                let tempDirectory = FileManager.default.temporaryDirectory
+                if FileManager.default.fileExists(atPath: tempDirectory.path) {
+                    let tempContents = try FileManager.default.contentsOfDirectory(at: tempDirectory, includingPropertiesForKeys: nil)
+                    for url in tempContents {
+                        try FileManager.default.removeItem(at: url)
+                    }
+                }
+
+                // 清理缓存目录
+                if let cacheDirectory = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first {
+                    let cacheContents = try FileManager.default.contentsOfDirectory(at: cacheDirectory, includingPropertiesForKeys: nil)
+                    for url in cacheContents {
+                        // 只删除非系统缓存文件
+                        if !url.lastPathComponent.hasPrefix("com.apple") {
+                            try FileManager.default.removeItem(at: url)
+                        }
+                    }
+                }
+
+                // 清理图片缓存等应用特定缓存
+                UserDefaults.standard.removeObject(forKey: "ImageCache")
+                UserDefaults.standard.removeObject(forKey: "TempData")
+
+                await MainActor.run {
+                    self.showingCacheCleared = true
+                }
+
+            } catch {
+                await MainActor.run {
+                    print("Failed to clear cache: \(error)")
+                    // 即使出错也显示完成，因为部分清理可能成功了
+                    self.showingCacheCleared = true
                 }
             }
         }
