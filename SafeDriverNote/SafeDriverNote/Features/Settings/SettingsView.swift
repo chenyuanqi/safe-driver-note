@@ -7,6 +7,7 @@ struct SettingsView: View {
     @State private var showingAbout = false
     @State private var showingDataExport = false
     @State private var showingThemeSelector = false
+    @State private var showingLocationPermission = false
     @EnvironmentObject private var themeManager: ThemeManager
     @EnvironmentObject private var di: AppDI
 
@@ -59,6 +60,10 @@ struct SettingsView: View {
         }
         .sheet(isPresented: $showingThemeSelector) {
             ThemeSelectorView()
+        }
+        .sheet(isPresented: $showingLocationPermission) {
+            LocationPermissionView()
+                .environmentObject(di)
         }
     }
 
@@ -154,12 +159,16 @@ struct SettingsView: View {
 
                 Divider().padding(.leading, 52)
 
-                settingsRow(
-                    icon: "location",
-                    title: "位置权限",
-                    subtitle: "用于记录驾驶路线",
-                    color: .brandInfo500
-                )
+                Button(action: {
+                    showingLocationPermission = true
+                }) {
+                    settingsRow(
+                        icon: "location",
+                        title: "位置权限",
+                        subtitle: "用于记录驾驶路线",
+                        color: .brandInfo500
+                    )
+                }
             }
             .background(Color.cardBackground)
             .cornerRadius(CornerRadius.md)
