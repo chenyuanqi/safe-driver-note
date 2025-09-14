@@ -37,7 +37,7 @@ struct DriveRouteDetailView: View {
     
     // MARK: - Route Overview Card
     private var routeOverviewCard: some View {
-        Card(backgroundColor: .white, shadow: true) {
+        Card(shadow: true) {
             VStack(spacing: Spacing.lg) {
                 HStack {
                     Image(systemName: "car.fill")
@@ -92,7 +92,7 @@ struct DriveRouteDetailView: View {
     
     // MARK: - Time Info Card
     private var timeInfoCard: some View {
-        Card(backgroundColor: .white, shadow: true) {
+        Card(shadow: true) {
             VStack(alignment: .leading, spacing: Spacing.lg) {
                 HStack {
                     Image(systemName: "clock")
@@ -130,7 +130,7 @@ struct DriveRouteDetailView: View {
     
     // MARK: - Location Info Card
     private var locationInfoCard: some View {
-        Card(backgroundColor: .white, shadow: true) {
+        Card(shadow: true) {
             VStack(alignment: .leading, spacing: Spacing.lg) {
                 HStack {
                     Image(systemName: "location")
@@ -172,7 +172,7 @@ struct DriveRouteDetailView: View {
     
     // MARK: - Route Map Card
     private var routeMapCard: some View {
-        Card(backgroundColor: .white, shadow: true) {
+        Card(shadow: true) {
             VStack(alignment: .leading, spacing: Spacing.lg) {
                 HStack {
                     Image(systemName: "map")
@@ -197,7 +197,7 @@ struct DriveRouteDetailView: View {
     
     // MARK: - Status Info Card
     private var statusInfoCard: some View {
-        Card(backgroundColor: .white, shadow: true) {
+        Card(shadow: true) {
             VStack(alignment: .leading, spacing: Spacing.lg) {
                 HStack {
                     Image(systemName: "info.circle")

@@ -139,7 +139,7 @@ struct ChecklistAllHistoryView: View {
                 .foregroundColor(.brandSecondary400)
         }
         .padding(Spacing.md)
-        .background(Color.white)
+        .background(Color.cardBackground)
         .cornerRadius(CornerRadius.md)
         .shadow(color: .black.opacity(0.05), radius: CGFloat(2), x: CGFloat(0), y: CGFloat(1))
     }

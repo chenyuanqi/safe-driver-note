@@ -25,6 +25,7 @@ let sharedModelContainer: ModelContainer = {
 @main
 struct SafeDriverNoteApp: App {
     @StateObject private var notificationDelegate = NotificationDelegate()
+    @StateObject private var themeManager = ThemeManager.shared
 
     init() {
         GlobalModelContext.container = sharedModelContainer
@@ -37,6 +38,7 @@ struct SafeDriverNoteApp: App {
             RootTabView()
                 .environmentObject(AppDI.shared)
                 .environmentObject(notificationDelegate)
+                .environmentObject(themeManager)
                 .onAppear {
                     // 设置通知代理
                     UNUserNotificationCenter.current().delegate = notificationDelegate
@@ -91,6 +93,7 @@ struct SafeDriverNoteApp: App {
 
 struct RootTabView: View {
     @EnvironmentObject private var notificationDelegate: NotificationDelegate
+    @EnvironmentObject private var themeManager: ThemeManager
 
     var body: some View {
         TabView {
@@ -113,6 +116,11 @@ struct RootTabView: View {
                 KnowledgeTodayView()
             }
             .tabItem { Label("知识", systemImage: "book") }
+
+            NavigationStack {
+                SettingsView()
+            }
+            .tabItem { Label("设置", systemImage: "gearshape") }
 
             // 测试页 (暂时隐藏)
             /*
@@ -138,6 +146,7 @@ struct RootTabView: View {
         } message: {
             Text("您好像有一段时间没有查看安全驾驶知识了。道路千万条，安全第一条！记得每天学习新的驾驶技巧哦~")
         }
+        .preferredColorScheme(themeManager.colorScheme)
     }
 }
 

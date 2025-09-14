@@ -9,7 +9,7 @@ struct ChecklistStatsSummaryView: View {
             statsGrid
         }
         .padding(Spacing.lg)
-        .background(Color.white)
+        .background(Color.cardBackground)
         .cornerRadius(CornerRadius.lg)
         .shadow(color: .black.opacity(0.05), radius: CGFloat(4), x: CGFloat(0), y: CGFloat(2))
     }

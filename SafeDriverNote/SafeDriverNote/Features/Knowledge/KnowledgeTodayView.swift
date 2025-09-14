@@ -285,7 +285,7 @@ struct KnowledgeTodayView: View {
         }
         .background(
             RoundedRectangle(cornerRadius: CornerRadius.xl, style: .continuous)
-                .fill(Color.white)
+                .fill(Color.cardBackground)
                 .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
         )
         .overlay(
@@ -350,7 +350,7 @@ struct KnowledgeTodayView: View {
             }
             .padding(.horizontal, Spacing.lg)
             .padding(.vertical, Spacing.md)
-            .background(Color.white)
+            .background(Color.cardBackground)
             .cornerRadius(CornerRadius.lg)
             .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
         }

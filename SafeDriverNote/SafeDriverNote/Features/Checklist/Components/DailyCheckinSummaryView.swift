@@ -15,7 +15,7 @@ struct DailyCheckinSummaryView: View {
             }
         }
         .padding(Spacing.lg)
-        .background(Color.white)
+        .background(Color.cardBackground)
         .cornerRadius(CornerRadius.lg)
         .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
     }

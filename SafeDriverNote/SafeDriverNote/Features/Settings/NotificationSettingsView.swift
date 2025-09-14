@@ -13,7 +13,7 @@ struct NotificationSettingsView: View {
             // 标题（移除）
             
             // 通知状态卡片
-            Card(backgroundColor: .white, shadow: true) {
+            Card(shadow: true) {
                 VStack(spacing: Spacing.lg) {
                     HStack {
                         Image(systemName: permissionGranted == true ? "bell.fill" : "bell.slash.fill")
@@ -52,7 +52,7 @@ struct NotificationSettingsView: View {
             }
             
             // 通知时间设置
-            Card(backgroundColor: .white, shadow: true) {
+            Card(shadow: true) {
                 VStack(alignment: .leading, spacing: Spacing.md) {
                     HStack {
                         Image(systemName: "clock")

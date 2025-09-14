@@ -10,7 +10,7 @@ struct Card<Content: View>: View {
     let shadow: Bool
     
     init(
-        backgroundColor: Color = .white,
+        backgroundColor: Color = .cardBackground,
         borderColor: Color? = nil,
         padding: EdgeInsets = EdgeInsets(top: Spacing.cardPadding, leading: Spacing.cardPadding, bottom: Spacing.cardPadding, trailing: Spacing.cardPadding),
         cornerRadius: CGFloat = CornerRadius.lg,
@@ -348,7 +348,7 @@ struct ExpandableCard<Header: View, Content: View>: View {
     let backgroundColor: Color
     
     init(
-        backgroundColor: Color = .white,
+        backgroundColor: Color = .cardBackground,
         @ViewBuilder header: () -> Header,
         @ViewBuilder content: () -> Content
     ) {

@@ -121,7 +121,7 @@ struct LogListView: View {
             options: Segment.allCases,
             displayText: { $0.rawValue }
         )
-        .background(Color.white)
+        .background(Color.cardBackground)
         .onChange(of: selectedSegment) { _, newValue in
             updateFilter(for: newValue)
         }
@@ -165,7 +165,7 @@ struct LogListView: View {
                 tagFilterRow
             }
         }
-        .background(Color.white)
+        .background(Color.cardBackground)
     }
     
     // MARK: - Monthly Stats Row
@@ -336,7 +336,7 @@ struct LogListView: View {
     }
     
     private func modernLogCard(for log: LogEntry) -> some View {
-        Card(backgroundColor: .white, shadow: true) {
+        Card(shadow: true) {
             VStack(alignment: .leading, spacing: Spacing.lg) {
                 // Header Row
                 HStack {
@@ -428,7 +428,7 @@ struct LogListView: View {
     
     private func driveRouteCard(for route: DriveRoute) -> some View {
         NavigationLink(destination: DriveRouteDetailView(route: route).environmentObject(AppDI.shared)) {
-            Card(backgroundColor: .white, shadow: true) {
+            Card(shadow: true) {
                 VStack(alignment: .leading, spacing: Spacing.lg) {
                     // Header Row
                     HStack {

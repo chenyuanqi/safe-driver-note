@@ -8,7 +8,7 @@ struct BrandNavigationBar<Leading: View, Center: View, Trailing: View>: View {
     let backgroundColor: Color
     
     init(
-        backgroundColor: Color = .white,
+        backgroundColor: Color = .cardBackground,
         @ViewBuilder leading: () -> Leading,
         @ViewBuilder center: () -> Center,
         @ViewBuilder trailing: () -> Trailing
@@ -179,7 +179,7 @@ struct BottomNavigationBar: View {
         .frame(height: Spacing.bottomNavHeight)
         .background(
             Rectangle()
-                .fill(Color.white)
+                .fill(Color.cardBackground)
                 .shadow(
                     color: Shadow.md.color,
                     radius: Shadow.md.radius,

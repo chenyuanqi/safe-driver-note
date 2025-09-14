@@ -27,7 +27,7 @@ struct BrandTextFieldStyle: TextFieldStyle {
         .padding(.vertical, Spacing.lg)
         .background(
             RoundedRectangle(cornerRadius: CornerRadius.md, style: .continuous)
-                .fill(Color.white)
+                .fill(Color.inputBackground)
                 .overlay(
                     RoundedRectangle(cornerRadius: CornerRadius.md, style: .continuous)
                         .stroke(isError ? Color.brandDanger500 : Color.brandSecondary300, lineWidth: 1)
@@ -124,7 +124,7 @@ struct BrandTextEditor: View {
         .frame(minHeight: minHeight)
         .background(
             RoundedRectangle(cornerRadius: CornerRadius.md, style: .continuous)
-                .fill(Color.white)
+                .fill(Color.inputBackground)
                 .overlay(
                     RoundedRectangle(cornerRadius: CornerRadius.md, style: .continuous)
                         .stroke(isError ? Color.brandDanger500 : Color.brandSecondary300, lineWidth: 1)

@@ -70,7 +70,7 @@ struct DrivingRulesView: View {
                         .padding(Spacing.lg)
                         .background(
                             RoundedRectangle(cornerRadius: CornerRadius.lg, style: .continuous)
-                                .fill(Color.white)
+                                .fill(Color.cardBackground)
                                 .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
                         )
                         .overlay(

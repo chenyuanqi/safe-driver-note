@@ -16,7 +16,7 @@ struct VoiceNoteView: View {
 				.fontWeight(.semibold)
 				.frame(maxWidth: .infinity, alignment: .leading)
 
-			Card(backgroundColor: .white, shadow: true) {
+			Card(shadow: true) {
 				VStack(alignment: .leading, spacing: Spacing.md) {
 					HStack(spacing: Spacing.md) {
 						Image(systemName: speech.isRecording ? "mic.fill" : "mic")

@@ -114,7 +114,7 @@ struct ChecklistHistoryView: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, Spacing.xl)
         .padding(.horizontal, Spacing.lg)
-        .background(Color.white)
+        .background(Color.cardBackground)
         .cornerRadius(CornerRadius.lg)
         .shadow(color: .black.opacity(0.05), radius: CGFloat(4), x: CGFloat(0), y: CGFloat(2))
         .padding(.horizontal, Spacing.lg)
@@ -194,7 +194,7 @@ struct ChecklistHistoryView: View {
                 .foregroundColor(.brandSecondary400)
         }
         .padding(Spacing.md)
-        .background(Color.white)
+        .background(Color.cardBackground)
         .cornerRadius(CornerRadius.md)
         .shadow(color: .black.opacity(0.05), radius: CGFloat(2), x: CGFloat(0), y: CGFloat(1))
     }

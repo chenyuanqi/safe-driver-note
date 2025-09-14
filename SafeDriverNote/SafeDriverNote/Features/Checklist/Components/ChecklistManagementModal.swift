@@ -101,7 +101,7 @@ struct ChecklistManagementModal: View {
         }
         .padding(.horizontal, Spacing.lg)
         .padding(.top, Spacing.lg)
-        .background(Color.white)
+        .background(Color.cardBackground)
     }
     
     private var addNewItemButton: some View {
@@ -122,7 +122,7 @@ struct ChecklistManagementModal: View {
                 Spacer()
             }
             .padding(Spacing.lg)
-            .background(Color.white)
+            .background(Color.cardBackground)
             .cornerRadius(CornerRadius.lg)
             .overlay(
                 RoundedRectangle(cornerRadius: CornerRadius.lg)
@@ -166,7 +166,7 @@ struct ChecklistManagementModal: View {
             Spacer()
         }
         .padding(Spacing.lg)
-        .background(Color.white)
+        .background(Color.cardBackground)
         .cornerRadius(CornerRadius.lg)
         .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
         .padding(.horizontal, Spacing.lg)

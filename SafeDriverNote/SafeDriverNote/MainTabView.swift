@@ -145,7 +145,7 @@ struct ProfileView: View {
     }
     
     private func settingItem(icon: String, title: String, hasArrow: Bool = false) -> some View {
-        Card(backgroundColor: .white, shadow: false) {
+        Card(shadow: false) {
             HStack(spacing: Spacing.lg) {
                 Image(systemName: icon)
                     .font(.body)
