@@ -1,8 +1,13 @@
 import SwiftUI
 import Foundation
+import MessageUI
 
 struct AboutView: View {
     @Environment(\.dismiss) private var dismiss
+    @State private var showingMailComposer = false
+    @State private var showingPrivacyPolicy = false
+    @State private var showingTermsOfService = false
+    @State private var showingOpenSourceLicenses = false
 
     var body: some View {
         NavigationView {
@@ -35,6 +40,15 @@ struct AboutView: View {
                     }
                 }
             }
+        }
+        .sheet(isPresented: $showingPrivacyPolicy) {
+            PrivacyPolicyView()
+        }
+        .sheet(isPresented: $showingTermsOfService) {
+            TermsOfServiceView()
+        }
+        .sheet(isPresented: $showingOpenSourceLicenses) {
+            OpenSourceLicensesView()
         }
     }
 
@@ -84,14 +98,14 @@ struct AboutView: View {
 
                 infoRow(
                     title: "构建号",
-                    value: "2024.001"
+                    value: "2025.001"
                 )
 
                 Divider()
 
                 infoRow(
                     title: "发布日期",
-                    value: "2024年9月"
+                    value: "2025年1月"
                 )
 
                 Divider()
@@ -189,7 +203,7 @@ struct AboutView: View {
                     }
 
                     Button(action: {
-                        // TODO: 发送反馈邮件
+                        sendEmail()
                     }) {
                         Text("联系我们")
                             .font(.bodyMedium)
@@ -236,7 +250,7 @@ struct AboutView: View {
             }
 
             // 版权信息
-            Text("© 2024 Safe Driver Team. All rights reserved.")
+            Text("© 2025 Safe Driver Team. All rights reserved.")
                 .font(.caption)
                 .foregroundColor(.brandSecondary400)
                 .frame(maxWidth: .infinity)
@@ -286,7 +300,16 @@ struct AboutView: View {
 
     private func legalItem(title: String, description: String) -> some View {
         Button(action: {
-            // TODO: 打开相应的法律文档
+            switch title {
+            case "隐私政策":
+                showingPrivacyPolicy = true
+            case "服务条款":
+                showingTermsOfService = true
+            case "开源许可":
+                showingOpenSourceLicenses = true
+            default:
+                break
+            }
         }) {
             HStack {
                 VStack(alignment: .leading, spacing: Spacing.xs) {
@@ -308,6 +331,38 @@ struct AboutView: View {
             }
         }
         .buttonStyle(PlainButtonStyle())
+    }
+
+    // MARK: - Actions
+
+    private func sendEmail() {
+        let email = "chenyuanqi@outlook.com"
+        let subject = "安全驾驶助手 - 用户反馈"
+        let body = """
+        您好，
+
+        我在使用安全驾驶助手过程中有以下反馈：
+
+        [请在此处描述您的问题或建议]
+
+        设备信息：
+        - 应用版本：1.0.0 (2025.001)
+        - 系统版本：iOS \(UIDevice.current.systemVersion)
+        - 设备型号：\(UIDevice.current.model)
+
+        谢谢！
+        """
+
+        if let emailURL = URL(string: "mailto:\(email)?subject=\(subject.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")&body=\(body.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")") {
+            if UIApplication.shared.canOpenURL(emailURL) {
+                UIApplication.shared.open(emailURL)
+            } else {
+                // 如果无法打开邮件应用，可以显示一个提示
+                if let url = UIPasteboard.general.url {
+                    UIPasteboard.general.string = email
+                }
+            }
+        }
     }
 }
 
