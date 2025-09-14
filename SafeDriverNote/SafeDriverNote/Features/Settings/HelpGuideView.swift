@@ -50,42 +50,43 @@ struct HelpGuideView: View {
 
     // MARK: - 侧边栏导航
     private var sidebarNavigation: some View {
-        VStack(spacing: 0) {
+        VStack(spacing: Spacing.xs) {
+            // 添加顶部间距
+            Spacer()
+                .frame(height: Spacing.md)
+
             ForEach(GuideSection.allCases, id: \.self) { section in
                 Button(action: {
                     selectedSection = section
                 }) {
-                    HStack(spacing: Spacing.sm) {
+                    VStack(spacing: Spacing.xs) {
                         Image(systemName: section.icon)
-                            .font(.bodyMedium)
+                            .font(.title3)
                             .foregroundColor(selectedSection == section ? .brandPrimary500 : .brandSecondary500)
 
                         Text(section.rawValue)
-                            .font(.bodySmall)
+                            .font(.caption)
                             .fontWeight(selectedSection == section ? .semibold : .medium)
                             .foregroundColor(selectedSection == section ? .brandPrimary500 : .brandSecondary700)
-
-                        Spacer()
+                            .multilineTextAlignment(.center)
                     }
-                    .padding(.horizontal, Spacing.md)
-                    .padding(.vertical, Spacing.sm)
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, Spacing.sm)
+                    .padding(.vertical, Spacing.md)
                     .background(
                         selectedSection == section ?
                         Color.brandPrimary50 : Color.clear
                     )
+                    .cornerRadius(CornerRadius.sm)
                 }
                 .buttonStyle(PlainButtonStyle())
-
-                if section != GuideSection.allCases.last {
-                    Divider()
-                        .padding(.horizontal, Spacing.sm)
-                }
             }
 
             Spacer()
         }
-        .frame(width: 120)
+        .frame(width: 140)
         .background(Color.brandSecondary50)
+        .padding(.horizontal, Spacing.sm)
     }
 
     // MARK: - 内容视图
