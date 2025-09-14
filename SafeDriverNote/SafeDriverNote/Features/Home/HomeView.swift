@@ -862,6 +862,7 @@ final class HomeViewModel: ObservableObject {
     @Published private(set) var todayPreCount: Int = 0
     @Published private(set) var todayPostCount: Int = 0
     @Published private(set) var todayKnowledgeCards: [KnowledgeCardData] = []
+    @Published private(set) var todayKnowledgeCompleted: Bool = false
         
     init() { reload() }
     
@@ -983,15 +984,26 @@ final class HomeViewModel: ObservableObject {
             // 获取今天的日期（用于检查是否已学习）
             let today = Calendar.current.startOfDay(for: Date())
             
+            // 计算今天已标记学习的卡片数量
+            let todayLearnedCount = progresses.reduce(0) { count, progress in
+                let hasLearnedToday = progress.markedDates.contains { date in
+                    Calendar.current.isDate(date, inSameDayAs: today)
+                }
+                return count + (hasLearnedToday ? 1 : 0)
+            }
+
+            // 如果今天已经标记学习了3个或以上卡片，则认为今日知识学习已完成
+            self.todayKnowledgeCompleted = todayLearnedCount >= 3
+
             self.todayKnowledgeCards = knowledgeCards.map { card in
                 // 检查该卡片今天是否已学习
                 let isLearned = progresses.contains { progress in
-                    progress.cardId == card.id && 
+                    progress.cardId == card.id &&
                     progress.markedDates.contains { date in
                         Calendar.current.isDate(date, inSameDayAs: today)
                     }
                 }
-                
+
                 return KnowledgeCardData(
                     title: card.title,
                     content: card.what,
@@ -1000,6 +1012,7 @@ final class HomeViewModel: ObservableObject {
             }
         } else {
             // 如果获取失败，使用模拟数据
+            self.todayKnowledgeCompleted = false
             todayKnowledgeCards = [
                 KnowledgeCardData(
                     title: "安全跟车距离",
@@ -1067,7 +1080,7 @@ final class HomeViewModel: ObservableObject {
 	
 	var todayCompletionRate: String {
 		let totalTasks = 3 // Assume 3 daily tasks (checklist pre, post, learning)
-		let completed = min(1, todayPreCount) + min(1, todayPostCount) + (todayKnowledgeCards.allSatisfy(\.isLearned) && !todayKnowledgeCards.isEmpty ? 1 : 0)
+		let completed = min(1, todayPreCount) + min(1, todayPostCount) + (todayKnowledgeCompleted ? 1 : 0)
 		let rate = totalTasks > 0 ? (Double(completed) / Double(totalTasks) * 100) : 0
 		return String(format: "%.0f%%", rate)
 	}
