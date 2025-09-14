@@ -159,6 +159,20 @@ struct ChecklistItemState: Codable, Hashable {
     }
 }
 
+@Model final class KnowledgeRecentlyShown {
+    @Attribute(.unique) var id: UUID
+    var cardId: String
+    var shownDate: Date
+    var sessionId: String // 用于标识同一个学习会话
+
+    init(id: UUID = UUID(), cardId: String, shownDate: Date = Date(), sessionId: String) {
+        self.id = id
+        self.cardId = cardId
+        self.shownDate = shownDate
+        self.sessionId = sessionId
+    }
+}
+
 // MARK: - Daily Checkin Summary
 struct ChecklistPunchSummary: Codable {
     let id: UUID

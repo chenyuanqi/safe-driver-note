@@ -4,7 +4,7 @@ import SwiftData
 
 enum TestSupport {
     static func makeInMemoryContainer() -> ModelContainer {
-        let schema = Schema([LogEntry.self, ChecklistRecord.self, KnowledgeCard.self, KnowledgeProgress.self])
+        let schema = Schema([LogEntry.self, ChecklistRecord.self, KnowledgeCard.self, KnowledgeProgress.self, KnowledgeRecentlyShown.self])
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         do { return try ModelContainer(for: schema, configurations: [config]) } catch { fatalError("Failed to create in-memory container: \(error)") }
     }

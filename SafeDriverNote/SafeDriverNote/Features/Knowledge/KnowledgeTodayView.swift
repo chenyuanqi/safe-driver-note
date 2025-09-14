@@ -14,7 +14,7 @@ struct KnowledgeTodayView: View {
     @State private var fireworkColor = Color.brandPrimary500
     @State private var cardOpacity: Double = 1.0
     @State private var isDismissing = false
-    @State private var showDrivingRules = true
+    @State private var showDrivingRulesModal = false
     // 添加一个计数器来跟踪滑动过的卡片数量
     @State private var swipedCardsCount = 0
     // 添加一个标志来跟踪是否已经发送过通知
@@ -33,78 +33,76 @@ struct KnowledgeTodayView: View {
                                 Color.brandSecondary50
                                     .ignoresSafeArea()
 
-                                Group {
-                    if showDrivingRules {
-                        DrivingRulesView(onDismiss: {
-                            withAnimation {
-                                showDrivingRules = false
-                            }
-                        })
-                    } else if let card = vm.today.first {
-                        GeometryReader { geo in
-                            let cardHeight = geo.size.height * 0.7
-                            VStack(spacing: Spacing.xl) {
-                                Spacer(minLength: 0)
-                                
-                                ZStack {
-                                    // 主卡片
-                                    cardFullView(card)
-                                        .frame(height: cardHeight)
-                                        .offset(x: dragOffset)
-                                        .rotationEffect(.degrees(cardRotation))
-                                        .opacity(cardOpacity)
-                                        .scaleEffect(isDismissing ? 0.8 : 1.0)
-                                        .gesture(
-                                            DragGesture(minimumDistance: 20)
-                                                .onChanged { value in
-                                                    withAnimation(.interactiveSpring()) {
-                                                        dragOffset = value.translation.width
-                                                        cardRotation = Double(dragOffset / 15)
+                                VStack(spacing: Spacing.xl) {
+                                    // 增加顶部间距，避免被导航栏遮挡
+                                    Spacer(minLength: Spacing.navBarHeight + Spacing.lg)
+
+                                    // 顶部开车守则（可展开）
+                                    drivingRulesSection
+
+                                    // 学习卡片区域
+                                    if let card = vm.today.first {
+                                        GeometryReader { geo in
+                                            let cardHeight = geo.size.height * 0.5
+                                            VStack(spacing: Spacing.xl) {
+                                                ZStack {
+                                                    // 主卡片
+                                                    cardFullView(card)
+                                                        .frame(height: cardHeight)
+                                                        .offset(x: dragOffset)
+                                                        .rotationEffect(.degrees(cardRotation))
+                                                        .opacity(cardOpacity)
+                                                        .scaleEffect(isDismissing ? 0.8 : 1.0)
+                                                        .gesture(
+                                                            DragGesture(minimumDistance: 20)
+                                                                .onChanged { value in
+                                                                    withAnimation(.interactiveSpring()) {
+                                                                        dragOffset = value.translation.width
+                                                                        cardRotation = Double(dragOffset / 15)
+                                                                    }
+                                                                }
+                                                                .onEnded { value in
+                                                                    let dx = value.translation.width
+                                                                    if dx > 120 { // 右滑：掌握
+                                                                        dismissCard(direction: .right, action: {
+                                                                            vm.mark(card: card)
+                                                                            // 增加滑动计数
+                                                                            incrementSwipedCardsCount()
+                                                                        })
+                                                                    } else if dx < -120 { // 左滑：稍后
+                                                                        dismissCard(direction: .left, action: {
+                                                                            vm.snooze(card: card)
+                                                                            // 增加滑动计数
+                                                                            incrementSwipedCardsCount()
+                                                                        })
+                                                                    } else {
+                                                                        // 回弹
+                                                                        withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
+                                                                            dragOffset = 0
+                                                                            cardRotation = 0
+                                                                        }
+                                                                    }
+                                                                }
+                                                        )
+
+                                                    // 烟花文字效果
+                                                    if showingFirework {
+                                                        FireworkTextView(text: fireworkText, color: fireworkColor)
                                                     }
                                                 }
-                                                .onEnded { value in
-                                                    let dx = value.translation.width
-                                                    if dx > 120 { // 右滑：掌握
-                                                        dismissCard(direction: .right, action: {
-                                                            vm.mark(card: card)
-                                                            // 增加滑动计数
-                                                            incrementSwipedCardsCount()
-                                                        })
-                                                    } else if dx < -120 { // 左滑：稍后
-                                                        dismissCard(direction: .left, action: {
-                                                            vm.snooze(card: card)
-                                                            // 增加滑动计数
-                                                            incrementSwipedCardsCount()
-                                                        })
-                                                    } else {
-                                                        // 回弹
-                                                        withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
-                                                            dragOffset = 0
-                                                            cardRotation = 0
-                                                        }
-                                                    }
-                                                }
-                                        )
-                                    
-                                    // 烟花文字效果
-                                    if showingFirework {
-                                        FireworkTextView(text: fireworkText, color: fireworkColor)
+
+                                                // 提示文字
+                                                Text("左滑稍后，右滑掌握")
+                                                    .font(.bodySmall)
+                                                    .foregroundColor(.brandSecondary500)
+                                            }
+                                            .padding(.horizontal, Spacing.pagePadding)
+                                        }
+                                    } else {
+                                        emptyState
                                     }
                                 }
-                                
-                                // 提示文字
-                                Text("左滑稍后，右滑掌握")
-                                    .font(.bodySmall)
-                                    .foregroundColor(.brandSecondary500)
-                                
-                                Spacer(minLength: 0)
-                            }
-                            .padding(.horizontal, Spacing.pagePadding)
-                        }
-                    } else {
-                        emptyState
-                    }
-                                }
+                                .padding(.horizontal, Spacing.pagePadding)
                             }
                         )
                 }
@@ -129,6 +127,12 @@ struct KnowledgeTodayView: View {
             .onAppear {
                 swipedCardsCount = 0
                 hasSentCompletionNotification = false
+            }
+            // 开车守则弹框
+            .sheet(isPresented: $showDrivingRulesModal) {
+                DrivingRulesView(onDismiss: {
+                    showDrivingRulesModal = false
+                })
             }
         }
     }
@@ -321,6 +325,36 @@ struct KnowledgeTodayView: View {
             Spacer()
         }
         .padding(Spacing.pagePadding)
+    }
+
+    // MARK: - 开车守则按钮区域
+    private var drivingRulesSection: some View {
+        Button(action: {
+            showDrivingRulesModal = true
+        }) {
+            HStack {
+                Image(systemName: "car.fill")
+                    .foregroundColor(.brandPrimary500)
+                    .font(.body)
+
+                Text("开车守则")
+                    .font(.bodyLarge)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.brandSecondary900)
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .foregroundColor(.brandSecondary500)
+                    .font(.caption)
+            }
+            .padding(.horizontal, Spacing.lg)
+            .padding(.vertical, Spacing.md)
+            .background(Color.white)
+            .cornerRadius(CornerRadius.lg)
+            .shadow(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
+        }
+        .buttonStyle(PlainButtonStyle())
     }
 
     // MARK: - Pull to Refresh

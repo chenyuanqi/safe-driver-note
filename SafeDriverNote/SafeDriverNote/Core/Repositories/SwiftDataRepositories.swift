@@ -125,9 +125,59 @@ struct KnowledgeRepositorySwiftData: KnowledgeRepository {
         try context().fetch(FetchDescriptor<KnowledgeCard>())
     }
     func todayCards(limit: Int) throws -> [KnowledgeCard] {
-        // 简单随机（后续可利用 KnowledgeProgress 过滤当日已标记）
-        let cards = try allCards().shuffled()
-        return Array(cards.prefix(limit))
+        let ctx = try context()
+        let allCards = try allCards()
+        let today = Calendar.current.startOfDay(for: Date())
+        let sessionId = DateFormatter().string(from: Date()) // 使用当前时间作为会话ID
+
+        // 获取今日已标记的卡片
+        let progresses = try ctx.fetch(FetchDescriptor<KnowledgeProgress>())
+        let todayMarkedCardIds = Set(progresses.compactMap { progress in
+            progress.markedDates.contains { Calendar.current.isDate($0, inSameDayAs: today) } ? progress.cardId : nil
+        })
+
+        // 获取最近7天内显示过的卡片（避免短期重复）
+        let sevenDaysAgo = Calendar.current.date(byAdding: .day, value: -7, to: today) ?? today
+        let recentlyShown = try ctx.fetch(FetchDescriptor<KnowledgeRecentlyShown>())
+            .filter { $0.shownDate >= sevenDaysAgo }
+        let recentlyShownCardIds = Set(recentlyShown.map { $0.cardId })
+
+        // 筛选候选卡片：排除今日已标记和最近显示过的
+        let availableCards = allCards.filter { card in
+            !todayMarkedCardIds.contains(card.id) && !recentlyShownCardIds.contains(card.id)
+        }
+
+        // 如果可用卡片不足，则允许包含一些最近显示过的卡片（但仍排除今日已标记的）
+        let finalCards: [KnowledgeCard]
+        if availableCards.count >= limit {
+            finalCards = Array(availableCards.shuffled().prefix(limit))
+        } else {
+            // 添加一些最近显示过但未标记的卡片
+            let fallbackCards = allCards.filter { card in
+                !todayMarkedCardIds.contains(card.id)
+            }
+            finalCards = Array(fallbackCards.shuffled().prefix(limit))
+        }
+
+        // 记录本次显示的卡片，便于下次避免重复
+        for card in finalCards {
+            let recentRecord = KnowledgeRecentlyShown(
+                cardId: card.id,
+                shownDate: Date(),
+                sessionId: sessionId
+            )
+            ctx.insert(recentRecord)
+        }
+
+        // 清理30天前的显示记录
+        let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: today) ?? today
+        let oldRecords = recentlyShown.filter { $0.shownDate < thirtyDaysAgo }
+        for record in oldRecords {
+            ctx.delete(record)
+        }
+
+        try ctx.save()
+        return finalCards
     }
     func mark(cardId: String) throws {
         let ctx = try context()
