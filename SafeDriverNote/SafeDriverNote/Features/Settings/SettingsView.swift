@@ -11,6 +11,8 @@ struct SettingsView: View {
     @State private var showingCloudSyncAlert = false
     @State private var showingClearCacheAlert = false
     @State private var showingCacheCleared = false
+    @State private var showingRatingAlert = false
+    @State private var showingFeedbackOptions = false
     @EnvironmentObject private var themeManager: ThemeManager
     @EnvironmentObject private var di: AppDI
 
@@ -85,6 +87,27 @@ struct SettingsView: View {
             Button("确定") { }
         } message: {
             Text("清理完成")
+        }
+        .alert("为我们评分", isPresented: $showingRatingAlert) {
+            Button("确定") { }
+        } message: {
+            Text("应用还未发布到App Store，评分功能暂时无法使用。您可以通过意见反馈向我们提出建议！")
+        }
+        .actionSheet(isPresented: $showingFeedbackOptions) {
+            ActionSheet(
+                title: Text("意见反馈"),
+                message: Text("选择反馈方式"),
+                buttons: [
+                    .default(Text("📧 发送邮件")) {
+                        sendFeedbackEmail()
+                    },
+                    .default(Text("⭐ 应用评分")) {
+                        // 如果应用发布后，可以打开App Store评分页面
+                        showingRatingAlert = true
+                    },
+                    .cancel(Text("取消"))
+                ]
+            )
         }
     }
 
@@ -265,21 +288,29 @@ struct SettingsView: View {
 
                 Divider().padding(.leading, 52)
 
-                settingsRow(
-                    icon: "envelope",
-                    title: "意见反馈",
-                    subtitle: "告诉我们您的想法",
-                    color: .brandSecondary600
-                )
+                Button(action: {
+                    showingFeedbackOptions = true
+                }) {
+                    settingsRow(
+                        icon: "envelope",
+                        title: "意见反馈",
+                        subtitle: "告诉我们您的想法和建议",
+                        color: .brandSecondary600
+                    )
+                }
 
                 Divider().padding(.leading, 52)
 
-                settingsRow(
-                    icon: "star",
-                    title: "为我们评分",
-                    subtitle: "在 App Store 中评分",
-                    color: .brandWarning500
-                )
+                Button(action: {
+                    showingRatingAlert = true
+                }) {
+                    settingsRow(
+                        icon: "star",
+                        title: "为我们评分",
+                        subtitle: "功能未开发",
+                        color: .brandWarning500
+                    )
+                }
             }
             .background(Color.cardBackground)
             .cornerRadius(CornerRadius.md)
@@ -366,6 +397,37 @@ struct SettingsView: View {
                     print("Failed to load user data: \(error)")
                     self.isLoading = false
                 }
+            }
+        }
+    }
+
+    // MARK: - Feedback Management
+
+    private func sendFeedbackEmail() {
+        let email = "chenyuanqi@outlook.com"
+        let subject = "安全驾驶助手 - 用户反馈"
+        let body = """
+        您好，
+
+        我在使用安全驾驶助手过程中有以下反馈：
+
+        [请在此处描述您的问题或建议]
+
+        设备信息：
+        - 应用版本：1.0.0 (2025.001)
+        - 系统版本：iOS \(UIDevice.current.systemVersion)
+        - 设备型号：\(UIDevice.current.model)
+
+        谢谢！
+        """
+
+        if let emailURL = URL(string: "mailto:\(email)?subject=\(subject.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")&body=\(body.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")") {
+            if UIApplication.shared.canOpenURL(emailURL) {
+                UIApplication.shared.open(emailURL)
+            } else {
+                // 如果无法打开邮件应用，将邮箱地址复制到剪贴板
+                UIPasteboard.general.string = email
+                showingRatingAlert = true // 复用alert显示提示信息
             }
         }
     }
