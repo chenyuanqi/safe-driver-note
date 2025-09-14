@@ -257,7 +257,7 @@ enum DriveStatus: String, Codable, CaseIterable {
     case active = "active"     // 正在驾驶
     case completed = "completed" // 已完成
     case cancelled = "cancelled" // 已取消
-    
+
     var displayName: String {
         switch self {
         case .active: return "驾驶中"
@@ -265,12 +265,65 @@ enum DriveStatus: String, Codable, CaseIterable {
         case .cancelled: return "已取消"
         }
     }
-    
+
     var color: String {
         switch self {
         case .active: return "brandWarning500"
         case .completed: return "brandPrimary500"
         case .cancelled: return "brandSecondary400"
         }
+    }
+}
+
+// MARK: - User Profile
+@Model final class UserProfile {
+    @Attribute(.unique) var id: UUID
+    var userName: String
+    var userAge: Int?
+    var drivingYears: Int
+    var vehicleType: String
+    var avatarImagePath: String?
+    var createdAt: Date
+    var updatedAt: Date
+
+    init(id: UUID = UUID(), userName: String = "安全驾驶人", userAge: Int? = nil, drivingYears: Int = 0, vehicleType: String = "小型汽车", avatarImagePath: String? = nil, createdAt: Date = Date(), updatedAt: Date = Date()) {
+        self.id = id
+        self.userName = userName
+        self.userAge = userAge
+        self.drivingYears = drivingYears
+        self.vehicleType = vehicleType
+        self.avatarImagePath = avatarImagePath
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+    }
+}
+
+// MARK: - Achievement Statistics
+struct AchievementStats {
+    let safetyScore: Int
+    let continuousDays: Int
+    let totalDistance: Double
+    let recentAchievement: RecentAchievement?
+
+    struct RecentAchievement {
+        let title: String
+        let description: String
+        let achievedDate: Date
+    }
+}
+
+struct UserStats {
+    let totalDrivingLogs: Int
+    let totalSuccessLogs: Int
+    let totalMistakeLogs: Int
+    let totalChecklistDays: Int
+    let totalRouteDistance: Double
+    let currentStreakDays: Int
+    let safetyScore: Int
+    let recentAchievement: AchievementStats.RecentAchievement?
+
+    var improvementRate: Double {
+        guard totalDrivingLogs > 0 else { return 0.0 }
+        return Double(totalSuccessLogs) / Double(totalDrivingLogs)
     }
 }

@@ -8,6 +8,11 @@ struct SettingsView: View {
     @State private var showingDataExport = false
     @State private var showingThemeSelector = false
     @EnvironmentObject private var themeManager: ThemeManager
+    @EnvironmentObject private var di: AppDI
+
+    @State private var userProfile: UserProfile?
+    @State private var userStats: UserStats?
+    @State private var isLoading = true
 
     var body: some View {
         ScrollView {
@@ -32,8 +37,16 @@ struct SettingsView: View {
         .background(Color.brandSecondary50)
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            loadUserData()
+        }
         .sheet(isPresented: $showingUserProfile) {
             UserProfileView()
+                .environmentObject(di)
+                .onDisappear {
+                    // 当个人资料页面关闭时重新加载数据
+                    loadUserData()
+                }
         }
         .sheet(isPresented: $showingHelpGuide) {
             HelpGuideView()
@@ -67,18 +80,36 @@ struct SettingsView: View {
                         )
 
                     VStack(alignment: .leading, spacing: Spacing.xs) {
-                        Text("安全驾驶人")
+                        Text(userProfile?.userName ?? "安全驾驶人")
                             .font(.title3)
                             .fontWeight(.semibold)
                             .foregroundColor(.brandSecondary900)
 
-                        Text("驾龄 3 年 · 安全评分 92分")
-                            .font(.bodySmall)
-                            .foregroundColor(.brandSecondary500)
+                        if let profile = userProfile, let stats = userStats {
+                            Text("驾龄 \(profile.drivingYears) 年 · 安全评分 \(stats.safetyScore)分")
+                                .font(.bodySmall)
+                                .foregroundColor(.brandSecondary500)
 
-                        Text("连续打卡 15天")
-                            .font(.caption)
-                            .foregroundColor(.brandPrimary500)
+                            Text("连续打卡 \(stats.currentStreakDays)天")
+                                .font(.caption)
+                                .foregroundColor(.brandPrimary500)
+                        } else if isLoading {
+                            Text("加载中...")
+                                .font(.bodySmall)
+                                .foregroundColor(.brandSecondary500)
+
+                            Text("数据统计中...")
+                                .font(.caption)
+                                .foregroundColor(.brandSecondary400)
+                        } else {
+                            Text("驾龄 0 年 · 安全评分 --分")
+                                .font(.bodySmall)
+                                .foregroundColor(.brandSecondary500)
+
+                            Text("连续打卡 0天")
+                                .font(.caption)
+                                .foregroundColor(.brandPrimary500)
+                        }
                     }
 
                     Spacer()
@@ -285,10 +316,33 @@ struct SettingsView: View {
         }
         .padding(Spacing.md)
     }
+
+    // MARK: - Data Loading
+
+    private func loadUserData() {
+        Task {
+            do {
+                let profile = try di.userProfileRepository.fetchUserProfile()
+                let stats = try di.userProfileRepository.calculateUserStats()
+
+                await MainActor.run {
+                    self.userProfile = profile
+                    self.userStats = stats
+                    self.isLoading = false
+                }
+            } catch {
+                await MainActor.run {
+                    print("Failed to load user data: \(error)")
+                    self.isLoading = false
+                }
+            }
+        }
+    }
 }
 
 #Preview {
     NavigationStack {
         SettingsView()
+            .environmentObject(AppDI.shared)
     }
 }

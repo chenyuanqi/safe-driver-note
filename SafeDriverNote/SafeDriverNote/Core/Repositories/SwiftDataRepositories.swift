@@ -313,6 +313,181 @@ struct DriveRouteRepositorySwiftData: DriveRouteRepository {
     }
 }
 
+// MARK: - UserProfileRepository Implementation
+@MainActor
+struct UserProfileRepositorySwiftData: UserProfileRepository {
+    func fetchUserProfile() throws -> UserProfile {
+        let ctx = try context()
+        let profiles = try ctx.fetch(FetchDescriptor<UserProfile>())
+
+        // 如果没有用户资料，创建默认的
+        if profiles.isEmpty {
+            let defaultProfile = UserProfile()
+            ctx.insert(defaultProfile)
+            try ctx.save()
+            return defaultProfile
+        }
+
+        return profiles.first!
+    }
+
+    func saveUserProfile(_ profile: UserProfile) throws {
+        let ctx = try context()
+        profile.updatedAt = Date()
+        try ctx.save()
+    }
+
+    func updateUserProfile(userName: String, userAge: Int?, drivingYears: Int, vehicleType: String, avatarImagePath: String? = nil) throws -> UserProfile {
+        let profile = try fetchUserProfile()
+        profile.userName = userName
+        profile.userAge = userAge
+        profile.drivingYears = drivingYears
+        profile.vehicleType = vehicleType
+        if let avatarImagePath = avatarImagePath {
+            profile.avatarImagePath = avatarImagePath
+        }
+        try saveUserProfile(profile)
+        return profile
+    }
+
+    func calculateUserStats() throws -> UserStats {
+        let ctx = try context()
+
+        // 获取所有驾驶日志
+        let logs = try ctx.fetch(FetchDescriptor<LogEntry>())
+
+        // 获取所有打卡记录
+        let punches = try ctx.fetch(FetchDescriptor<ChecklistPunch>())
+
+        // 获取所有已完成的驾驶路线
+        let routes = try ctx.fetch(FetchDescriptor<DriveRoute>()).filter { $0.status == .completed }
+
+        // 计算统计数据
+        let totalDrivingLogs = logs.count
+        let totalSuccessLogs = logs.filter { $0.type == .success }.count
+        let totalMistakeLogs = logs.filter { $0.type == .mistake }.count
+
+        // 计算打卡天数（按日期去重）
+        let checklistDays = Set(punches.map { Calendar.current.startOfDay(for: $0.createdAt) }).count
+
+        // 计算总里程
+        let totalRouteDistance = routes.compactMap { $0.distance }.reduce(0, +)
+
+        // 计算连续打卡天数
+        let currentStreakDays = calculateCurrentStreak(from: punches)
+
+        // 计算安全评分
+        let safetyScore = calculateSafetyScore(logs: logs, punches: punches, routes: routes)
+
+        // 查找最近成就
+        let recentAchievement = findRecentAchievement(
+            totalLogs: totalDrivingLogs,
+            streakDays: currentStreakDays,
+            checklistDays: checklistDays
+        )
+
+        return UserStats(
+            totalDrivingLogs: totalDrivingLogs,
+            totalSuccessLogs: totalSuccessLogs,
+            totalMistakeLogs: totalMistakeLogs,
+            totalChecklistDays: checklistDays,
+            totalRouteDistance: totalRouteDistance,
+            currentStreakDays: currentStreakDays,
+            safetyScore: safetyScore,
+            recentAchievement: recentAchievement
+        )
+    }
+
+    // MARK: - Private Helper Methods
+
+    private func calculateCurrentStreak(from punches: [ChecklistPunch]) -> Int {
+        guard !punches.isEmpty else { return 0 }
+
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+
+        // 按日期分组
+        let punchesByDay = Dictionary(grouping: punches) { punch in
+            calendar.startOfDay(for: punch.createdAt)
+        }
+
+        let sortedDays = punchesByDay.keys.sorted(by: >)
+
+        // 从今天开始往前计算连续天数
+        var streakCount = 0
+        var currentDay = today
+
+        while sortedDays.contains(currentDay) {
+            streakCount += 1
+            currentDay = calendar.date(byAdding: .day, value: -1, to: currentDay)!
+        }
+
+        return streakCount
+    }
+
+    private func calculateSafetyScore(logs: [LogEntry], punches: [ChecklistPunch], routes: [DriveRoute]) -> Int {
+        var score = 50 // 基础分数
+
+        // 成功记录加分
+        let successCount = logs.filter { $0.type == .success }.count
+        score += successCount * 5
+
+        // 失误记录扣分
+        let mistakeCount = logs.filter { $0.type == .mistake }.count
+        score -= mistakeCount * 3
+
+        // 打卡记录加分
+        let totalPunchScore = punches.reduce(0) { $0 + $1.score }
+        score += totalPunchScore / 10
+
+        // 完成路线加分
+        score += routes.count * 2
+
+        // 确保分数在0-100范围内
+        return max(0, min(100, score))
+    }
+
+    private func findRecentAchievement(totalLogs: Int, streakDays: Int, checklistDays: Int) -> AchievementStats.RecentAchievement? {
+        let calendar = Calendar.current
+        let threeDaysAgo = calendar.date(byAdding: .day, value: -3, to: Date())!
+
+        // 检查各种成就条件
+        if streakDays == 7 {
+            return AchievementStats.RecentAchievement(
+                title: "坚持不懈",
+                description: "🎉 连续打卡7天",
+                achievedDate: threeDaysAgo
+            )
+        } else if streakDays == 15 {
+            return AchievementStats.RecentAchievement(
+                title: "习惯养成",
+                description: "🎉 连续打卡15天",
+                achievedDate: threeDaysAgo
+            )
+        } else if streakDays == 30 {
+            return AchievementStats.RecentAchievement(
+                title: "安全达人",
+                description: "🎉 连续打卡30天",
+                achievedDate: threeDaysAgo
+            )
+        } else if totalLogs >= 10 {
+            return AchievementStats.RecentAchievement(
+                title: "记录专家",
+                description: "🎉 累计记录10条日志",
+                achievedDate: threeDaysAgo
+            )
+        } else if checklistDays >= 5 {
+            return AchievementStats.RecentAchievement(
+                title: "检查能手",
+                description: "🎉 完成5天检查清单",
+                achievedDate: threeDaysAgo
+            )
+        }
+
+        return nil
+    }
+}
+
 // MARK: - Checklist Templates
 enum ChecklistConstants {
     static let preTemplate: [ChecklistItemState] = [

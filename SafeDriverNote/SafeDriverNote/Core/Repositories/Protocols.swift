@@ -41,3 +41,10 @@ protocol DriveRouteRepository {
     func deleteRoute(_ route: DriveRoute) throws
     func updateRoute(_ route: DriveRoute, mutate: (DriveRoute) -> Void) throws
 }
+
+protocol UserProfileRepository {
+    func fetchUserProfile() throws -> UserProfile
+    func saveUserProfile(_ profile: UserProfile) throws
+    func updateUserProfile(userName: String, userAge: Int?, drivingYears: Int, vehicleType: String, avatarImagePath: String?) throws -> UserProfile
+    func calculateUserStats() throws -> UserStats
+}

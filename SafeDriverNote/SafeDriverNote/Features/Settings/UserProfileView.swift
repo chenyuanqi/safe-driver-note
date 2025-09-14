@@ -3,27 +3,47 @@ import Foundation
 
 struct UserProfileView: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var di: AppDI
+
     @State private var userName = "安全驾驶人"
     @State private var userAge = ""
     @State private var drivingYears = "3"
     @State private var vehicleType = "小型汽车"
     @State private var showingImagePicker = false
+    @State private var userStats: UserStats?
+    @State private var isLoading = true
+    @State private var isSaving = false
+    @State private var showingError = false
+    @State private var errorMessage = ""
 
     var body: some View {
         NavigationView {
             ScrollView {
                 VStack(spacing: Spacing.xl) {
-                    // 头像区域
-                    profileImageSection
+                    if isLoading {
+                        // 加载状态
+                        VStack(spacing: Spacing.lg) {
+                            ProgressView()
+                                .scaleEffect(1.5)
+                            Text("加载中...")
+                                .font(.bodyMedium)
+                                .foregroundColor(.brandSecondary500)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, Spacing.xxxl)
+                    } else {
+                        // 头像区域
+                        profileImageSection
 
-                    // 基本信息
-                    basicInfoSection
+                        // 基本信息
+                        basicInfoSection
 
-                    // 驾驶信息
-                    drivingInfoSection
+                        // 驾驶信息
+                        drivingInfoSection
 
-                    // 成就统计
-                    achievementSection
+                        // 成就统计
+                        achievementSection
+                    }
                 }
                 .padding(Spacing.pagePadding)
             }
@@ -35,14 +55,23 @@ struct UserProfileView: View {
                     Button("取消") {
                         dismiss()
                     }
+                    .disabled(isSaving)
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("保存") {
-                        // TODO: 保存用户信息
-                        dismiss()
+                        saveUserProfile()
                     }
                     .fontWeight(.semibold)
+                    .disabled(isSaving)
                 }
+            }
+            .onAppear {
+                loadUserProfile()
+            }
+            .alert("保存失败", isPresented: $showingError) {
+                Button("确定") { }
+            } message: {
+                Text(errorMessage)
             }
         }
     }
@@ -146,48 +175,77 @@ struct UserProfileView: View {
 
             Card(shadow: true) {
                 VStack(spacing: Spacing.md) {
-                    HStack {
-                        achievementItem(
-                            title: "安全评分",
-                            value: "92",
-                            unit: "分",
-                            color: .brandPrimary500
-                        )
+                    if let stats = userStats {
+                        HStack {
+                            achievementItem(
+                                title: "安全评分",
+                                value: "\(stats.safetyScore)",
+                                unit: "分",
+                                color: .brandPrimary500
+                            )
 
-                        achievementItem(
-                            title: "连续天数",
-                            value: "15",
-                            unit: "天",
-                            color: .brandInfo500
-                        )
+                            achievementItem(
+                                title: "连续天数",
+                                value: "\(stats.currentStreakDays)",
+                                unit: "天",
+                                color: .brandInfo500
+                            )
 
-                        achievementItem(
-                            title: "总里程",
-                            value: "1,240",
-                            unit: "km",
-                            color: .brandWarning500
-                        )
-                    }
-
-                    Divider()
-
-                    HStack {
-                        VStack(alignment: .leading, spacing: Spacing.xs) {
-                            Text("最近成就")
-                                .font(.bodyMedium)
-                                .fontWeight(.medium)
-                                .foregroundColor(.brandSecondary900)
-
-                            Text("🎉 连续打卡15天")
-                                .font(.bodySmall)
-                                .foregroundColor(.brandSecondary600)
+                            achievementItem(
+                                title: "总里程",
+                                value: formatDistance(stats.totalRouteDistance),
+                                unit: stats.totalRouteDistance >= 1000 ? "km" : "m",
+                                color: .brandWarning500
+                            )
                         }
 
-                        Spacer()
+                        Divider()
 
-                        Text("3天前")
-                            .font(.caption)
-                            .foregroundColor(.brandSecondary400)
+                        if let achievement = stats.recentAchievement {
+                            HStack {
+                                VStack(alignment: .leading, spacing: Spacing.xs) {
+                                    Text("最近成就")
+                                        .font(.bodyMedium)
+                                        .fontWeight(.medium)
+                                        .foregroundColor(.brandSecondary900)
+
+                                    Text(achievement.description)
+                                        .font(.bodySmall)
+                                        .foregroundColor(.brandSecondary600)
+                                }
+
+                                Spacer()
+
+                                Text(formatRelativeDate(achievement.achievedDate))
+                                    .font(.caption)
+                                    .foregroundColor(.brandSecondary400)
+                            }
+                        } else {
+                            HStack {
+                                VStack(alignment: .leading, spacing: Spacing.xs) {
+                                    Text("最近成就")
+                                        .font(.bodyMedium)
+                                        .fontWeight(.medium)
+                                        .foregroundColor(.brandSecondary900)
+
+                                    Text("继续努力，即将获得新成就！")
+                                        .font(.bodySmall)
+                                        .foregroundColor(.brandSecondary500)
+                                }
+
+                                Spacer()
+                            }
+                        }
+                    } else {
+                        // 加载状态
+                        VStack(spacing: Spacing.md) {
+                            ProgressView()
+                            Text("加载统计数据...")
+                                .font(.bodySmall)
+                                .foregroundColor(.brandSecondary500)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, Spacing.lg)
                     }
                 }
                 .padding(Spacing.lg)
@@ -247,8 +305,98 @@ struct UserProfileView: View {
         }
         .frame(maxWidth: .infinity)
     }
+
+    // MARK: - Data Loading & Saving
+
+    private func loadUserProfile() {
+        Task {
+            do {
+                let profile = try di.userProfileRepository.fetchUserProfile()
+                let stats = try di.userProfileRepository.calculateUserStats()
+
+                await MainActor.run {
+                    self.userName = profile.userName
+                    self.userAge = profile.userAge != nil ? "\(profile.userAge!)" : ""
+                    self.drivingYears = "\(profile.drivingYears)"
+                    self.vehicleType = profile.vehicleType
+                    self.userStats = stats
+                    self.isLoading = false
+                }
+            } catch {
+                await MainActor.run {
+                    self.errorMessage = "加载用户资料失败：\(error.localizedDescription)"
+                    self.showingError = true
+                    self.isLoading = false
+                }
+            }
+        }
+    }
+
+    private func saveUserProfile() {
+        guard !isSaving else { return }
+
+        isSaving = true
+
+        Task {
+            do {
+                let ageValue = userAge.isEmpty ? nil : Int(userAge)
+                let drivingYearsValue = Int(drivingYears) ?? 0
+
+                let updatedProfile = try di.userProfileRepository.updateUserProfile(
+                    userName: userName,
+                    userAge: ageValue,
+                    drivingYears: drivingYearsValue,
+                    vehicleType: vehicleType,
+                    avatarImagePath: nil
+                )
+
+                await MainActor.run {
+                    self.isSaving = false
+                    self.dismiss()
+                }
+            } catch {
+                await MainActor.run {
+                    self.isSaving = false
+                    self.errorMessage = "保存用户资料失败：\(error.localizedDescription)"
+                    self.showingError = true
+                }
+            }
+        }
+    }
+
+    // MARK: - Formatting Helpers
+
+    private func formatDistance(_ distance: Double) -> String {
+        if distance >= 1000 {
+            return String(format: "%.1f", distance / 1000)
+        } else {
+            return String(format: "%.0f", distance)
+        }
+    }
+
+    private func formatRelativeDate(_ date: Date) -> String {
+        let now = Date()
+        let components = Calendar.current.dateComponents([.day], from: date, to: now)
+
+        if let days = components.day {
+            if days == 0 {
+                return "今天"
+            } else if days == 1 {
+                return "昨天"
+            } else if days < 7 {
+                return "\(days)天前"
+            } else {
+                let formatter = DateFormatter()
+                formatter.locale = Locale(identifier: "zh_CN")
+                formatter.dateFormat = "M月d日"
+                return formatter.string(from: date)
+            }
+        }
+        return ""
+    }
 }
 
 #Preview {
     UserProfileView()
+        .environmentObject(AppDI.shared)
 }

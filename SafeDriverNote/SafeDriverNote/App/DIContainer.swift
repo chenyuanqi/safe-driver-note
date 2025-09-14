@@ -10,6 +10,7 @@ final class AppDI: ObservableObject {
     var checklistRepository: ChecklistRepository { ChecklistRepositorySwiftData() }
     var knowledgeRepository: KnowledgeRepository { KnowledgeRepositorySwiftData() }
     var driveRouteRepository: DriveRouteRepository { DriveRouteRepositorySwiftData() }
+    var userProfileRepository: UserProfileRepository { UserProfileRepositorySwiftData() }
     var tagSuggestionService: TagSuggestionService { TagSuggestionService.shared }
     var knowledgeSyncService: KnowledgeSyncService { KnowledgeSyncService(repository: knowledgeRepository) }
     var locationService: LocationService { LocationService.shared }
