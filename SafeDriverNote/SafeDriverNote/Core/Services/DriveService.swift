@@ -261,9 +261,9 @@ class DriveService: ObservableObject {
     private func startLocationTracking() {
         stopLocationTracking()
         currentWaypoints = []
-        
-        // 启动连续定位，设置更灵敏的距离过滤器
-        locationService.startContinuousUpdates(desiredAccuracy: kCLLocationAccuracyBest, distanceFilter: 10) // 10米更新一次
+
+        // 启动连续定位，使用更高精度和更低的距离过滤器以获得更详细的路径
+        locationService.startContinuousUpdates(desiredAccuracy: kCLLocationAccuracyBest, distanceFilter: 5) // 5米更新一次，提高精度
         
         // 立即采集一次
         captureCurrentLocation()
@@ -273,10 +273,26 @@ class DriveService: ObservableObject {
             .sink { [weak self] location in
                 guard let self = self else { return }
                 Task { @MainActor in
+                    // 检查位置精度，过滤掉精度太差的位置
+                    guard location.horizontalAccuracy <= 20 && location.horizontalAccuracy >= 0 else {
+                        print("位置精度太差，跳过: 精度=\(location.horizontalAccuracy)米")
+                        return
+                    }
+
+                    // 检查是否与上一个位置太近，避免重复记录
+                    if let lastWaypoint = self.currentWaypoints.last {
+                        let lastLocation = CLLocation(latitude: lastWaypoint.latitude, longitude: lastWaypoint.longitude)
+                        let distance = location.distance(from: lastLocation)
+                        if distance < 5 { // 小于5米的移动不记录
+                            return
+                        }
+                    }
+
                     let address = await self.locationService.getLocationDescription(from: location)
                     let waypoint = RouteLocation(latitude: location.coordinate.latitude, longitude: location.coordinate.longitude, address: address)
                     self.currentWaypoints.append(waypoint)
-                    print("添加路径点: \(waypoint.latitude), \(waypoint.longitude)")
+                    print("添加路径点: \(waypoint.latitude), \(waypoint.longitude), 精度: \(location.horizontalAccuracy)米")
+
                     // 实时更新路线的路径点
                     if let route = self.currentRoute {
                         try? self.repository.updateRoute(route) { r in

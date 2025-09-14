@@ -28,7 +28,7 @@ class LocationService: NSObject, ObservableObject {
     private func setupLocationManager() {
         locationManager.delegate = self
         locationManager.desiredAccuracy = kCLLocationAccuracyBest
-        locationManager.distanceFilter = 10.0 // 保持10米更新一次
+        locationManager.distanceFilter = 5.0 // 改为5米更新一次，获得更详细的路径
         locationManager.pausesLocationUpdatesAutomatically = true
         authorizationStatus = locationManager.authorizationStatus
     }
@@ -57,7 +57,7 @@ class LocationService: NSObject, ObservableObject {
         let backgroundModes = Bundle.main.object(forInfoDictionaryKey: "UIBackgroundModes") as? [String] ?? []
         let canBackgroundLocation = backgroundModes.contains("location")
         locationManager.allowsBackgroundLocationUpdates = canBackgroundLocation
-        locationManager.pausesLocationUpdatesAutomatically = false
+        locationManager.pausesLocationUpdatesAutomatically = false // 确保不会自动暂停
         if #available(iOS 11.0, *) {
             locationManager.showsBackgroundLocationIndicator = canBackgroundLocation
         }
@@ -127,7 +127,7 @@ class LocationService: NSObject, ObservableObject {
             }
             
             // 为加速首次定位，临时开启连续更新；收到第一次回调后会在代理中结束（若非连续模式）
-            self.locationManager.desiredAccuracy = kCLLocationAccuracyNearestTenMeters
+            self.locationManager.desiredAccuracy = kCLLocationAccuracyBest // 使用最高精度
             self.locationManager.startUpdatingLocation()
         }
     }
@@ -235,6 +235,8 @@ extension LocationService: CLLocationManagerDelegate {
         }
         
         currentLocation = location
+        print("位置更新: (\(location.coordinate.latitude), \(location.coordinate.longitude)), 精度: \(location.horizontalAccuracy)米, 时间: \(location.timestamp)")
+
         // 发布连续定位的更新
         locationUpdateSubject.send(location)
         locationContinuation?.resume(returning: location)
