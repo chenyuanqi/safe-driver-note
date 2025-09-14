@@ -22,9 +22,37 @@ struct VoiceNoteView: View {
 						Image(systemName: speech.isRecording ? "mic.fill" : "mic")
 							.font(.title2)
 							.foregroundColor(speech.isRecording ? .brandDanger500 : .brandPrimary500)
-						Text(speech.isRecording ? "点击停止录音" : "点击开始录音")
-							.font(.bodyLarge)
-							.foregroundColor(.brandSecondary900)
+
+						VStack(alignment: .leading, spacing: Spacing.xs) {
+							Text(speech.isRecording ? "正在录音..." : "点击开始录音")
+								.font(.bodyLarge)
+								.foregroundColor(.brandSecondary900)
+
+							// 显示音频电平
+							if speech.isRecording {
+								HStack(spacing: Spacing.xs) {
+									Text("音量:")
+										.font(.caption)
+										.foregroundColor(.brandSecondary500)
+
+									GeometryReader { geometry in
+										ZStack(alignment: .leading) {
+											Rectangle()
+												.fill(Color.brandSecondary200)
+												.frame(height: 4)
+
+											Rectangle()
+												.fill(speech.audioLevel > 0.8 ? Color.brandDanger500 :
+													  speech.audioLevel > 0.5 ? Color.brandWarning500 : Color.brandPrimary500)
+												.frame(width: max(2, geometry.size.width * CGFloat(speech.audioLevel)), height: 4)
+										}
+									}
+									.frame(height: 4)
+									.clipShape(Capsule())
+								}
+							}
+						}
+
 						Spacer()
 					}
 					.contentShape(Rectangle())

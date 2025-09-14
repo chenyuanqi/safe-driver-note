@@ -9,6 +9,7 @@ final class SpeechRecognitionService: ObservableObject {
 	@Published var isRecording: Bool = false
 	@Published var recognitionAuthorized: Bool = false
 	@Published var micAuthorized: Bool = false
+	@Published var audioLevel: Float = 0.0 // 新增：音频电平监控
 
 	private let speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: "zh-CN"))
 	private let audioEngine = AVAudioEngine()
@@ -16,6 +17,8 @@ final class SpeechRecognitionService: ObservableObject {
 	private var task: SFSpeechRecognitionTask?
 	private var baseTextAtStart: String = ""
 	private var accumulatedText: String = ""
+	private var lastUpdateTime = Date()
+	private var silenceTimer: Timer?
 
 	func requestPermissions() async {
 		// 语音识别
@@ -57,15 +60,47 @@ final class SpeechRecognitionService: ObservableObject {
 		request.requiresOnDeviceRecognition = false
 		request.taskHint = .dictation
 		request.addsPunctuation = true // 启用标点符号添加
+
+		// 优化识别配置
+		if #available(iOS 16.0, *) {
+			request.addsPunctuation = true
+			request.requiresOnDeviceRecognition = false // 使用云端识别获得更好效果
+		}
 		self.request = request
 		let audioSession = AVAudioSession.sharedInstance()
-		try? audioSession.setCategory(.record, mode: .measurement, options: .duckOthers)
-		try? audioSession.setActive(true, options: .notifyOthersOnDeactivation)
+		do {
+			// 使用专门的语音录制模式，提高录音质量
+			try audioSession.setCategory(.record, mode: .spokenAudio, options: [.duckOthers, .allowBluetooth])
+			try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
+
+			// 设置首选的采样率，提高识别准确性
+			try audioSession.setPreferredSampleRate(44100.0)
+
+			// 设置首选输入数据源（如果可用）
+			if let preferredInput = audioSession.availableInputs?.first {
+				try audioSession.setPreferredInput(preferredInput)
+			}
+		} catch {
+			print("音频会话配置失败: \(error)")
+			// 回退到基本配置
+			try? audioSession.setCategory(.record, mode: .measurement, options: .duckOthers)
+			try? audioSession.setActive(true, options: .notifyOthersOnDeactivation)
+		}
 		let input = audioEngine.inputNode
 		let format = input.outputFormat(forBus: 0)
 		input.removeTap(onBus: 0)
-		input.installTap(onBus: 0, bufferSize: 1024, format: format) { [weak self] buffer, _ in
-			self?.request?.append(buffer)
+
+		// 使用更大的缓冲区大小以获得更好的音频质量和识别准确性
+		let bufferSize: AVAudioFrameCount = 4096
+		input.installTap(onBus: 0, bufferSize: bufferSize, format: format) { [weak self] buffer, _ in
+			guard let self = self else { return }
+
+			// 监控音频电平，帮助用户了解录音质量
+			Task { @MainActor in
+				self.updateAudioLevel(from: buffer)
+			}
+
+			self.request?.append(buffer)
 		}
 		audioEngine.prepare()
 		try? audioEngine.start()
@@ -77,7 +112,13 @@ final class SpeechRecognitionService: ObservableObject {
 			if let result = result {
 				let snapshot = result.bestTranscription.formattedString
 				print("Received snapshot: '\(snapshot)'")
-				
+
+				// 更新最后识别时间，用于停顿检测
+				Task { @MainActor in
+					self.lastUpdateTime = Date()
+					self.resetSilenceTimer()
+				}
+
 				Task { @MainActor in
 					// 保存当前 transcript 内容
 					let previousTranscript = self.transcript
@@ -131,6 +172,11 @@ final class SpeechRecognitionService: ObservableObject {
 	func stop() {
 		guard isRecording else { return }
 		isRecording = false
+
+		// 停止停顿检测定时器
+		silenceTimer?.invalidate()
+		silenceTimer = nil
+
 		audioEngine.stop()
 		audioEngine.inputNode.removeTap(onBus: 0)
 		request?.endAudio()
@@ -176,32 +222,70 @@ final class SpeechRecognitionService: ObservableObject {
 	// 改进标点符号的智能处理
 	private func improvePunctuation(_ text: String) -> String {
 		print("Improving punctuation for text: '\(text)'")
-		
+
 		// 如果文本为空，直接返回原文本
-		guard !text.isEmpty else { 
+		guard !text.isEmpty else {
 			print("Text is empty, returning as is")
-			return text 
+			return text
 		}
-		
+
 		var result = text
-		
-		// 1. 处理句末标点符号
-		// 将连续的逗号替换为适当的句号或问号
-		result = replaceConsecutiveCommas(result)
-		
-		// 2. 处理常见的句式结尾
-		result = processCommonSentenceEndings(result)
-		
-		// 3. 处理常见的疑问句式
-		result = processQuestionPatterns(result)
-		
-		// 4. 处理常见的感叹句式
-		result = processExclamationPatterns(result)
-		
-		// 5. 清理多余的标点符号
+
+		// 1. 首先清理多余的标点符号（避免重复处理）
 		result = cleanExtraPunctuation(result)
-		
+
+		// 2. 处理语音识别中常见的逗号过多问题
+		result = replaceConsecutiveCommas(result)
+
+		// 3. 智能识别句子类型并添加合适的标点符号
+		result = addIntelligentPunctuation(result)
+
+		// 4. 处理常见的句式结尾
+		result = processCommonSentenceEndings(result)
+
+		// 5. 处理常见的疑问句式
+		result = processQuestionPatterns(result)
+
+		// 6. 处理常见的感叹句式
+		result = processExclamationPatterns(result)
+
+		// 7. 最后再次清理多余的标点符号
+		result = cleanExtraPunctuation(result)
+
 		print("Improved punctuation result: '\(result)'")
+		return result
+	}
+
+	// 新增：智能标点符号添加
+	private func addIntelligentPunctuation(_ text: String) -> String {
+		var result = text
+
+		// 检查文本是否已经以合适的标点符号结尾
+		let trimmed = result.trimmingCharacters(in: .whitespacesAndNewlines)
+		if trimmed.isEmpty { return result }
+
+		let lastChar = String(trimmed.last!)
+		let punctuations = Set(["。", "！", "？", ".", "!", "?"])
+
+		// 如果没有适当的结束标点，根据语境添加
+		if !punctuations.contains(lastChar) {
+			// 检查是否是疑问句的特征
+			let questionIndicators = ["什么", "怎么", "为什么", "哪里", "何时", "谁", "是否", "能不能", "可不可以", "吗", "呢", "吧"]
+			let isQuestion = questionIndicators.contains { trimmed.contains($0) }
+
+			// 检查是否是感叹句的特征
+			let exclamationIndicators = ["太", "真的", "好棒", "厉害", "不错", "很好", "完美", "糟糕", "天哪"]
+			let isExclamation = exclamationIndicators.contains { trimmed.contains($0) }
+
+			if isQuestion {
+				result = trimmed + "？"
+			} else if isExclamation {
+				result = trimmed + "！"
+			} else {
+				result = trimmed + "。"
+			}
+		}
+
 		return result
 	}
 	
@@ -363,5 +447,64 @@ final class SpeechRecognitionService: ObservableObject {
 		transcript = ""
 		accumulatedText = ""
 		baseTextAtStart = ""
+		silenceTimer?.invalidate()
+		silenceTimer = nil
+	}
+
+	// MARK: - 停顿检测和智能标点
+
+	/// 重置停顿检测定时器
+	private func resetSilenceTimer() {
+		silenceTimer?.invalidate()
+
+		// 设置2秒的停顿检测定时器
+		silenceTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: false) { [weak self] _ in
+			Task { @MainActor in
+				self?.handleSilencePause()
+			}
+		}
+	}
+
+	/// 处理停顿暂停，添加适当的标点符号
+	private func handleSilencePause() {
+		guard !transcript.isEmpty else { return }
+
+		print("检测到2秒停顿，添加句号")
+
+		// 检查最后一个字符是否已经是标点符号
+		let trimmed = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+		if !trimmed.isEmpty {
+			let lastChar = String(trimmed.last!)
+			let punctuations = Set(["。", "！", "？", ".", "!", "?", "，", ","])
+
+			if !punctuations.contains(lastChar) {
+				// 如果没有标点符号，添加句号
+				transcript = trimmed + "。"
+				print("添加句号后的文本: '\(transcript)'")
+			}
+		}
+	}
+
+	// MARK: - 音频质量监控
+
+	/// 更新音频电平，用于监控录音质量
+	private func updateAudioLevel(from buffer: AVAudioPCMBuffer) {
+		guard let channelData = buffer.floatChannelData?[0] else { return }
+
+		// 计算音频电平
+		let frameCount = Int(buffer.frameLength)
+		var sum: Float = 0
+		for i in 0..<frameCount {
+			let sample = channelData[i]
+			sum += sample * sample
+		}
+
+		let rms = sqrt(sum / Float(frameCount))
+		let avgPower = 20 * log10(max(rms, 0.000001)) // 避免log(0)
+		let meterLevel = (avgPower + 60) / 60 // 转换到0-1范围
+
+		DispatchQueue.main.async {
+			self.audioLevel = max(0.0, min(1.0, meterLevel))
+		}
 	}
 }
