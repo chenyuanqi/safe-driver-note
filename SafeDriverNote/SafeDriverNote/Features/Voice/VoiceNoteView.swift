@@ -24,12 +24,27 @@ struct VoiceNoteView: View {
 							.foregroundColor(speech.isRecording ? .brandDanger500 : .brandPrimary500)
 
 						VStack(alignment: .leading, spacing: Spacing.xs) {
-							Text(speech.isRecording ? "正在录音..." : "点击开始录音")
+							Text(speech.isRecording ?
+								(speech.isListening ? "识别中..." : "等待语音...") :
+								"点击开始录音")
 								.font(.bodyLarge)
 								.foregroundColor(.brandSecondary900)
 
-							// 显示音频电平
+							// 显示录音状态和音频电平
 							if speech.isRecording {
+								HStack(spacing: Spacing.xs) {
+									// 语音状态指示器
+									Circle()
+										.fill(speech.isListening ? Color.green : Color.orange)
+										.frame(width: 8, height: 8)
+
+									Text(speech.isListening ? "检测到语音" : "等待语音输入")
+										.font(.caption)
+										.foregroundColor(.brandSecondary500)
+
+									Spacer()
+								}
+
 								HStack(spacing: Spacing.xs) {
 									Text("音量:")
 										.font(.caption)

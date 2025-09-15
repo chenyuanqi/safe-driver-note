@@ -10,6 +10,7 @@ final class SpeechRecognitionService: ObservableObject {
 	@Published var recognitionAuthorized: Bool = false
 	@Published var micAuthorized: Bool = false
 	@Published var audioLevel: Float = 0.0 // 新增：音频电平监控
+	@Published var isListening: Bool = false // 新增：是否检测到语音输入
 
 	private let speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: "zh-CN"))
 	private let audioEngine = AVAudioEngine()
@@ -19,6 +20,9 @@ final class SpeechRecognitionService: ObservableObject {
 	private var accumulatedText: String = ""
 	private var lastUpdateTime = Date()
 	private var silenceTimer: Timer?
+	private var voiceDetectionTimer: Timer? // 新增：语音检测定时器
+	private let voiceThreshold: Float = 0.02 // 语音检测阈值
+	private let silenceThreshold: Float = 0.005 // 静音检测阈值
 
 	func requestPermissions() async {
 		// 语音识别
@@ -66,19 +70,35 @@ final class SpeechRecognitionService: ObservableObject {
 			request.addsPunctuation = true
 			request.requiresOnDeviceRecognition = false // 使用云端识别获得更好效果
 		}
+
+		// 优化识别参数以提高敏感度
+		if #available(iOS 13.0, *) {
+			// 设置更短的语音检测超时
+			request.interactionIdentifier = UUID().uuidString
+		}
 		self.request = request
 		let audioSession = AVAudioSession.sharedInstance()
 		do {
 			// 使用专门的语音录制模式，提高录音质量
-			try audioSession.setCategory(.record, mode: .spokenAudio, options: [.duckOthers, .allowBluetooth])
+			try audioSession.setCategory(.record, mode: .spokenAudio, options: [.duckOthers, .allowBluetooth, .defaultToSpeaker])
 			try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
 
-			// 设置首选的采样率，提高识别准确性
-			try audioSession.setPreferredSampleRate(44100.0)
+			// 设置更高的采样率，提高识别准确性
+			try audioSession.setPreferredSampleRate(48000.0) // 提高到48kHz
 
-			// 设置首选输入数据源（如果可用）
+			// 设置更短的I/O缓冲时长，提高响应性
+			try audioSession.setPreferredIOBufferDuration(0.005) // 5ms缓冲
+
+			// 设置首选输入数据源和增益
 			if let preferredInput = audioSession.availableInputs?.first {
 				try audioSession.setPreferredInput(preferredInput)
+			}
+
+			// 设置输入增益以提高敏感度（如果支持）
+			do {
+				try audioSession.setInputGain(0.8) // 设置较高的输入增益
+			} catch {
+				print("设置输入增益失败: \(error)")
 			}
 		} catch {
 			print("音频会话配置失败: \(error)")
@@ -90,14 +110,15 @@ final class SpeechRecognitionService: ObservableObject {
 		let format = input.outputFormat(forBus: 0)
 		input.removeTap(onBus: 0)
 
-		// 使用更大的缓冲区大小以获得更好的音频质量和识别准确性
-		let bufferSize: AVAudioFrameCount = 4096
+		// 使用更小的缓冲区以获得更快的响应速度
+		let bufferSize: AVAudioFrameCount = 1024 // 降低缓冲区大小提高响应性
 		input.installTap(onBus: 0, bufferSize: bufferSize, format: format) { [weak self] buffer, _ in
 			guard let self = self else { return }
 
-			// 监控音频电平，帮助用户了解录音质量
+			// 监控音频电平和语音活动，帮助用户了解录音质量
 			Task { @MainActor in
 				self.updateAudioLevel(from: buffer)
+				self.detectVoiceActivity(from: buffer)
 			}
 
 			self.request?.append(buffer)
@@ -172,10 +193,13 @@ final class SpeechRecognitionService: ObservableObject {
 	func stop() {
 		guard isRecording else { return }
 		isRecording = false
+		isListening = false
 
-		// 停止停顿检测定时器
+		// 停止所有定时器
 		silenceTimer?.invalidate()
 		silenceTimer = nil
+		voiceDetectionTimer?.invalidate()
+		voiceDetectionTimer = nil
 
 		audioEngine.stop()
 		audioEngine.inputNode.removeTap(onBus: 0)
@@ -449,6 +473,9 @@ final class SpeechRecognitionService: ObservableObject {
 		baseTextAtStart = ""
 		silenceTimer?.invalidate()
 		silenceTimer = nil
+		voiceDetectionTimer?.invalidate()
+		voiceDetectionTimer = nil
+		isListening = false
 	}
 
 	// MARK: - 停顿检测和智能标点
@@ -506,5 +533,56 @@ final class SpeechRecognitionService: ObservableObject {
 		DispatchQueue.main.async {
 			self.audioLevel = max(0.0, min(1.0, meterLevel))
 		}
+	}
+
+	// MARK: - 语音活动检测
+
+	/// 检测语音活动，提高识别敏感度
+	private func detectVoiceActivity(from buffer: AVAudioPCMBuffer) {
+		guard let channelData = buffer.floatChannelData?[0] else { return }
+
+		// 计算RMS音频电平
+		let frameCount = Int(buffer.frameLength)
+		var sum: Float = 0
+		for i in 0..<frameCount {
+			let sample = channelData[i]
+			sum += sample * sample
+		}
+		let rms = sqrt(sum / Float(frameCount))
+
+		// 检测是否有语音活动
+		let hasVoiceActivity = rms > voiceThreshold
+
+		if hasVoiceActivity && !isListening {
+			// 检测到语音开始
+			print("检测到语音活动开始，RMS: \(rms)")
+			isListening = true
+			// 重置停顿检测
+			resetSilenceTimer()
+		} else if !hasVoiceActivity && isListening {
+			// 可能语音停止，启动延迟检测
+			startVoiceActivityTimeout()
+		} else if hasVoiceActivity && isListening {
+			// 持续语音活动，重置停顿检测
+			resetSilenceTimer()
+		}
+	}
+
+	/// 启动语音活动超时检测
+	private func startVoiceActivityTimeout() {
+		voiceDetectionTimer?.invalidate()
+		voiceDetectionTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: false) { [weak self] _ in
+			Task { @MainActor in
+				self?.handleVoiceActivityEnd()
+			}
+		}
+	}
+
+	/// 处理语音活动结束
+	private func handleVoiceActivityEnd() {
+		print("语音活动结束检测")
+		isListening = false
+		// 不立即停止识别，而是等待更长的停顿时间
+		resetSilenceTimer()
 	}
 }
