@@ -83,7 +83,7 @@ struct DrivingRulesView: View {
                 .frame(maxHeight: .infinity)
                 .background(
                     RoundedRectangle(cornerRadius: CornerRadius.xl, style: .continuous)
-                        .fill(Color.white)
+                        .fill(Color.cardBackground)
                         .shadow(color: .black.opacity(0.1), radius: 8, x: 0, y: 4)
                 )
                 .overlay(
@@ -93,7 +93,7 @@ struct DrivingRulesView: View {
                 
                 // 按钮
                 Button(action: onDismiss) {
-                    Text("开始学习")
+                    Text("知道了")
                         .font(.bodyMedium)
                         .fontWeight(.medium)
                         .foregroundColor(.white)
