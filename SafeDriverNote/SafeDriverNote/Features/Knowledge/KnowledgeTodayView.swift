@@ -33,9 +33,9 @@ struct KnowledgeTodayView: View {
                                 Color.brandSecondary50
                                     .ignoresSafeArea()
 
-                                VStack(spacing: Spacing.xl) {
-                                    // 增加顶部间距，避免被导航栏遮挡
-                                    Spacer(minLength: Spacing.navBarHeight + Spacing.lg)
+                                VStack(spacing: Spacing.lg) {
+                                    // 减少顶部间距，让卡片有更多空间
+                                    Spacer(minLength: Spacing.navBarHeight + Spacing.sm)
 
                                     // 顶部开车守则（可展开）
                                     drivingRulesSection
@@ -43,8 +43,8 @@ struct KnowledgeTodayView: View {
                                     // 学习卡片区域
                                     if let card = vm.today.first {
                                         GeometryReader { geo in
-                                            let cardHeight = geo.size.height * 0.5
-                                            VStack(spacing: Spacing.xl) {
+                                            let cardHeight = geo.size.height * 0.7
+                                            VStack(spacing: Spacing.lg) {
                                                 ZStack {
                                                     // 主卡片
                                                     cardFullView(card)
@@ -95,6 +95,7 @@ struct KnowledgeTodayView: View {
                                                 Text("左滑稍后，右滑掌握")
                                                     .font(.bodySmall)
                                                     .foregroundColor(.brandSecondary500)
+                                                    .padding(.bottom, Spacing.lg)
                                             }
                                             .padding(.horizontal, Spacing.pagePadding)
                                         }
@@ -191,9 +192,9 @@ struct KnowledgeTodayView: View {
     @ViewBuilder
     private func cardFullView(_ card: KnowledgeCard) -> some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: Spacing.xl) {
+            VStack(alignment: .leading, spacing: Spacing.xxxxl) {
                 // 卡片头部 - 标题区域
-                VStack(alignment: .leading, spacing: Spacing.md) {
+                VStack(alignment: .leading, spacing: Spacing.lg) {
                     Text(card.title)
                         .font(.title1)
                         .fontWeight(.bold)
@@ -207,7 +208,7 @@ struct KnowledgeTodayView: View {
                 }
                 
                 // 主要内容
-                VStack(alignment: .leading, spacing: Spacing.xxl) {
+                VStack(alignment: .leading, spacing: Spacing.xxxxl) {
                     // What 部分
                     VStack(alignment: .leading, spacing: Spacing.md) {
                         Text("要点")
@@ -281,7 +282,7 @@ struct KnowledgeTodayView: View {
                     }
                 }
             }
-            .padding(Spacing.xxxl)
+            .padding(Spacing.xxxxl)
         }
         .background(
             RoundedRectangle(cornerRadius: CornerRadius.xl, style: .continuous)
