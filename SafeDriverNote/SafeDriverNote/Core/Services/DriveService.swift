@@ -19,10 +19,10 @@ class DriveService: ObservableObject {
     private let repository: DriveRouteRepository
     private let locationService: LocationService
     private var drivingTimer: Timer?
-    private var locationTrackingTimer: Timer? // 位置跟踪定时器（兼容保留）
+    private var locationTrackingTimer: Timer? // 位置跟踪定时器
     private var currentWaypoints: [RouteLocation] = [] // 当前路径点集合
     private var locationCancellable: AnyCancellable?
-    
+
     /// 定时采集位置的时间间隔（秒）
     private let locationTrackingInterval: TimeInterval = 60 // 每60秒采集一次位置，符合设计要求
     
@@ -264,11 +264,18 @@ class DriveService: ObservableObject {
 
         // 启动连续定位，使用更高精度和更低的距离过滤器以获得更详细的路径
         locationService.startContinuousUpdates(desiredAccuracy: kCLLocationAccuracyBest, distanceFilter: 5) // 5米更新一次，提高精度
-        
+
         // 立即采集一次
         captureCurrentLocation()
-        
-        // 订阅连续定位
+
+        // 添加定时器，每分钟强制记录一次位置（即使车辆未移动）
+        locationTrackingTimer = Timer.scheduledTimer(withTimeInterval: locationTrackingInterval, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                self?.captureCurrentLocationForced()
+            }
+        }
+
+        // 订阅连续定位（基于移动距离的实时更新）
         locationCancellable = locationService.locationPublisher
             .sink { [weak self] location in
                 guard let self = self else { return }
@@ -291,7 +298,7 @@ class DriveService: ObservableObject {
                     let address = await self.locationService.getLocationDescription(from: location)
                     let waypoint = RouteLocation(latitude: location.coordinate.latitude, longitude: location.coordinate.longitude, address: address)
                     self.currentWaypoints.append(waypoint)
-                    print("添加路径点: \(waypoint.latitude), \(waypoint.longitude), 精度: \(location.horizontalAccuracy)米")
+                    print("移动触发路径点: \(waypoint.latitude), \(waypoint.longitude), 精度: \(location.horizontalAccuracy)米")
 
                     // 实时更新路线的路径点
                     if let route = self.currentRoute {
@@ -318,29 +325,78 @@ class DriveService: ObservableObject {
             do {
                 // 获取当前位置
                 guard let currentLocation = try await locationService.getCurrentLocation() else { return }
-                
+
                 let address = await locationService.getLocationDescription(from: currentLocation)
-                
+
                 // 创建路径点
                 let routeLocation = RouteLocation(
                     latitude: currentLocation.coordinate.latitude,
                     longitude: currentLocation.coordinate.longitude,
                     address: address
                 )
-                
+
                 // 添加到路径点集合
                 currentWaypoints.append(routeLocation)
                 print("立即采集路径点: \(routeLocation.latitude), \(routeLocation.longitude)")
-                
+
                 // 更新当前路线的路径点
                 if let route = currentRoute {
                     try repository.updateRoute(route) { route in
                         route.waypoints = self.currentWaypoints
                     }
                 }
-                
+
             } catch {
                 print("采集位置失败: \(error)")
+            }
+        }
+    }
+
+    /// 强制采集当前位置（定时器使用，即使车辆未移动也记录）
+    private func captureCurrentLocationForced() {
+        Task {
+            do {
+                // 优先使用缓存位置，如果没有则尝试获取新位置
+                var currentLocation = locationService.currentLocation
+
+                // 如果没有缓存位置，尝试获取（短超时）
+                if currentLocation == nil {
+                    currentLocation = try? await locationService.getCurrentLocation(timeout: 3.0)
+                }
+
+                guard let location = currentLocation else {
+                    print("定时采集位置失败：无法获取位置")
+                    return
+                }
+
+                // 检查位置精度
+                guard location.horizontalAccuracy <= 30 && location.horizontalAccuracy >= 0 else {
+                    print("定时采集位置精度太差，跳过: 精度=\(location.horizontalAccuracy)米")
+                    return
+                }
+
+                let address = await locationService.getLocationDescription(from: location)
+
+                // 创建路径点
+                let routeLocation = RouteLocation(
+                    latitude: location.coordinate.latitude,
+                    longitude: location.coordinate.longitude,
+                    address: address
+                )
+
+                // 添加到路径点集合
+                currentWaypoints.append(routeLocation)
+                print("定时采集路径点: \(routeLocation.latitude), \(routeLocation.longitude), 精度: \(location.horizontalAccuracy)米")
+
+                // 更新当前路线的路径点
+                if let route = currentRoute {
+                    try repository.updateRoute(route) { route in
+                        route.waypoints = self.currentWaypoints
+                    }
+                }
+
+            } catch {
+                print("定时采集位置失败: \(error)")
             }
         }
     }
