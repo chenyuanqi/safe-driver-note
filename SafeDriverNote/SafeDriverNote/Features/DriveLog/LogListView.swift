@@ -6,6 +6,18 @@ struct LogListView: View {
     @State private var searchText: String = ""
     @State private var selectedSegment: Segment = .all
     @State private var showingStats = false
+
+    // 组合项类型，用于"全部"tab
+    struct CombinedItem {
+        let id: String
+        let date: Date
+        let type: CombinedItemType
+
+        enum CombinedItemType {
+            case log(LogEntry)
+            case route(DriveRoute)
+        }
+    }
     
     // 添加初始化参数，用于指定默认选中的tab
     var defaultTab: Segment?
@@ -52,6 +64,12 @@ struct LogListView: View {
                                 driveRouteEmptyStateView
                             } else {
                                 driveRouteListView
+                            }
+                        } else if selectedSegment == .all {
+                            if filteredLogs.isEmpty && filteredRoutes.isEmpty {
+                                emptyStateView
+                            } else {
+                                combinedListView
                             }
                         } else {
                             if filteredLogs.isEmpty {
@@ -302,12 +320,47 @@ struct LogListView: View {
                             .fontWeight(.semibold)
                             .foregroundColor(.brandSecondary900)
                             .padding(.horizontal, Spacing.pagePadding)
-                        
+
                         // Route Cards
                         VStack(spacing: Spacing.md) {
                             ForEach(section.items, id: \.id) { route in
                                 driveRouteCard(for: route)
                                     .padding(.horizontal, Spacing.pagePadding)
+                            }
+                        }
+                    }
+                }
+            }
+            .padding(.vertical, Spacing.lg)
+        }
+    }
+
+    private var combinedListView: some View {
+        ScrollView {
+            LazyVStack(spacing: Spacing.lg) {
+                ForEach(combinedGroupedByDay, id: \.key) { section in
+                    VStack(alignment: .leading, spacing: Spacing.lg) {
+                        // Date Header
+                        Text(section.key)
+                            .font(.bodyLarge)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.brandSecondary900)
+                            .padding(.horizontal, Spacing.pagePadding)
+
+                        // Combined Cards
+                        VStack(spacing: Spacing.md) {
+                            ForEach(section.items, id: \.id) { item in
+                                switch item.type {
+                                case .log(let log):
+                                    modernLogCard(for: log)
+                                        .padding(.horizontal, Spacing.pagePadding)
+                                        .onTapGesture {
+                                            vm.beginEdit(log)
+                                        }
+                                case .route(let route):
+                                    driveRouteCard(for: route)
+                                        .padding(.horizontal, Spacing.pagePadding)
+                                }
                             }
                         }
                     }
@@ -322,6 +375,7 @@ struct LogListView: View {
         switch segment {
         case .all:
             vm.filter = nil
+            // "全部"现在同时显示日志和行驶记录，但使用自定义的combinedListView
             vm.showDriveRoutes = false
         case .mistake:
             vm.filter = .mistake
@@ -571,8 +625,12 @@ struct LogListView: View {
     
     private var filteredRoutes: [DriveRoute] {
         let q = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        if q.isEmpty { return vm.routes }
-        return vm.routes.filter { route in
+
+        // 对于"全部"tab，直接从allRoutes获取数据，否则使用vm.routes
+        let sourcRoutes = (selectedSegment == .all) ? vm.allRoutes : vm.routes
+
+        if q.isEmpty { return sourcRoutes }
+        return sourcRoutes.filter { route in
             let startAddr = route.startLocation?.address ?? ""
             let endAddr = route.endLocation?.address ?? ""
             let hay = [startAddr, endAddr].joined(separator: " ").lowercased()
@@ -600,6 +658,40 @@ struct LogListView: View {
         return groups
             .map { ($0.key, $0.value.sorted { $0.startTime > $1.startTime }) }
             .sorted { lhs, rhs in lhs.items.first?.startTime ?? .distantPast > rhs.items.first?.startTime ?? .distantPast }
+    }
+
+    private var combinedGroupedByDay: [(key: String, items: [CombinedItem])] {
+        let df = DateFormatter()
+        df.locale = Locale(identifier: "zh_CN")
+        df.calendar = Calendar(identifier: .gregorian)
+        df.dateFormat = "yyyy年M月d日 EEEE"
+
+        // 将日志和行驶记录合并为CombinedItem
+        var combinedItems: [CombinedItem] = []
+
+        // 添加日志
+        for log in filteredLogs {
+            combinedItems.append(CombinedItem(
+                id: "log_\(log.id)",
+                date: log.createdAt,
+                type: .log(log)
+            ))
+        }
+
+        // 添加行驶记录
+        for route in filteredRoutes {
+            combinedItems.append(CombinedItem(
+                id: "route_\(route.id)",
+                date: route.startTime,
+                type: .route(route)
+            ))
+        }
+
+        // 按日期分组
+        let groups = Dictionary(grouping: combinedItems) { item in df.string(from: item.date) }
+        return groups
+            .map { ($0.key, $0.value.sorted { $0.date > $1.date }) }
+            .sorted { lhs, rhs in lhs.items.first?.date ?? .distantPast > rhs.items.first?.date ?? .distantPast }
     }
 
     private var list: some View {
@@ -756,12 +848,31 @@ struct LogListView: View {
         guard let start = cal.date(from: cal.dateComponents([.year, .month], from: Date())) else { return [] }
         return vm.logs.filter { $0.createdAt >= start }
     }
-    private var monthTotal: Int { monthLogs.count }
+
+    private var monthRoutes: [DriveRoute] {
+        let cal = Calendar(identifier: .gregorian)
+        guard let start = cal.date(from: cal.dateComponents([.year, .month], from: Date())) else { return [] }
+        // 对于"全部"tab，使用allRoutes；否则使用routes
+        let sourceRoutes = (selectedSegment == .all) ? vm.allRoutes : vm.routes
+        return sourceRoutes.filter { $0.startTime >= start }
+    }
+
+    private var monthTotal: Int {
+        // 在"全部"模式下，总次数 = 日志数 + 行驶记录数
+        if selectedSegment == .all {
+            return monthLogs.count + monthRoutes.count
+        } else {
+            return monthLogs.count
+        }
+    }
+
     private var monthMistakes: Int { monthLogs.filter { $0.type == .mistake }.count }
     private var monthSuccess: Int { monthLogs.filter { $0.type == .success }.count }
     private var improvementRateFormatted: String {
-        guard monthTotal > 0 else { return "--%" }
-        let rate = Double(monthSuccess) / Double(monthTotal)
+        // 改进率只基于日志数据计算（成功/总日志数），不包含行驶记录
+        let totalLogs = monthLogs.count
+        guard totalLogs > 0 else { return "--%" }
+        let rate = Double(monthSuccess) / Double(totalLogs)
         return String(format: "%.0f%%", rate * 100)
     }
     @ViewBuilder

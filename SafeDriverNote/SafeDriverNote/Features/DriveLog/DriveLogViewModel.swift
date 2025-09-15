@@ -16,7 +16,7 @@ final class DriveLogViewModel: ObservableObject {
     private let repository: LogRepository
     private let routeRepository: DriveRouteRepository
     private var all: [LogEntry] = []
-    private var allRoutes: [DriveRoute] = []
+    private(set) var allRoutes: [DriveRoute] = []
 
     init(repository: LogRepository, routeRepository: DriveRouteRepository? = nil) {
         self.repository = repository
