@@ -8,7 +8,7 @@ struct SettingsView: View {
     @State private var showingDataExport = false
     @State private var showingThemeSelector = false
     @State private var showingLocationPermission = false
-    @State private var showingCloudSyncAlert = false
+    @State private var showingiCloudSync = false
     @State private var showingClearCacheAlert = false
     @State private var showingCacheCleared = false
     @State private var showingRatingAlert = false
@@ -70,10 +70,9 @@ struct SettingsView: View {
             LocationPermissionView()
                 .environmentObject(di)
         }
-        .alert("iCloud 同步", isPresented: $showingCloudSyncAlert) {
-            Button("确定") { }
-        } message: {
-            Text("功能未开发")
+        .sheet(isPresented: $showingiCloudSync) {
+            iCloudSyncView()
+                .environmentObject(di)
         }
         .alert("清除缓存", isPresented: $showingClearCacheAlert) {
             Button("取消", role: .cancel) { }
@@ -237,18 +236,18 @@ struct SettingsView: View {
                     )
                 }
 
-                Divider().padding(.leading, 52)
-
-                Button(action: {
-                    showingCloudSyncAlert = true
-                }) {
-                    settingsRow(
-                        icon: "icloud",
-                        title: "iCloud 同步",
-                        subtitle: "同步数据到 iCloud",
-                        color: .brandSecondary600
-                    )
-                }
+                // iCloud 同步功能暂时隐藏，避免崩溃问题
+                // Divider().padding(.leading, 52)
+                // Button(action: {
+                //     showingiCloudSync = true
+                // }) {
+                //     settingsRow(
+                //         icon: "icloud",
+                //         title: "iCloud 同步",
+                //         subtitle: "同步数据到 iCloud",
+                //         color: .brandSecondary600
+                //     )
+                // }
 
                 Divider().padding(.leading, 52)
 
