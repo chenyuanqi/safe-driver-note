@@ -326,10 +326,31 @@ struct HomeView: View {
 				}
 			}
 		}
-		.alert(statusExplanationTitle, isPresented: $showingStatusExplanation) {
-			Button("知道了") { }
-		} message: {
-			Text(statusExplanationContent)
+		.sheet(isPresented: $showingStatusExplanation) {
+			NavigationStack {
+				VStack(alignment: .leading, spacing: Spacing.lg) {
+					Text(statusExplanationTitle)
+						.font(.title2)
+						.fontWeight(.semibold)
+						.foregroundColor(.brandSecondary900)
+
+					Text(statusExplanationContent)
+						.font(.body)
+						.foregroundColor(.brandSecondary700)
+						.multilineTextAlignment(.leading)
+
+					Spacer()
+				}
+				.padding()
+				.toolbar {
+					ToolbarItem(placement: .confirmationAction) {
+						Button("知道了") {
+							showingStatusExplanation = false
+						}
+					}
+				}
+			}
+			.presentationDetents([.medium])
 		}
 	}
 	
