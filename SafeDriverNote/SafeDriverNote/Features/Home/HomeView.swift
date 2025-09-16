@@ -559,36 +559,37 @@ struct HomeView: View {
 	                .fontWeight(.semibold)
 	                .foregroundColor(.brandSecondary900)
 	                .multilineTextAlignment(.leading)
-	            
+
 	            Text(card.content)
 	                .font(.body)
 	                .foregroundColor(.brandSecondary700)
 	                .lineLimit(3)
 	                .multilineTextAlignment(.leading)
-	            
+
 	            Spacer()
-	            
+
 	            HStack {
 	                Spacer()
-	                
+
 	                if card.isLearned {
 	                    Text("已学习")
 	                        .tagStyle(.success)
 	                } else {
-	                    Button("开始学习") {
-	                        // 使用状态变量来控制导航
-	                        showingKnowledgeView = true
+	                    HStack(spacing: Spacing.xs) {
+	                        Text("点击学习")
+	                            .font(.bodySmall)
+	                            .foregroundColor(.brandPrimary500)
+	                        Image(systemName: "chevron.right")
+	                            .font(.caption)
+	                            .foregroundColor(.brandPrimary500)
 	                    }
-	                    .compactStyle(color: .brandPrimary500)
 	                }
 	            }
 	        }
 	    }
 	    .onTapGesture {
-	        // 点击卡片时切换到该卡片
-	        withAnimation {
-	            selectedKnowledgeIndex = index
-	        }
+	        // 点击卡片时跳转到知识页面
+	        showingKnowledgeView = true
 	    }
 	    .gesture(
 	        DragGesture(minimumDistance: 50)
@@ -597,11 +598,15 @@ struct HomeView: View {
 	                    // 右滑，切换到上一张卡片
 	                    withAnimation {
 	                        selectedKnowledgeIndex = max(0, selectedKnowledgeIndex - 1)
+	                        // 用户手动切换时重置定时器
+	                        resetAutoCarousel()
 	                    }
 	                } else if value.translation.width < -50 {
 	                    // 左滑，切换到下一张卡片
 	                    withAnimation {
 	                        selectedKnowledgeIndex = min(vm.todayKnowledgeCards.count - 1, selectedKnowledgeIndex + 1)
+	                        // 用户手动切换时重置定时器
+	                        resetAutoCarousel()
 	                    }
 	                }
 	            }

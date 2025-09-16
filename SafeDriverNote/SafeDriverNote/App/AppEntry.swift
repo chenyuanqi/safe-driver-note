@@ -74,6 +74,9 @@ struct SafeDriverNoteApp: App {
 
     /// 检查是否需要显示延时提醒
     private func checkForDelayedAlert() {
+        // 首先检查今天是否已经显示过
+        guard notificationDelegate.shouldShowReminder() else { return }
+
         let defaults = UserDefaults.standard
 
         // 检查上次通知发送时间
@@ -139,12 +142,13 @@ struct RootTabView: View {
         } message: {
             Text(notificationDelegate.notificationDetailContent)
         }
-        .alert("安全驾驶提醒", isPresented: $notificationDelegate.showDelayedAlert) {
-            Button("知道了") {
+        .sheet(isPresented: $notificationDelegate.showDelayedAlert) {
+            SafetyReminderView {
                 notificationDelegate.showDelayedAlert = false
+                notificationDelegate.markReminderShown()
             }
-        } message: {
-            Text("您好像有一段时间没有查看安全驾驶知识了。道路千万条，安全第一条！记得每天学习新的驾驶技巧哦~")
+            .presentationDetents([.height(240)])
+            .presentationDragIndicator(.visible)
         }
         .preferredColorScheme(themeManager.colorScheme)
     }
@@ -157,6 +161,23 @@ final class NotificationDelegate: NSObject, UNUserNotificationCenterDelegate, Ob
     @Published var notificationDetailTitle = ""
     @Published var notificationDetailContent = ""
     @Published var showDelayedAlert = false
+
+    // UserDefaults key for tracking last shown date
+    private let lastReminderShownKey = "lastSafetyReminderShownDate"
+
+    // 检查今天是否已经显示过提醒
+    func shouldShowReminder() -> Bool {
+        let defaults = UserDefaults.standard
+        if let lastShownDate = defaults.object(forKey: lastReminderShownKey) as? Date {
+            return !Calendar.current.isDateInToday(lastShownDate)
+        }
+        return true
+    }
+
+    // 标记提醒已显示
+    func markReminderShown() {
+        UserDefaults.standard.set(Date(), forKey: lastReminderShownKey)
+    }
 
     /// 当应用在前台时收到通知
     func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
