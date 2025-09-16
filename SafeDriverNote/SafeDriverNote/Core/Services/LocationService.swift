@@ -34,7 +34,8 @@ class LocationService: NSObject, ObservableObject {
         locationManager.delegate = self
         locationManager.desiredAccuracy = kCLLocationAccuracyBest
         locationManager.distanceFilter = 5.0 // 改为5米更新一次，获得更详细的路径
-        locationManager.pausesLocationUpdatesAutomatically = true
+        locationManager.pausesLocationUpdatesAutomatically = false // 改为false，防止系统自动暂停
+        locationManager.activityType = .automotiveNavigation // 设置为汽车导航类型
         authorizationStatus = locationManager.authorizationStatus
     }
     
@@ -58,6 +59,7 @@ class LocationService: NSObject, ObservableObject {
     func startContinuousUpdates(desiredAccuracy: CLLocationAccuracy = kCLLocationAccuracyBest, distanceFilter: CLLocationDistance = 10.0) {
         locationManager.desiredAccuracy = desiredAccuracy
         locationManager.distanceFilter = distanceFilter // 使用传入的参数，默认为10米
+        locationManager.activityType = .automotiveNavigation // 确保设置为汽车导航类型
         // 仅当 Info.plist 开启了 Background Modes -> location 时，才允许后台定位
         let backgroundModes = Bundle.main.object(forInfoDictionaryKey: "UIBackgroundModes") as? [String] ?? []
         let canBackgroundLocation = backgroundModes.contains("location")
@@ -68,6 +70,7 @@ class LocationService: NSObject, ObservableObject {
         }
         locationManager.startUpdatingLocation()
         isContinuousMode = true
+        print("开始连续定位 - 精度: \(desiredAccuracy), 距离过滤: \(distanceFilter)米, 后台定位: \(canBackgroundLocation)")
     }
     
     /// 后台连续定位：停止持续更新

@@ -15,6 +15,7 @@ class DriveService: ObservableObject {
     @Published var isStartingDrive: Bool = false
     @Published var isEndingDrive: Bool = false
     @Published var currentDrivingTime: String = ""
+    @Published var currentWaypointCount: Int = 0
     
     private let repository: DriveRouteRepository
     private let locationService: LocationService
@@ -24,7 +25,7 @@ class DriveService: ObservableObject {
     private var locationCancellable: AnyCancellable?
 
     /// 定时采集位置的时间间隔（秒）
-    private let locationTrackingInterval: TimeInterval = 60 // 每60秒采集一次位置，符合设计要求
+    private let locationTrackingInterval: TimeInterval = 30 // 每30秒强制采集一次位置，确保轨迹完整
     
     @MainActor
     init(repository: DriveRouteRepository? = nil,
@@ -268,9 +269,10 @@ class DriveService: ObservableObject {
     private func startLocationTracking() {
         stopLocationTracking()
         currentWaypoints = []
+        currentWaypointCount = 0
 
-        // 启动连续定位，使用更高精度和更低的距离过滤器以获得更详细的路径
-        locationService.startContinuousUpdates(desiredAccuracy: kCLLocationAccuracyBest, distanceFilter: 5) // 5米更新一次，提高精度
+        // 启动连续定位，使用导航级精度和合适的距离过滤器
+        locationService.startContinuousUpdates(desiredAccuracy: kCLLocationAccuracyBestForNavigation, distanceFilter: 10) // 10米更新一次，平衡精度和性能
 
         // 立即采集一次
         captureCurrentLocation()
@@ -297,7 +299,7 @@ class DriveService: ObservableObject {
                     if let lastWaypoint = self.currentWaypoints.last {
                         let lastLocation = CLLocation(latitude: lastWaypoint.latitude, longitude: lastWaypoint.longitude)
                         let distance = location.distance(from: lastLocation)
-                        if distance < 5 { // 小于5米的移动不记录
+                        if distance < 10 { // 小于10米的移动不记录，与distanceFilter保持一致
                             return
                         }
                     }
@@ -305,6 +307,7 @@ class DriveService: ObservableObject {
                     let address = await self.locationService.getLocationDescription(from: location)
                     let waypoint = RouteLocation(latitude: location.coordinate.latitude, longitude: location.coordinate.longitude, address: address)
                     self.currentWaypoints.append(waypoint)
+                    self.currentWaypointCount = self.currentWaypoints.count
                     print("移动触发路径点: \(waypoint.latitude), \(waypoint.longitude), 精度: \(location.horizontalAccuracy)米")
 
                     // 实时更新路线的路径点
@@ -324,6 +327,7 @@ class DriveService: ObservableObject {
         locationCancellable?.cancel()
         locationCancellable = nil
         locationService.stopContinuousUpdates()
+        currentWaypointCount = 0
     }
     
     /// 采集当前位置并保存到路径点集合
@@ -344,6 +348,7 @@ class DriveService: ObservableObject {
 
                 // 添加到路径点集合
                 currentWaypoints.append(routeLocation)
+                currentWaypointCount = currentWaypoints.count
                 print("立即采集路径点: \(routeLocation.latitude), \(routeLocation.longitude)")
 
                 // 更新当前路线的路径点
@@ -393,6 +398,7 @@ class DriveService: ObservableObject {
 
                 // 添加到路径点集合
                 currentWaypoints.append(routeLocation)
+                currentWaypointCount = currentWaypoints.count
                 print("定时采集路径点: \(routeLocation.latitude), \(routeLocation.longitude), 精度: \(location.horizontalAccuracy)米")
 
                 // 更新当前路线的路径点

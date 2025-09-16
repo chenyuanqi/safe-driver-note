@@ -427,10 +427,10 @@ struct HomeView: View {
 							.foregroundColor(.white)
 								
 							if driveService.isDriving, let route = driveService.currentRoute {
-								Text("已驾驶 \(driveService.currentDrivingTime)")
+								Text("已驾驶 \(driveService.currentDrivingTime) · 记录\(driveService.currentWaypointCount)个点")
 									.font(.bodySmall)
 									.foregroundColor(.white.opacity(0.8))
-								
+
 								// 显示当前位置
 								Text(currentLocationDescription)
 									.font(.bodySmall)
