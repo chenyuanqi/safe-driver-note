@@ -32,7 +32,7 @@ struct ChecklistView: View {
             VStack(spacing: 0) {
                 StandardNavigationBar(
                     title: "检查清单",
-                    showBackButton: true,
+                    showBackButton: false,
                     trailingButtons: [
                         StandardNavigationBar.NavBarButton(icon: "chart.bar") {
                             showingHistory = true
