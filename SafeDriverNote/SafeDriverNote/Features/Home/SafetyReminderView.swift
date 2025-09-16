@@ -12,11 +12,24 @@ struct SafetyReminderView: View {
                 .foregroundColor(.brandSecondary900)
 
             // 内容 - 左对齐
-            Text("您好像有一段时间没有查看安全驾驶知识了。道路千万条，安全第一条！记得每天学习新的驾驶技巧哦~")
-                .font(.body)
-                .foregroundColor(.brandSecondary700)
-                .multilineTextAlignment(.leading)
-                .fixedSize(horizontal: false, vertical: true)
+            VStack(alignment: .leading, spacing: Spacing.sm) {
+                Text("您好像有一段时间没有查看安全驾驶知识了。")
+                    .font(.body)
+                    .foregroundColor(.brandSecondary700)
+                    .multilineTextAlignment(.leading)
+
+                Text("道路千万条，安全第一条！")
+                    .font(.body)
+                    .fontWeight(.bold)
+                    .foregroundColor(.brandDanger500)
+                    .multilineTextAlignment(.leading)
+
+                Text("记得每天学习新的驾驶技巧哦~")
+                    .font(.body)
+                    .foregroundColor(.brandSecondary700)
+                    .multilineTextAlignment(.leading)
+            }
+            .fixedSize(horizontal: false, vertical: true)
 
             Spacer()
 

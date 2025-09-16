@@ -45,7 +45,7 @@ struct HomeView: View {
     
     var body: some View {
         NavigationStack {
-        VStack(spacing: 0) {
+            VStack(spacing: 0) {
             // Custom Navigation Bar
             StandardNavigationBar(
                 title: "安全驾驶",
@@ -76,10 +76,7 @@ struct HomeView: View {
                 await refreshHomeData()
             }
             .background(Color.brandSecondary50)
-        }
-        .navigationDestination(isPresented: $showingKnowledgeView) {
-            KnowledgeTodayView()
-        }
+            }
         }
         .onAppear { 
             vm.reload() 
@@ -138,32 +135,37 @@ struct HomeView: View {
         } message: {
             Text("语音记录功能正在开发中，敬请期待！")
         }
-        .alert("开始驾驶", isPresented: $showingDriveConfirmation) {
-            Button("取消", role: .cancel) { }
-            Button("开始") {
-                Task {
-                    // 尝试定位，失败累计计数
-                    let locationService = LocationService.shared
-                    do {
-                        try _ = await locationService.getCurrentLocation(timeout: 5.0)
-                        await driveService.startDriving()
-                        await vm.loadRecentRoutes()
-                        manualLocationTries = 0
-                    } catch {
-                        manualLocationTries += 1
-                        if manualLocationTries >= 3 {
-                            manualStartOrEnd = "start"
-                            showingManualLocationSheet = true
-                        } else {
-                            // 仍然允许开始驾驶，但无起点
+        .sheet(isPresented: $showingDriveConfirmation) {
+            StartDrivingConfirmationView(
+                onCancel: {
+                    showingDriveConfirmation = false
+                },
+                onConfirm: {
+                    showingDriveConfirmation = false
+                    Task {
+                        // 尝试定位，失败累计计数
+                        let locationService = LocationService.shared
+                        do {
+                            try _ = await locationService.getCurrentLocation(timeout: 5.0)
                             await driveService.startDriving()
                             await vm.loadRecentRoutes()
+                            manualLocationTries = 0
+                        } catch {
+                            manualLocationTries += 1
+                            if manualLocationTries >= 3 {
+                                manualStartOrEnd = "start"
+                                showingManualLocationSheet = true
+                            } else {
+                                // 仍然允许开始驾驶，但无起点
+                                await driveService.startDriving()
+                                await vm.loadRecentRoutes()
+                            }
                         }
                     }
                 }
-            }
-        } message: {
-            Text("将记录您的驾驶路线和时间，帮助您更好地管理驾驶行为。道路千万条，安全第一条！")
+            )
+            .presentationDetents([.height(220)])
+            .presentationDragIndicator(.visible)
         }
         .alert("驾驶服务错误", isPresented: $showingDriveError) {
             Button("知道了") { }
@@ -241,6 +243,12 @@ struct HomeView: View {
             Button("知道了") { }
         } message: {
             Text(notificationDetailContent)
+        }
+        .sheet(isPresented: $showingKnowledgeView) {
+            KnowledgeTodayView()
+                .presentationDetents([.large, .fraction(0.85)])
+                .presentationDragIndicator(.visible)
+                .presentationCornerRadius(20)
         }
     }
     
@@ -587,10 +595,6 @@ struct HomeView: View {
 	            }
 	        }
 	    }
-	    .onTapGesture {
-	        // 点击卡片时跳转到知识页面
-	        showingKnowledgeView = true
-	    }
 	    .gesture(
 	        DragGesture(minimumDistance: 50)
 	            .onEnded { value in
@@ -611,6 +615,10 @@ struct HomeView: View {
 	                }
 	            }
 	    )
+	    .onTapGesture {
+	        // 点击卡片时跳转到知识页面
+	        showingKnowledgeView = true
+	    }
 	}
 	
 	// MARK: - Smart Recommendations Section
