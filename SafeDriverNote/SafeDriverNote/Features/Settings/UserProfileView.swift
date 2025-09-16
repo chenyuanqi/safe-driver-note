@@ -1,5 +1,6 @@
 import SwiftUI
 import Foundation
+import PhotosUI
 
 struct UserProfileView: View {
     @Environment(\.dismiss) private var dismiss
@@ -10,11 +11,16 @@ struct UserProfileView: View {
     @State private var drivingYears = "3"
     @State private var vehicleType = "小型汽车"
     @State private var showingImagePicker = false
+    @State private var selectedImage: UIImage?
+    @State private var avatarImage: Image?
+    @State private var showingCropView = false
     @State private var userStats: UserStats?
     @State private var isLoading = true
     @State private var isSaving = false
     @State private var showingError = false
     @State private var errorMessage = ""
+    @State private var showingActionSheet = false
+    @State private var sourceType: UIImagePickerController.SourceType = .photoLibrary
 
     var body: some View {
         NavigationView {
@@ -80,26 +86,88 @@ struct UserProfileView: View {
     private var profileImageSection: some View {
         VStack(spacing: Spacing.md) {
             Button(action: {
-                showingImagePicker = true
+                showingActionSheet = true
             }) {
-                Circle()
-                    .fill(Color.brandPrimary100)
-                    .frame(width: 100, height: 100)
-                    .overlay(
+                ZStack {
+                    Circle()
+                        .fill(Color.brandPrimary100)
+                        .frame(width: 100, height: 100)
+
+                    if let avatarImage = avatarImage {
+                        avatarImage
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 100, height: 100)
+                            .clipShape(Circle())
+                    } else {
                         Image(systemName: "person.fill")
                             .font(.system(size: 40))
                             .foregroundColor(.brandPrimary500)
-                    )
-                    .overlay(
-                        Circle()
-                            .stroke(Color.cardBackground, lineWidth: 4)
-                    )
-                    .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
+                    }
+
+                    // 相机图标覆盖层
+                    Circle()
+                        .fill(Color.white)
+                        .frame(width: 30, height: 30)
+                        .overlay(
+                            Image(systemName: "camera.fill")
+                                .font(.system(size: 14))
+                                .foregroundColor(.brandPrimary500)
+                        )
+                        .offset(x: 35, y: 35)
+                }
+                .overlay(
+                    Circle()
+                        .stroke(Color.cardBackground, lineWidth: 4)
+                )
+                .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
             }
 
             Text("点击更换头像")
                 .font(.bodySmall)
                 .foregroundColor(.brandSecondary500)
+        }
+        .confirmationDialog("选择头像来源", isPresented: $showingActionSheet, titleVisibility: .visible) {
+            Button("从相册选择") {
+                sourceType = .photoLibrary
+                showingImagePicker = true
+            }
+
+            if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                Button("拍照") {
+                    sourceType = .camera
+                    showingImagePicker = true
+                }
+            }
+
+            if avatarImage != nil {
+                Button("删除头像", role: .destructive) {
+                    avatarImage = nil
+                    selectedImage = nil
+                }
+            }
+
+            Button("取消", role: .cancel) {}
+        }
+        .sheet(isPresented: $showingImagePicker) {
+            if sourceType == .camera {
+                CameraImagePicker(image: $selectedImage, showingCropView: $showingCropView)
+            } else {
+                ImagePicker(image: $selectedImage, showingCropView: $showingCropView)
+            }
+        }
+        .sheet(isPresented: $showingCropView) {
+            if let image = selectedImage {
+                ImageCropView(
+                    image: image,
+                    croppedImage: $avatarImage,
+                    isPresented: $showingCropView,
+                    onComplete: { croppedUIImage in
+                        selectedImage = croppedUIImage
+                        avatarImage = Image(uiImage: croppedUIImage)
+                    }
+                )
+            }
         }
     }
 
@@ -320,6 +388,7 @@ struct UserProfileView: View {
                     self.drivingYears = "\(profile.drivingYears)"
                     self.vehicleType = profile.vehicleType
                     self.userStats = stats
+                    self.loadAvatarImage(from: profile.avatarImagePath)
                     self.isLoading = false
                 }
             } catch {
@@ -342,12 +411,18 @@ struct UserProfileView: View {
                 let ageValue = userAge.isEmpty ? nil : Int(userAge)
                 let drivingYearsValue = Int(drivingYears) ?? 0
 
+                // 保存头像图片
+                var avatarPath: String? = nil
+                if let uiImage = selectedImage {
+                    avatarPath = saveAvatarImage(uiImage)
+                }
+
                 let updatedProfile = try di.userProfileRepository.updateUserProfile(
                     userName: userName,
                     userAge: ageValue,
                     drivingYears: drivingYearsValue,
                     vehicleType: vehicleType,
-                    avatarImagePath: nil
+                    avatarImagePath: avatarPath
                 )
 
                 await MainActor.run {
@@ -393,6 +468,339 @@ struct UserProfileView: View {
             }
         }
         return ""
+    }
+
+    private func saveAvatarImage(_ image: UIImage) -> String? {
+        guard let data = image.jpegData(compressionQuality: 0.8) else { return nil }
+
+        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+        let fileName = "avatar_\(UUID().uuidString).jpg"
+        let fileURL = documentsPath.appendingPathComponent(fileName)
+
+        do {
+            try data.write(to: fileURL)
+            return fileName
+        } catch {
+            print("Failed to save avatar image: \(error)")
+            return nil
+        }
+    }
+
+    private func loadAvatarImage(from path: String?) {
+        guard let path = path else { return }
+
+        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+        let fileURL = documentsPath.appendingPathComponent(path)
+
+        if let data = try? Data(contentsOf: fileURL),
+           let uiImage = UIImage(data: data) {
+            self.selectedImage = uiImage
+            self.avatarImage = Image(uiImage: uiImage)
+        }
+    }
+}
+
+// MARK: - Image Picker
+struct ImagePicker: UIViewControllerRepresentable {
+    @Binding var image: UIImage?
+    @Binding var showingCropView: Bool
+    @Environment(\.dismiss) private var dismiss
+
+    func makeUIViewController(context: Context) -> PHPickerViewController {
+        var config = PHPickerConfiguration()
+        config.filter = .images
+        config.selectionLimit = 1
+
+        let picker = PHPickerViewController(configuration: config)
+        picker.delegate = context.coordinator
+        return picker
+    }
+
+    func updateUIViewController(_ uiViewController: PHPickerViewController, context: Context) {}
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+
+    class Coordinator: NSObject, PHPickerViewControllerDelegate {
+        let parent: ImagePicker
+
+        init(_ parent: ImagePicker) {
+            self.parent = parent
+        }
+
+        func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
+            parent.dismiss()
+
+            guard let provider = results.first?.itemProvider else { return }
+
+            if provider.canLoadObject(ofClass: UIImage.self) {
+                provider.loadObject(ofClass: UIImage.self) { image, _ in
+                    DispatchQueue.main.async {
+                        self.parent.image = image as? UIImage
+                        self.parent.showingCropView = true
+                    }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Camera Image Picker
+struct CameraImagePicker: UIViewControllerRepresentable {
+    @Binding var image: UIImage?
+    @Binding var showingCropView: Bool
+    @Environment(\.dismiss) private var dismiss
+
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let picker = UIImagePickerController()
+        picker.sourceType = .camera
+        picker.delegate = context.coordinator
+        return picker
+    }
+
+    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+
+    class Coordinator: NSObject, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+        let parent: CameraImagePicker
+
+        init(_ parent: CameraImagePicker) {
+            self.parent = parent
+        }
+
+        func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
+            if let image = info[.originalImage] as? UIImage {
+                parent.image = image
+                parent.showingCropView = true
+            }
+            parent.dismiss()
+        }
+
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+            parent.dismiss()
+        }
+    }
+}
+
+// MARK: - Image Crop View
+struct ImageCropView: View {
+    let image: UIImage
+    @Binding var croppedImage: Image?
+    @Binding var isPresented: Bool
+    var onComplete: ((UIImage) -> Void)?
+
+    @State private var scale: CGFloat = 1.0
+    @State private var lastScale: CGFloat = 1.0
+    @State private var offset: CGSize = .zero
+    @State private var lastOffset: CGSize = .zero
+    @State private var cropSize: CGFloat = 300
+
+    var body: some View {
+        NavigationView {
+            GeometryReader { geometry in
+                let availableWidth = geometry.size.width
+                let availableHeight = geometry.size.height
+                let actualCropSize = min(availableWidth - 40, cropSize)
+
+                VStack(spacing: 0) {
+                    // 裁剪区域
+                    ZStack {
+                        // 背景
+                        Color.black
+
+                        // 图片层
+                        Image(uiImage: image)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(
+                                width: image.size.width,
+                                height: image.size.height
+                            )
+                            .scaleEffect(scale)
+                            .offset(offset)
+                            .gesture(
+                                DragGesture()
+                                    .onChanged { value in
+                                        self.offset = CGSize(
+                                            width: lastOffset.width + value.translation.width,
+                                            height: lastOffset.height + value.translation.height
+                                        )
+                                    }
+                                    .onEnded { _ in
+                                        self.lastOffset = self.offset
+                                    }
+                            )
+                            .gesture(
+                                MagnificationGesture()
+                                    .onChanged { value in
+                                        let delta = value / self.lastScale
+                                        self.lastScale = value
+                                        self.scale *= delta
+                                    }
+                                    .onEnded { _ in
+                                        self.lastScale = 1.0
+                                    }
+                            )
+
+                        // 遮罩层 - 创建圆形窗口效果
+                        Rectangle()
+                            .fill(Color.black.opacity(0.6))
+                            .frame(width: availableWidth, height: availableHeight)
+                            .mask(
+                                ZStack {
+                                    Rectangle()
+                                        .fill(Color.white)
+
+                                    Circle()
+                                        .fill(Color.black)
+                                        .frame(width: actualCropSize, height: actualCropSize)
+                                }
+                            )
+                            .allowsHitTesting(false)
+
+                        // 圆形边框
+                        Circle()
+                            .stroke(Color.white, lineWidth: 2)
+                            .frame(width: actualCropSize, height: actualCropSize)
+                            .allowsHitTesting(false)
+
+                        // 网格线（可选的辅助线）
+                        Circle()
+                            .stroke(Color.white.opacity(0.3), lineWidth: 0.5)
+                            .frame(width: actualCropSize, height: actualCropSize)
+                            .overlay(
+                                // 十字辅助线
+                                ZStack {
+                                    Rectangle()
+                                        .fill(Color.white.opacity(0.3))
+                                        .frame(width: 0.5, height: actualCropSize)
+                                    Rectangle()
+                                        .fill(Color.white.opacity(0.3))
+                                        .frame(width: actualCropSize, height: 0.5)
+                                }
+                            )
+                            .allowsHitTesting(false)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                    // 缩放控制
+                    VStack(spacing: Spacing.lg) {
+                        HStack(spacing: Spacing.xl) {
+                            Button(action: {
+                                withAnimation {
+                                    scale = max(0.5, scale - 0.1)
+                                }
+                            }) {
+                                Image(systemName: "minus.circle.fill")
+                                    .font(.title)
+                                    .foregroundColor(.white)
+                            }
+
+                            Slider(value: $scale, in: 0.5...3.0)
+                                .accentColor(.white)
+
+                            Button(action: {
+                                withAnimation {
+                                    scale = min(3.0, scale + 0.1)
+                                }
+                            }) {
+                                Image(systemName: "plus.circle.fill")
+                                    .font(.title)
+                                    .foregroundColor(.white)
+                            }
+                        }
+                        .padding(.horizontal, Spacing.xl)
+
+                        Text("拖动和缩放图片以调整位置")
+                            .font(.bodySmall)
+                            .foregroundColor(.white.opacity(0.8))
+                    }
+                    .padding(.vertical, Spacing.xl)
+                    .background(Color.black.opacity(0.8))
+                }
+            }
+            .background(Color.black)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("取消") {
+                        isPresented = false
+                    }
+                    .foregroundColor(.white)
+                }
+
+                ToolbarItem(placement: .principal) {
+                    Text("调整头像")
+                        .font(.headline)
+                        .foregroundColor(.white)
+                }
+
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("完成") {
+                        let croppedUIImage = cropImage()
+                        croppedImage = Image(uiImage: croppedUIImage)
+                        onComplete?(croppedUIImage)
+                        isPresented = false
+                    }
+                    .fontWeight(.semibold)
+                    .foregroundColor(.white)
+                }
+            }
+        }
+    }
+
+    private func cropImage() -> UIImage {
+        // 创建裁剪后的图像，输出大小为300x300
+        let outputSize = CGSize(width: cropSize, height: cropSize)
+
+        // 创建图像渲染器
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = UIScreen.main.scale // 使用屏幕比例确保高质量
+        let renderer = UIGraphicsImageRenderer(size: outputSize, format: format)
+
+        let croppedUIImage = renderer.image { context in
+            // 保存图形上下文状态
+            context.cgContext.saveGState()
+
+            // 设置圆形裁剪路径
+            let clipPath = UIBezierPath(ovalIn: CGRect(origin: .zero, size: outputSize))
+            clipPath.addClip()
+
+            // 填充白色背景
+            UIColor.white.setFill()
+            context.fill(CGRect(origin: .zero, size: outputSize))
+
+            // 计算实际图像大小和位置
+            // 图像的原始大小
+            let imageSize = image.size
+
+            // 应用缩放后的图像大小
+            let scaledWidth = imageSize.width * scale
+            let scaledHeight = imageSize.height * scale
+
+            // 计算绘制位置（居中 + 偏移）
+            let drawX = (outputSize.width - scaledWidth) / 2 + offset.width
+            let drawY = (outputSize.height - scaledHeight) / 2 + offset.height
+
+            // 绘制图像
+            let drawRect = CGRect(
+                x: drawX,
+                y: drawY,
+                width: scaledWidth,
+                height: scaledHeight
+            )
+
+            image.draw(in: drawRect)
+
+            // 恢复图形上下文状态
+            context.cgContext.restoreGState()
+        }
+
+        return croppedUIImage
     }
 }
 

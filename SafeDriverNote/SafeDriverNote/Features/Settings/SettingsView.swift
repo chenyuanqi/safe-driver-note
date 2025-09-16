@@ -19,6 +19,7 @@ struct SettingsView: View {
     @State private var userProfile: UserProfile?
     @State private var userStats: UserStats?
     @State private var isLoading = true
+    @State private var avatarImage: Image?
 
     var body: some View {
         ScrollView {
@@ -118,14 +119,23 @@ struct SettingsView: View {
             Card(shadow: true) {
                 HStack(spacing: Spacing.md) {
                     // 头像
-                    Circle()
-                        .fill(Color.brandPrimary100)
-                        .frame(width: 60, height: 60)
-                        .overlay(
+                    ZStack {
+                        Circle()
+                            .fill(Color.brandPrimary100)
+                            .frame(width: 60, height: 60)
+
+                        if let avatarImage = avatarImage {
+                            avatarImage
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 60, height: 60)
+                                .clipShape(Circle())
+                        } else {
                             Image(systemName: "person.fill")
                                 .font(.title)
                                 .foregroundColor(.brandPrimary500)
-                        )
+                        }
+                    }
 
                     VStack(alignment: .leading, spacing: Spacing.xs) {
                         Text(userProfile?.userName ?? "安全驾驶人")
@@ -389,6 +399,7 @@ struct SettingsView: View {
                 await MainActor.run {
                     self.userProfile = profile
                     self.userStats = stats
+                    self.loadAvatarImage(from: profile.avatarImagePath)
                     self.isLoading = false
                 }
             } catch {
@@ -397,6 +408,21 @@ struct SettingsView: View {
                     self.isLoading = false
                 }
             }
+        }
+    }
+
+    private func loadAvatarImage(from path: String?) {
+        guard let path = path else {
+            avatarImage = nil
+            return
+        }
+
+        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+        let fileURL = documentsPath.appendingPathComponent(path)
+
+        if let data = try? Data(contentsOf: fileURL),
+           let uiImage = UIImage(data: data) {
+            self.avatarImage = Image(uiImage: uiImage)
         }
     }
 
