@@ -15,10 +15,15 @@ class LocationService: NSObject, ObservableObject {
     @Published var currentLocation: CLLocation?
     @Published var currentPlacemark: CLPlacemark?
     @Published var isLocationUpdating = false
-    
+
     private var locationContinuation: CheckedContinuation<CLLocation?, Error>?
     private var locationTimeoutTask: Task<Void, Error>?
     private var isContinuousMode: Bool = false
+
+    /// 公开属性：是否正在连续定位
+    var isContinuousTracking: Bool {
+        return isContinuousMode
+    }
     
     override init() {
         super.init()

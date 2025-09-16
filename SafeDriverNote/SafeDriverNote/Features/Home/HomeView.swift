@@ -42,6 +42,10 @@ struct HomeView: View {
     @State private var showingNotificationDetail = false
     @State private var notificationDetailTitle = ""
     @State private var notificationDetailContent = ""
+
+    // 添加调试信息弹框
+    @State private var showingDebugInfo = false
+    @State private var debugInfoText = ""
     
     var body: some View {
         NavigationStack {
@@ -250,6 +254,14 @@ struct HomeView: View {
                 .presentationDragIndicator(.visible)
                 .presentationCornerRadius(20)
         }
+        .alert("驾驶调试信息", isPresented: $showingDebugInfo) {
+            Button("复制") {
+                UIPasteboard.general.string = debugInfoText
+            }
+            Button("关闭", role: .cancel) { }
+        } message: {
+            Text(debugInfoText)
+        }
     }
     
     // 添加通知监听
@@ -375,9 +387,15 @@ struct HomeView: View {
 				if driveService.isDriving {
 					// 结束驾驶（带三次失败后手动输入）
 					Task {
+						// 获取调试信息
+						debugInfoText = driveService.getDebugInfo()
+
 						// 使用带重试和超时的结束流程
 						await driveService.endDrivingWithRetries(maxAttempts: 3, perAttemptTimeout: 5)
 						await vm.loadRecentRoutes()
+
+						// 显示调试信息弹框
+						showingDebugInfo = true
 					}
 				} else {
 					// 权限引导：如果仅使用期间或被拒绝，先弹权限引导页

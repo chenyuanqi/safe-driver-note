@@ -95,10 +95,13 @@ class DriveService: ObservableObject {
     /// 结束驾驶
     func endDriving() async {
         guard isDriving, let routeId = currentRoute?.id else { return }
-        
+
         isEndingDrive = true
         defer { isEndingDrive = false }
-        
+
+        // 调试信息：显示收集到的坐标数据
+        printDebugInfo()
+
         do {
             // 使用最近一次已知位置作为终点（获取实际地址而不是坐标）
             var endLocation: RouteLocation? = nil
@@ -109,17 +112,17 @@ class DriveService: ObservableObject {
                 let address = await locationService.getLocationDescription(from: loc)
                 endLocation = RouteLocation(latitude: lat, longitude: lon, address: address)
             }
-            
+
             // 结束路线记录，并传递收集到的路径点
             try repository.endRoute(routeId: routeId, endLocation: endLocation, waypoints: currentWaypoints)
-            
+
             // 更新状态
             self.currentRoute = nil
             self.isDriving = false
-            
+
             // 停止定时器
             stopDrivingTimer()
-            
+
         } catch {
             print("结束路线失败: \(error)")
             NotificationCenter.default.post(name: .driveServiceError, object: "结束驾驶失败: \(error.localizedDescription)")
@@ -131,6 +134,10 @@ class DriveService: ObservableObject {
         guard isDriving, let routeId = currentRoute?.id else { return }
         isEndingDrive = true
         defer { isEndingDrive = false }
+
+        // 调试信息：显示收集到的坐标数据
+        printDebugInfo()
+
         do {
             try repository.endRoute(routeId: routeId, endLocation: endLocationOverride, waypoints: currentWaypoints)
             self.currentRoute = nil
@@ -416,12 +423,76 @@ class DriveService: ObservableObject {
     private func formatDrivingTime(_ timeInterval: TimeInterval) -> String {
         let hours = Int(timeInterval) / 3600
         let minutes = (Int(timeInterval) % 3600) / 60
-        
+
         if hours > 0 {
             return "\(hours)小时\(minutes)分钟"
         } else {
             return "\(minutes)分钟"
         }
+    }
+
+    /// 打印调试信息
+    private func printDebugInfo() {
+        print("================== 驾驶调试信息 ==================")
+        print("驾驶开始时间: \(currentRoute?.startTime ?? Date())")
+        print("驾驶结束时间: \(Date())")
+        print("总共收集坐标点数量: \(currentWaypoints.count)")
+
+        if currentWaypoints.isEmpty {
+            print("警告：没有收集到任何坐标点！")
+        } else {
+            print("第一个坐标点: \(currentWaypoints.first!.latitude), \(currentWaypoints.first!.longitude)")
+            print("最后一个坐标点: \(currentWaypoints.last!.latitude), \(currentWaypoints.last!.longitude)")
+
+            // 显示前5个和后5个坐标点
+            let showCount = min(5, currentWaypoints.count)
+            print("\n前\(showCount)个坐标点:")
+            for i in 0..<showCount {
+                let wp = currentWaypoints[i]
+                print("  [\(i+1)] \(wp.latitude), \(wp.longitude) - \(wp.address)")
+            }
+
+            if currentWaypoints.count > 10 {
+                print("\n后5个坐标点:")
+                for i in (currentWaypoints.count-5)..<currentWaypoints.count {
+                    let wp = currentWaypoints[i]
+                    print("  [\(i+1)] \(wp.latitude), \(wp.longitude) - \(wp.address)")
+                }
+            }
+        }
+
+        // 检查定位服务状态
+        print("\n定位服务状态:")
+        print("  当前定位权限: \(locationService.authorizationStatus)")
+        print("  是否正在连续定位: \(locationService.isContinuousTracking)")
+        print("  最近缓存位置: \(locationService.currentLocation != nil ? "有" : "无")")
+
+        print("================================================\n")
+    }
+
+    /// 获取调试信息字符串（供UI显示）
+    func getDebugInfo() -> String {
+        var info = "驾驶调试信息\n"
+        info += "==================\n"
+        info += "开始时间: \(currentRoute?.startTime ?? Date())\n"
+        info += "收集坐标点: \(currentWaypoints.count) 个\n"
+
+        if currentWaypoints.isEmpty {
+            info += "⚠️ 没有收集到任何坐标点\n"
+        } else {
+            if let first = currentWaypoints.first {
+                info += "起点: \(String(format: "%.6f, %.6f", first.latitude, first.longitude))\n"
+            }
+            if let last = currentWaypoints.last {
+                info += "终点: \(String(format: "%.6f, %.6f", last.latitude, last.longitude))\n"
+            }
+        }
+
+        info += "\n定位状态:\n"
+        info += "权限: \(locationService.authorizationStatus)\n"
+        info += "连续定位: \(locationService.isContinuousTracking ? "开启" : "关闭")\n"
+
+        return info
     }
 }
 
