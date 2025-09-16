@@ -6,6 +6,14 @@ struct LogListView: View {
     @State private var searchText: String = ""
     @State private var selectedSegment: Segment = .all
     @State private var showingStats = false
+    @State private var showingCalendar = false
+    @State private var viewMode: ViewMode = .list
+
+    enum ViewMode: String, CaseIterable {
+        case list = "列表"
+        case calendar = "日历"
+        case timeline = "时间线"
+    }
 
     // 组合项类型，用于"全部"tab
     struct CombinedItem {
@@ -54,12 +62,21 @@ struct LogListView: View {
                     // Tab Bar
                     tabBarSection
 
+                    // View Mode Selector
+                    viewModeSelectorSection
+
                     // Filter Bar
                     filterBarSection
 
                     // Content
                     Group {
-                        if selectedSegment == .driveRoute {
+                        if viewMode == .calendar {
+                            CalendarView(logs: filteredLogs, routes: filteredRoutes)
+                                .padding(.horizontal, Spacing.pagePadding)
+                        } else if viewMode == .timeline {
+                            timelineView
+                        } else {
+                            if selectedSegment == .driveRoute {
                             if filteredRoutes.isEmpty {
                                 driveRouteEmptyStateView
                             } else {
@@ -77,6 +94,7 @@ struct LogListView: View {
                             } else {
                                 logListView
                             }
+                        }
                         }
                     }
                 }
@@ -132,6 +150,47 @@ struct LogListView: View {
         }
     }
     
+    // MARK: - View Mode Selector Section
+    private var viewModeSelectorSection: some View {
+        HStack(spacing: 0) {
+            ForEach(ViewMode.allCases, id: \.self) { mode in
+                Button(action: {
+                    withAnimation(.spring()) {
+                        viewMode = mode
+                    }
+                }) {
+                    VStack(spacing: 4) {
+                        Image(systemName: iconForViewMode(mode))
+                            .font(.body)
+                        Text(mode.rawValue)
+                            .font(.caption)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, Spacing.sm)
+                    .foregroundColor(viewMode == mode ? .brandPrimary500 : .brandSecondary500)
+                    .background(
+                        viewMode == mode ? Color.brandPrimary100 : Color.clear
+                    )
+                }
+                .buttonStyle(PlainButtonStyle())
+            }
+        }
+        .background(Color.cardBackground)
+        .cornerRadius(CornerRadius.md)
+        .padding(.horizontal, Spacing.pagePadding)
+    }
+
+    private func iconForViewMode(_ mode: ViewMode) -> String {
+        switch mode {
+        case .list:
+            return "list.bullet"
+        case .calendar:
+            return "calendar"
+        case .timeline:
+            return "timeline.selection"
+        }
+    }
+
     // MARK: - Tab Bar Section
     private var tabBarSection: some View {
         BrandSegmentedControl(
@@ -229,7 +288,7 @@ struct LogListView: View {
                             RoundedRectangle(cornerRadius: CornerRadius.lg, style: .continuous)
                                 .fill(vm.selectedTags.contains(tag) ? Color.brandPrimary100 : Color.brandSecondary100)
                         )
-                        .foregroundColor(vm.selectedTags.contains(tag) ? .brandPrimary700 : .brandSecondary700)
+                        .foregroundColor(vm.selectedTags.contains(tag) ? .brandPrimary600 : .brandSecondary600)
                     }
                     .buttonStyle(PlainButtonStyle())
                 }
@@ -333,6 +392,164 @@ struct LogListView: View {
             }
             .padding(.vertical, Spacing.lg)
         }
+    }
+
+    // MARK: - Timeline View
+    private var timelineView: some View {
+        ScrollView {
+            LazyVStack(spacing: 0) {
+                ForEach(combinedGroupedByDay, id: \.key) { section in
+                    VStack(alignment: .leading, spacing: 0) {
+                        // 日期头部
+                        HStack {
+                            Text(section.key)
+                                .font(.bodyLarge)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.brandSecondary900)
+                            Spacer()
+                            // 当日统计
+                            HStack(spacing: Spacing.md) {
+                                let logs = section.items.compactMap { item in
+                                    if case .log(let log) = item.type { return log }
+                                    return nil
+                                }
+                                let routes = section.items.compactMap { item in
+                                    if case .route(let route) = item.type { return route }
+                                    return nil
+                                }
+                                if !logs.isEmpty {
+                                    Label("\(logs.count)", systemImage: "doc.text")
+                                        .font(.caption)
+                                        .foregroundColor(.brandSecondary500)
+                                }
+                                if !routes.isEmpty {
+                                    Label("\(routes.count)", systemImage: "car")
+                                        .font(.caption)
+                                        .foregroundColor(.brandSecondary500)
+                                }
+                            }
+                        }
+                        .padding(.horizontal, Spacing.pagePadding)
+                        .padding(.vertical, Spacing.md)
+                        .background(Color.brandSecondary100)
+
+                        // 时间线项目
+                        ForEach(Array(section.items.enumerated()), id: \.element.id) { index, item in
+                            HStack(alignment: .top, spacing: Spacing.md) {
+                                // 时间线轴
+                                VStack(spacing: 0) {
+                                    Circle()
+                                        .fill(colorForItem(item))
+                                        .frame(width: 12, height: 12)
+                                    if index < section.items.count - 1 {
+                                        Rectangle()
+                                            .fill(Color.brandSecondary200)
+                                            .frame(width: 2)
+                                    }
+                                }
+                                .frame(width: 12)
+
+                                // 内容
+                                VStack(alignment: .leading, spacing: Spacing.xs) {
+                                    Text(timeForItem(item))
+                                        .font(.caption)
+                                        .foregroundColor(.brandSecondary500)
+
+                                    switch item.type {
+                                    case .log(let log):
+                                        timelineLogCard(for: log)
+                                    case .route(let route):
+                                        timelineRouteCard(for: route)
+                                    }
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+
+                                Spacer()
+                            }
+                            .padding(.horizontal, Spacing.pagePadding)
+                            .padding(.vertical, Spacing.sm)
+                        }
+                    }
+                }
+            }
+            .padding(.vertical, Spacing.lg)
+        }
+    }
+
+    private func timelineLogCard(for log: LogEntry) -> some View {
+        Card(backgroundColor: Color.cardBackground, shadow: false) {
+            VStack(alignment: .leading, spacing: Spacing.sm) {
+                HStack {
+                    Image(systemName: log.type == .mistake ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
+                        .font(.caption)
+                        .foregroundColor(log.type == .mistake ? .brandDanger500 : .brandPrimary500)
+                    Text(log.type == .mistake ? "失误" : "成功")
+                        .font(.caption)
+                        .foregroundColor(log.type == .mistake ? .brandDanger600 : .brandPrimary600)
+                }
+
+                Text(cleanTitle(for: log))
+                    .font(.body)
+                    .fontWeight(.medium)
+                    .foregroundColor(.brandSecondary900)
+                    .lineLimit(2)
+
+                if !log.tags.isEmpty {
+                    Text(log.tags.prefix(3).map { "#\($0)" }.joined(separator: " "))
+                        .font(.caption)
+                        .foregroundColor(.brandSecondary500)
+                }
+            }
+        }
+        .onTapGesture {
+            vm.beginEdit(log)
+        }
+    }
+
+    private func timelineRouteCard(for route: DriveRoute) -> some View {
+        NavigationLink(destination: DriveRouteDetailView(route: route).environmentObject(AppDI.shared)) {
+            Card(backgroundColor: Color.cardBackground, shadow: false) {
+                VStack(alignment: .leading, spacing: Spacing.sm) {
+                    HStack {
+                        Image(systemName: "car.fill")
+                            .font(.caption)
+                            .foregroundColor(.brandInfo500)
+                        Text("行驶记录")
+                            .font(.caption)
+                            .foregroundColor(.brandInfo500)
+                    }
+
+                    Text(routeTitle(for: route))
+                        .font(.body)
+                        .fontWeight(.medium)
+                        .foregroundColor(.brandSecondary900)
+                        .lineLimit(2)
+
+                    if let duration = route.duration, let distance = route.distance {
+                        Text("\(formatDuration(duration)) · \(formatDistance(distance))")
+                            .font(.caption)
+                            .foregroundColor(.brandSecondary500)
+                    }
+                }
+            }
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+
+    private func colorForItem(_ item: CombinedItem) -> Color {
+        switch item.type {
+        case .log(let log):
+            return log.type == .mistake ? .brandDanger500 : .brandPrimary500
+        case .route:
+            return .brandInfo500
+        }
+    }
+
+    private func timeForItem(_ item: CombinedItem) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "zh_CN")
+        formatter.dateFormat = "HH:mm"
+        return formatter.string(from: item.date)
     }
 
     private var combinedListView: some View {
