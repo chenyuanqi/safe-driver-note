@@ -471,13 +471,30 @@ struct UserProfileView: View {
     }
 
     private func saveAvatarImage(_ image: UIImage) -> String? {
-        guard let data = image.jpegData(compressionQuality: 0.8) else { return nil }
+        // 压缩图片到合适大小
+        let maxSize: CGFloat = 400
+        let scale = min(maxSize / image.size.width, maxSize / image.size.height, 1.0)
+        let newSize = CGSize(width: image.size.width * scale, height: image.size.height * scale)
+
+        UIGraphicsBeginImageContextWithOptions(newSize, false, 0.0)
+        image.draw(in: CGRect(origin: .zero, size: newSize))
+        let resizedImage = UIGraphicsGetImageFromCurrentImageContext() ?? image
+        UIGraphicsEndImageContext()
+
+        guard let data = resizedImage.jpegData(compressionQuality: 0.7) else { return nil }
 
         let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
         let fileName = "avatar_\(UUID().uuidString).jpg"
         let fileURL = documentsPath.appendingPathComponent(fileName)
 
         do {
+            // 删除旧的头像文件
+            let oldFiles = try FileManager.default.contentsOfDirectory(at: documentsPath, includingPropertiesForKeys: nil)
+                .filter { $0.lastPathComponent.hasPrefix("avatar_") && $0.pathExtension == "jpg" }
+            for oldFile in oldFiles {
+                try? FileManager.default.removeItem(at: oldFile)
+            }
+
             try data.write(to: fileURL)
             return fileName
         } catch {
@@ -489,13 +506,17 @@ struct UserProfileView: View {
     private func loadAvatarImage(from path: String?) {
         guard let path = path else { return }
 
-        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
-        let fileURL = documentsPath.appendingPathComponent(path)
+        Task {
+            let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+            let fileURL = documentsPath.appendingPathComponent(path)
 
-        if let data = try? Data(contentsOf: fileURL),
-           let uiImage = UIImage(data: data) {
-            self.selectedImage = uiImage
-            self.avatarImage = Image(uiImage: uiImage)
+            if let data = try? Data(contentsOf: fileURL),
+               let uiImage = UIImage(data: data) {
+                await MainActor.run {
+                    self.selectedImage = uiImage
+                    self.avatarImage = Image(uiImage: uiImage)
+                }
+            }
         }
     }
 }
@@ -510,6 +531,7 @@ struct ImagePicker: UIViewControllerRepresentable {
         var config = PHPickerConfiguration()
         config.filter = .images
         config.selectionLimit = 1
+        config.preferredAssetRepresentationMode = .current // 使用当前表示模式以提高性能
 
         let picker = PHPickerViewController(configuration: config)
         picker.delegate = context.coordinator
@@ -535,10 +557,29 @@ struct ImagePicker: UIViewControllerRepresentable {
             guard let provider = results.first?.itemProvider else { return }
 
             if provider.canLoadObject(ofClass: UIImage.self) {
-                provider.loadObject(ofClass: UIImage.self) { image, _ in
+                provider.loadObject(ofClass: UIImage.self) { image, error in
+                    if let error = error {
+                        print("Error loading image: \(error)")
+                        return
+                    }
+
                     DispatchQueue.main.async {
-                        self.parent.image = image as? UIImage
-                        self.parent.showingCropView = true
+                        if let uiImage = image as? UIImage {
+                            // 限制图片大小以提高性能
+                            let maxDimension: CGFloat = 2000
+                            if uiImage.size.width > maxDimension || uiImage.size.height > maxDimension {
+                                let scale = min(maxDimension / uiImage.size.width, maxDimension / uiImage.size.height)
+                                let newSize = CGSize(width: uiImage.size.width * scale, height: uiImage.size.height * scale)
+
+                                UIGraphicsBeginImageContextWithOptions(newSize, false, 0.0)
+                                uiImage.draw(in: CGRect(origin: .zero, size: newSize))
+                                self.parent.image = UIGraphicsGetImageFromCurrentImageContext() ?? uiImage
+                                UIGraphicsEndImageContext()
+                            } else {
+                                self.parent.image = uiImage
+                            }
+                            self.parent.showingCropView = true
+                        }
                     }
                 }
             }
@@ -598,6 +639,7 @@ struct ImageCropView: View {
     @State private var offset: CGSize = .zero
     @State private var lastOffset: CGSize = .zero
     @State private var cropSize: CGFloat = 300
+    @State private var imageSize: CGSize = .zero
 
     var body: some View {
         NavigationView {
@@ -617,11 +659,14 @@ struct ImageCropView: View {
                             .resizable()
                             .aspectRatio(contentMode: .fill)
                             .frame(
-                                width: image.size.width,
-                                height: image.size.height
+                                width: calculateImageSize().width,
+                                height: calculateImageSize().height
                             )
                             .scaleEffect(scale)
                             .offset(offset)
+                            .onAppear {
+                                setupInitialImageSize(geometry: geometry, cropSize: actualCropSize)
+                            }
                             .gesture(
                                 DragGesture()
                                     .onChanged { value in
@@ -647,25 +692,29 @@ struct ImageCropView: View {
                             )
 
                         // 遮罩层 - 创建圆形窗口效果
-                        Rectangle()
-                            .fill(Color.black.opacity(0.6))
-                            .frame(width: availableWidth, height: availableHeight)
-                            .mask(
-                                ZStack {
-                                    Rectangle()
-                                        .fill(Color.white)
+                        GeometryReader { _ in
+                            Rectangle()
+                                .fill(Color.black.opacity(0.6))
+                                .frame(width: availableWidth, height: availableHeight)
+                                .mask(
+                                    ZStack {
+                                        Rectangle()
+                                            .fill(Color.white)
 
-                                    Circle()
-                                        .fill(Color.black)
-                                        .frame(width: actualCropSize, height: actualCropSize)
-                                }
-                            )
-                            .allowsHitTesting(false)
+                                        Circle()
+                                            .fill(Color.black)
+                                            .frame(width: actualCropSize, height: actualCropSize)
+                                            .position(x: availableWidth / 2, y: availableHeight / 2)
+                                    }
+                                )
+                                .allowsHitTesting(false)
+                        }
 
                         // 圆形边框
                         Circle()
                             .stroke(Color.white, lineWidth: 2)
                             .frame(width: actualCropSize, height: actualCropSize)
+                            .position(x: availableWidth / 2, y: availableHeight / 2 - 40)
                             .allowsHitTesting(false)
 
                         // 网格线（可选的辅助线）
@@ -683,6 +732,7 @@ struct ImageCropView: View {
                                         .frame(width: actualCropSize, height: 0.5)
                                 }
                             )
+                            .position(x: availableWidth / 2, y: availableHeight / 2 - 40)
                             .allowsHitTesting(false)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -741,9 +791,10 @@ struct ImageCropView: View {
 
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("完成") {
-                        let croppedUIImage = cropImage()
-                        croppedImage = Image(uiImage: croppedUIImage)
-                        onComplete?(croppedUIImage)
+                        if let croppedUIImage = cropImage() {
+                            croppedImage = Image(uiImage: croppedUIImage)
+                            onComplete?(croppedUIImage)
+                        }
                         isPresented = false
                     }
                     .fontWeight(.semibold)
@@ -753,51 +804,67 @@ struct ImageCropView: View {
         }
     }
 
-    private func cropImage() -> UIImage {
-        // 创建裁剪后的图像，输出大小为300x300
-        let outputSize = CGSize(width: cropSize, height: cropSize)
+    private func setupInitialImageSize(geometry: GeometryProxy, cropSize: CGFloat) {
+        let imageAspectRatio = image.size.width / image.size.height
+        let cropAspectRatio: CGFloat = 1.0 // 圆形裁剪框是正方形
+
+        var width: CGFloat
+        var height: CGFloat
+
+        if imageAspectRatio > cropAspectRatio {
+            // 图片比裁剪框更宽，以高度为准
+            height = cropSize
+            width = height * imageAspectRatio
+        } else {
+            // 图片比裁剪框更高，以宽度为准
+            width = cropSize
+            height = width / imageAspectRatio
+        }
+
+        self.imageSize = CGSize(width: width, height: height)
+    }
+
+    private func calculateImageSize() -> CGSize {
+        if imageSize == .zero {
+            return CGSize(width: 300, height: 300)
+        }
+        return imageSize
+    }
+
+    private func cropImage() -> UIImage? {
+        // 输出大小
+        let outputSize = CGSize(width: 200, height: 200) // 减小输出尺寸以提高性能
 
         // 创建图像渲染器
         let format = UIGraphicsImageRendererFormat()
-        format.scale = UIScreen.main.scale // 使用屏幕比例确保高质量
+        format.scale = 2.0 // 固定使用2x分辨率
         let renderer = UIGraphicsImageRenderer(size: outputSize, format: format)
 
         let croppedUIImage = renderer.image { context in
-            // 保存图形上下文状态
-            context.cgContext.saveGState()
-
             // 设置圆形裁剪路径
             let clipPath = UIBezierPath(ovalIn: CGRect(origin: .zero, size: outputSize))
             clipPath.addClip()
 
-            // 填充白色背景
-            UIColor.white.setFill()
-            context.fill(CGRect(origin: .zero, size: outputSize))
+            // 计算图片在裁剪框中的位置
+            let scaledImageSize = CGSize(
+                width: imageSize.width * scale,
+                height: imageSize.height * scale
+            )
 
-            // 计算实际图像大小和位置
-            // 图像的原始大小
-            let imageSize = image.size
-
-            // 应用缩放后的图像大小
-            let scaledWidth = imageSize.width * scale
-            let scaledHeight = imageSize.height * scale
-
-            // 计算绘制位置（居中 + 偏移）
-            let drawX = (outputSize.width - scaledWidth) / 2 + offset.width
-            let drawY = (outputSize.height - scaledHeight) / 2 + offset.height
+            // 计算绘制位置（基于300的裁剪框大小）
+            let scaleFactor = outputSize.width / cropSize
+            let drawX = (outputSize.width - scaledImageSize.width * scaleFactor) / 2 + (offset.width * scaleFactor)
+            let drawY = (outputSize.height - scaledImageSize.height * scaleFactor) / 2 + (offset.height * scaleFactor)
 
             // 绘制图像
             let drawRect = CGRect(
                 x: drawX,
                 y: drawY,
-                width: scaledWidth,
-                height: scaledHeight
+                width: scaledImageSize.width * scaleFactor,
+                height: scaledImageSize.height * scaleFactor
             )
 
             image.draw(in: drawRect)
-
-            // 恢复图形上下文状态
-            context.cgContext.restoreGState()
         }
 
         return croppedUIImage
