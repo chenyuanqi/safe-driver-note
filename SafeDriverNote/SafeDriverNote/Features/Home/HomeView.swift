@@ -532,7 +532,7 @@ struct HomeView: View {
 	            
 	            Spacer()
 	            
-	            Text("2/3")
+	            Text("\(vm.todayLearnedCount)/3")
 	                .font(.bodySmall)
 	                .foregroundColor(.brandSecondary500)
 	        }
@@ -921,6 +921,7 @@ final class HomeViewModel: ObservableObject {
     @Published private(set) var todayPostCount: Int = 0
     @Published private(set) var todayKnowledgeCards: [KnowledgeCardData] = []
     @Published private(set) var todayKnowledgeCompleted: Bool = false
+    @Published private(set) var todayLearnedCount: Int = 0  // 今天已学习的卡片数量
         
     init() { reload() }
     
@@ -1049,6 +1050,9 @@ final class HomeViewModel: ObservableObject {
                 }
                 return count + (hasLearnedToday ? 1 : 0)
             }
+
+            // 保存今天已学习的卡片数量
+            self.todayLearnedCount = todayLearnedCount
 
             // 如果今天已经标记学习了3个或以上卡片，则认为今日知识学习已完成
             self.todayKnowledgeCompleted = todayLearnedCount >= 3

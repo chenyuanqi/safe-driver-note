@@ -15,10 +15,6 @@ struct KnowledgeTodayView: View {
     @State private var cardOpacity: Double = 1.0
     @State private var isDismissing = false
     @State private var showDrivingRulesModal = false
-    // 添加一个计数器来跟踪滑动过的卡片数量
-    @State private var swipedCardsCount = 0
-    // 添加一个标志来跟踪是否已经发送过通知
-    @State private var hasSentCompletionNotification = false
 
     var body: some View {
         NavigationStack {
@@ -66,14 +62,12 @@ struct KnowledgeTodayView: View {
                                                                     if dx > 120 { // 右滑：掌握
                                                                         dismissCard(direction: .right, action: {
                                                                             vm.mark(card: card)
-                                                                            // 增加滑动计数
-                                                                            incrementSwipedCardsCount()
+                                                                            // 立即发送通知更新首页进度
+                                                                            NotificationCenter.default.post(name: .knowledgeCardMarked, object: nil)
                                                                         })
                                                                     } else if dx < -120 { // 左滑：稍后
                                                                         dismissCard(direction: .left, action: {
                                                                             vm.snooze(card: card)
-                                                                            // 增加滑动计数
-                                                                            incrementSwipedCardsCount()
                                                                         })
                                                                     } else {
                                                                         // 回弹
@@ -124,11 +118,6 @@ struct KnowledgeTodayView: View {
                     ]
                 )
             }
-            // 在视图出现时重置计数器和通知标志
-            .onAppear {
-                swipedCardsCount = 0
-                hasSentCompletionNotification = false
-            }
             // 开车守则弹框
             .sheet(isPresented: $showDrivingRulesModal) {
                 DrivingRulesView(onDismiss: {
@@ -165,17 +154,6 @@ struct KnowledgeTodayView: View {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
             action()
             resetCardState()
-        }
-    }
-    
-    // 增加滑动过的卡片计数，并在达到3个时发送通知
-    private func incrementSwipedCardsCount() {
-        swipedCardsCount += 1
-        // 检查是否已经滑动了3个卡片且还没有发送过通知
-        if swipedCardsCount >= 3 && !hasSentCompletionNotification {
-            // 发送通知，告知首页更新学习进度
-            NotificationCenter.default.post(name: .knowledgeCardMarked, object: nil)
-            hasSentCompletionNotification = true
         }
     }
         
