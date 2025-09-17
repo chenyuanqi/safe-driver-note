@@ -1,6 +1,7 @@
 import Foundation
 import CoreLocation
 import Combine
+import UIKit
 
 extension Notification.Name {
     static let driveServiceError = Notification.Name("driveServiceError")
@@ -23,9 +24,10 @@ class DriveService: ObservableObject {
     private var locationTrackingTimer: Timer? // 位置跟踪定时器
     private var currentWaypoints: [RouteLocation] = [] // 当前路径点集合
     private var locationCancellable: AnyCancellable?
+    private var backgroundTask: UIBackgroundTaskIdentifier = .invalid // 后台任务标识
 
     /// 定时采集位置的时间间隔（秒）
-    private let locationTrackingInterval: TimeInterval = 30 // 每30秒强制采集一次位置，确保轨迹完整
+    private let locationTrackingInterval: TimeInterval = 10 // 每10秒强制采集一次位置，确保轨迹完整
     
     @MainActor
     init(repository: DriveRouteRepository? = nil,
@@ -240,19 +242,22 @@ class DriveService: ObservableObject {
     /// 启动驾驶计时器
     private func startDrivingTimer() {
         stopDrivingTimer() // 确保旧的定时器停止
-        
+
         // 立即更新一次
         updateDrivingTime()
-        
+
         // 启动定时器，每60秒更新一次驾驶时间
         drivingTimer = Timer.scheduledTimer(withTimeInterval: 60.0, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 self?.updateDrivingTime()
             }
         }
-        
+
         // 启动位置跟踪（使用连续定位而不是定时器）
         startLocationTracking()
+
+        // 开始后台任务，确保应用在后台能继续记录
+        startBackgroundTask()
     }
     
     /// 停止驾驶计时器
@@ -260,9 +265,12 @@ class DriveService: ObservableObject {
         drivingTimer?.invalidate()
         drivingTimer = nil
         currentDrivingTime = ""
-        
+
         // 停止位置跟踪
         stopLocationTracking()
+
+        // 结束后台任务
+        endBackgroundTask()
     }
     
     /// 启动位置跟踪
@@ -271,8 +279,8 @@ class DriveService: ObservableObject {
         currentWaypoints = []
         currentWaypointCount = 0
 
-        // 启动连续定位，使用导航级精度和合适的距离过滤器
-        locationService.startContinuousUpdates(desiredAccuracy: kCLLocationAccuracyBestForNavigation, distanceFilter: 10) // 10米更新一次，平衡精度和性能
+        // 启动连续定位，使用导航级精度和更小的距离过滤器
+        locationService.startContinuousUpdates(desiredAccuracy: kCLLocationAccuracyBestForNavigation, distanceFilter: 5) // 5米更新一次，获得更详细的轨迹
 
         // 立即采集一次
         captureCurrentLocation()
@@ -289,8 +297,8 @@ class DriveService: ObservableObject {
             .sink { [weak self] location in
                 guard let self = self else { return }
                 Task { @MainActor in
-                    // 检查位置精度，过滤掉精度太差的位置
-                    guard location.horizontalAccuracy <= 20 && location.horizontalAccuracy >= 0 else {
+                    // 检查位置精度，放宽精度过滤条件以避免丢失轨迹点
+                    guard location.horizontalAccuracy <= 50 && location.horizontalAccuracy >= 0 else {
                         print("位置精度太差，跳过: 精度=\(location.horizontalAccuracy)米")
                         return
                     }
@@ -299,7 +307,7 @@ class DriveService: ObservableObject {
                     if let lastWaypoint = self.currentWaypoints.last {
                         let lastLocation = CLLocation(latitude: lastWaypoint.latitude, longitude: lastWaypoint.longitude)
                         let distance = location.distance(from: lastLocation)
-                        if distance < 10 { // 小于10米的移动不记录，与distanceFilter保持一致
+                        if distance < 5 { // 小于5米的移动不记录，与distanceFilter保持一致
                             return
                         }
                     }
@@ -381,8 +389,8 @@ class DriveService: ObservableObject {
                     return
                 }
 
-                // 检查位置精度
-                guard location.horizontalAccuracy <= 30 && location.horizontalAccuracy >= 0 else {
+                // 检查位置精度（定时采集时放宽标准，确保即使信号差也能记录）
+                guard location.horizontalAccuracy <= 100 && location.horizontalAccuracy >= 0 else {
                     print("定时采集位置精度太差，跳过: 精度=\(location.horizontalAccuracy)米")
                     return
                 }
@@ -499,6 +507,35 @@ class DriveService: ObservableObject {
         info += "连续定位: \(locationService.isContinuousTracking ? "开启" : "关闭")\n"
 
         return info
+    }
+
+    // MARK: - Background Task Management
+
+    /// 开始后台任务
+    private func startBackgroundTask() {
+        // 先结束之前的后台任务（如果存在）
+        endBackgroundTask()
+
+        backgroundTask = UIApplication.shared.beginBackgroundTask(withName: "DriveTracking") { [weak self] in
+            // 后台任务即将过期时的处理
+            print("后台任务即将过期，尝试重新申请...")
+            self?.endBackgroundTask()
+            // 尝试重新申请后台任务
+            self?.startBackgroundTask()
+        }
+
+        if backgroundTask != .invalid {
+            print("后台任务开始，ID: \(backgroundTask)")
+        }
+    }
+
+    /// 结束后台任务
+    private func endBackgroundTask() {
+        if backgroundTask != .invalid {
+            UIApplication.shared.endBackgroundTask(backgroundTask)
+            print("后台任务结束，ID: \(backgroundTask)")
+            backgroundTask = .invalid
+        }
     }
 }
 

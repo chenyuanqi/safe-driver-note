@@ -32,10 +32,16 @@ class LocationService: NSObject, ObservableObject {
     
     private func setupLocationManager() {
         locationManager.delegate = self
-        locationManager.desiredAccuracy = kCLLocationAccuracyBest
-        locationManager.distanceFilter = 5.0 // 改为5米更新一次，获得更详细的路径
-        locationManager.pausesLocationUpdatesAutomatically = false // 改为false，防止系统自动暂停
+        locationManager.desiredAccuracy = kCLLocationAccuracyBestForNavigation // 使用导航级精度
+        locationManager.distanceFilter = 5.0 // 5米更新一次，获得更详细的路径
+        locationManager.pausesLocationUpdatesAutomatically = false // 防止系统自动暂停
         locationManager.activityType = .automotiveNavigation // 设置为汽车导航类型
+
+        // iOS 11+ 设置在使用和始终使用期间都显示后台位置指示器
+        if #available(iOS 11.0, *) {
+            locationManager.showsBackgroundLocationIndicator = true
+        }
+
         authorizationStatus = locationManager.authorizationStatus
     }
     
@@ -56,19 +62,27 @@ class LocationService: NSObject, ObservableObject {
     }
     
     /// 后台连续定位：开始持续更新
-    func startContinuousUpdates(desiredAccuracy: CLLocationAccuracy = kCLLocationAccuracyBest, distanceFilter: CLLocationDistance = 10.0) {
+    func startContinuousUpdates(desiredAccuracy: CLLocationAccuracy = kCLLocationAccuracyBestForNavigation, distanceFilter: CLLocationDistance = 5.0) {
         locationManager.desiredAccuracy = desiredAccuracy
-        locationManager.distanceFilter = distanceFilter // 使用传入的参数，默认为10米
+        locationManager.distanceFilter = distanceFilter // 使用传入的参数，默认为5米
         locationManager.activityType = .automotiveNavigation // 确保设置为汽车导航类型
+
         // 仅当 Info.plist 开启了 Background Modes -> location 时，才允许后台定位
         let backgroundModes = Bundle.main.object(forInfoDictionaryKey: "UIBackgroundModes") as? [String] ?? []
         let canBackgroundLocation = backgroundModes.contains("location")
         locationManager.allowsBackgroundLocationUpdates = canBackgroundLocation
         locationManager.pausesLocationUpdatesAutomatically = false // 确保不会自动暂停
+
         if #available(iOS 11.0, *) {
             locationManager.showsBackgroundLocationIndicator = canBackgroundLocation
         }
+
+        // 开始标准位置更新
         locationManager.startUpdatingLocation()
+
+        // 同时启用显著位置变化监听作为备份（这个在后台也能工作）
+        locationManager.startMonitoringSignificantLocationChanges()
+
         isContinuousMode = true
         print("开始连续定位 - 精度: \(desiredAccuracy), 距离过滤: \(distanceFilter)米, 后台定位: \(canBackgroundLocation)")
     }
@@ -76,6 +90,8 @@ class LocationService: NSObject, ObservableObject {
     /// 后台连续定位：停止持续更新
     func stopContinuousUpdates() {
         locationManager.stopUpdatingLocation()
+        locationManager.stopMonitoringSignificantLocationChanges() // 同时停止显著位置变化监听
+
         if #available(iOS 11.0, *) {
             locationManager.showsBackgroundLocationIndicator = false
         }
