@@ -74,7 +74,11 @@ class DriveService: ObservableObject {
             // 更新状态
             self.currentRoute = route
             self.isDriving = true
-            
+
+            // 确保新驾驶会话的路径点从0开始
+            self.currentWaypoints = []
+            self.currentWaypointCount = 0
+
             // 升级为Always并启动连续定位
             locationService.requestAlwaysAuthorizationIfEligible()
             // 等待一小段时间确保权限申请完成
@@ -95,6 +99,11 @@ class DriveService: ObservableObject {
             let route = try repository.startRoute(startLocation: startLocationOverride)
             self.currentRoute = route
             self.isDriving = true
+
+            // 确保新驾驶会话的路径点从0开始
+            self.currentWaypoints = []
+            self.currentWaypointCount = 0
+
             locationService.requestAlwaysAuthorizationIfEligible()
             startDrivingTimer()
         } catch {
@@ -130,6 +139,10 @@ class DriveService: ObservableObject {
             self.currentRoute = nil
             self.isDriving = false
 
+            // 清空路径点数组，为下次驾驶做准备
+            self.currentWaypoints = []
+            self.currentWaypointCount = 0
+
             // 停止定时器
             stopDrivingTimer()
 
@@ -152,6 +165,11 @@ class DriveService: ObservableObject {
             try repository.endRoute(routeId: routeId, endLocation: endLocationOverride, waypoints: currentWaypoints)
             self.currentRoute = nil
             self.isDriving = false
+
+            // 清空路径点数组，为下次驾驶做准备
+            self.currentWaypoints = []
+            self.currentWaypointCount = 0
+
             stopDrivingTimer()
         } catch {
             print("结束驾驶失败: \(error)")
@@ -205,7 +223,11 @@ class DriveService: ObservableObject {
             
             self.currentRoute = nil
             self.isDriving = false
-            
+
+            // 清空路径点数组，为下次驾驶做准备
+            self.currentWaypoints = []
+            self.currentWaypointCount = 0
+
             // 停止定时器
             stopDrivingTimer()
             
