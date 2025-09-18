@@ -42,7 +42,14 @@ class DriveService: ObservableObject {
         if let activeRoute = try? repository.getCurrentActiveRoute() {
             self.currentRoute = activeRoute
             self.isDriving = true
-            
+
+            // 恢复已保存的路径点
+            if let waypoints = activeRoute.waypoints, !waypoints.isEmpty {
+                self.currentWaypoints = waypoints
+                self.currentWaypointCount = waypoints.count
+                print("恢复已保存的路径点: \(waypoints.count)个")
+            }
+
             // 如果有正在进行的路线，启动定时器
             startDrivingTimer()
         }
@@ -276,8 +283,12 @@ class DriveService: ObservableObject {
     /// 启动位置跟踪
     private func startLocationTracking() {
         stopLocationTracking()
-        currentWaypoints = []
-        currentWaypointCount = 0
+
+        // 如果已有路径点（从持久化恢复的），不要清空
+        if currentWaypoints.isEmpty {
+            currentWaypoints = []
+            currentWaypointCount = 0
+        }
 
         // 启动连续定位，使用导航级精度和更小的距离过滤器
         locationService.startContinuousUpdates(desiredAccuracy: kCLLocationAccuracyBestForNavigation, distanceFilter: 5) // 5米更新一次，获得更详细的轨迹
@@ -318,10 +329,13 @@ class DriveService: ObservableObject {
                     self.currentWaypointCount = self.currentWaypoints.count
                     print("移动触发路径点: \(waypoint.latitude), \(waypoint.longitude), 精度: \(location.horizontalAccuracy)米")
 
-                    // 实时更新路线的路径点
-                    if let route = self.currentRoute {
-                        try? self.repository.updateRoute(route) { r in
-                            r.waypoints = self.currentWaypoints
+                    // 实时更新路线的路径点（每10个点保存一次，减少IO操作）
+                    if self.currentWaypoints.count % 10 == 0 {
+                        if let route = self.currentRoute {
+                            try? self.repository.updateRoute(route) { r in
+                                r.waypoints = self.currentWaypoints
+                            }
+                            print("定期保存路径点：\(self.currentWaypoints.count)个")
                         }
                     }
                 }
@@ -335,7 +349,7 @@ class DriveService: ObservableObject {
         locationCancellable?.cancel()
         locationCancellable = nil
         locationService.stopContinuousUpdates()
-        currentWaypointCount = 0
+        // 不清空 currentWaypointCount，保持已记录的路径点数量
     }
     
     /// 采集当前位置并保存到路径点集合
@@ -359,11 +373,12 @@ class DriveService: ObservableObject {
                 currentWaypointCount = currentWaypoints.count
                 print("立即采集路径点: \(routeLocation.latitude), \(routeLocation.longitude)")
 
-                // 更新当前路线的路径点
+                // 立即保存路径点（采集时需要立即保存）
                 if let route = currentRoute {
                     try repository.updateRoute(route) { route in
                         route.waypoints = self.currentWaypoints
                     }
+                    print("保存路径点：\(currentWaypoints.count)个")
                 }
 
             } catch {
@@ -409,11 +424,12 @@ class DriveService: ObservableObject {
                 currentWaypointCount = currentWaypoints.count
                 print("定时采集路径点: \(routeLocation.latitude), \(routeLocation.longitude), 精度: \(location.horizontalAccuracy)米")
 
-                // 更新当前路线的路径点
+                // 立即保存路径点（采集时需要立即保存）
                 if let route = currentRoute {
                     try repository.updateRoute(route) { route in
                         route.waypoints = self.currentWaypoints
                     }
+                    print("保存路径点：\(currentWaypoints.count)个")
                 }
 
             } catch {
@@ -510,6 +526,36 @@ class DriveService: ObservableObject {
     }
 
     // MARK: - Background Task Management
+
+    /// 获取当前路径点（供外部访问）
+    func getCurrentWaypoints() -> [RouteLocation] {
+        return currentWaypoints
+    }
+
+    /// 恢复位置跟踪（如果需要）
+    func resumeLocationTrackingIfNeeded() {
+        guard isDriving else { return }
+
+        // 如果没有在连续跟踪，重新启动
+        if !locationService.isContinuousTracking {
+            print("恢复位置跟踪")
+            startLocationTracking()
+        }
+    }
+
+    /// 立即保存当前路径点到持久化存储
+    func saveWaypointsImmediately() {
+        guard let route = currentRoute else { return }
+
+        do {
+            try repository.updateRoute(route) { r in
+                r.waypoints = self.currentWaypoints
+            }
+            print("已保存 \(currentWaypoints.count) 个路径点到持久化存储")
+        } catch {
+            print("保存路径点失败: \(error)")
+        }
+    }
 
     /// 开始后台任务
     private func startBackgroundTask() {

@@ -26,6 +26,7 @@ let sharedModelContainer: ModelContainer = {
 struct SafeDriverNoteApp: App {
     @StateObject private var notificationDelegate = NotificationDelegate()
     @StateObject private var themeManager = ThemeManager.shared
+    @Environment(\.scenePhase) private var scenePhase
 
     init() {
         GlobalModelContext.container = sharedModelContainer
@@ -54,6 +55,9 @@ struct SafeDriverNoteApp: App {
 
                     // 检查是否需要显示延时提醒
                     checkForDelayedAlert()
+                }
+                .onChange(of: scenePhase) { oldPhase, newPhase in
+                    handleScenePhaseChange(from: oldPhase, to: newPhase)
                 }
         }
         .modelContainer(sharedModelContainer)
@@ -89,6 +93,49 @@ struct SafeDriverNoteApp: App {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
                     notificationDelegate.showDelayedAlert = true
                 }
+            }
+        }
+    }
+
+    /// 处理场景阶段变化
+    private func handleScenePhaseChange(from oldPhase: ScenePhase, to newPhase: ScenePhase) {
+        Task { @MainActor in
+            let driveService = AppDI.shared.driveService
+
+            switch newPhase {
+            case .background:
+                print("App进入后台")
+                // 如果正在驾驶，确保后台位置更新继续
+                if driveService.isDriving {
+                    // 强制保存当前路径点到持久化存储
+                    if let route = driveService.currentRoute {
+                        try? AppDI.shared.driveRouteRepository.updateRoute(route) { r in
+                            r.waypoints = driveService.getCurrentWaypoints()
+                        }
+                    }
+                }
+
+            case .inactive:
+                print("App进入非活跃状态")
+                // 保存当前状态
+                if driveService.isDriving {
+                    if let route = driveService.currentRoute {
+                        try? AppDI.shared.driveRouteRepository.updateRoute(route) { r in
+                            r.waypoints = driveService.getCurrentWaypoints()
+                        }
+                    }
+                }
+
+            case .active:
+                print("App进入活跃状态")
+                // 恢复驾驶状态
+                if driveService.isDriving {
+                    // 重新启动位置跟踪（如果需要）
+                    driveService.resumeLocationTrackingIfNeeded()
+                }
+
+            @unknown default:
+                break
             }
         }
     }

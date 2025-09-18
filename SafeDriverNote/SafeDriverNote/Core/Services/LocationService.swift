@@ -73,6 +73,13 @@ class LocationService: NSObject, ObservableObject {
         locationManager.allowsBackgroundLocationUpdates = canBackgroundLocation
         locationManager.pausesLocationUpdatesAutomatically = false // 确保不会自动暂停
 
+        // 设置后台模式下的精度和距离过滤
+        if canBackgroundLocation {
+            // 后台模式下使用稍低的精度以节省电量，但仍保持轨迹精度
+            locationManager.desiredAccuracy = kCLLocationAccuracyNearestTenMeters
+            locationManager.distanceFilter = 10.0 // 10米更新一次
+        }
+
         if #available(iOS 11.0, *) {
             locationManager.showsBackgroundLocationIndicator = canBackgroundLocation
         }
