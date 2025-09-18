@@ -16,70 +16,129 @@ struct VoiceNoteView: View {
 				.fontWeight(.semibold)
 				.frame(maxWidth: .infinity, alignment: .leading)
 
-			Card(shadow: true) {
-				VStack(alignment: .leading, spacing: Spacing.md) {
-					HStack(spacing: Spacing.md) {
-						Image(systemName: speech.isRecording ? "mic.fill" : "mic")
-							.font(.title2)
-							.foregroundColor(speech.isRecording ? .brandDanger500 : .brandPrimary500)
+			// 检查权限状态
+			if !speech.recognitionAuthorized || !speech.micAuthorized {
+				// 权限未授予时显示引导卡片
+				Card(backgroundColor: Color.brandWarning500.opacity(0.1), shadow: true) {
+					VStack(alignment: .leading, spacing: Spacing.lg) {
+						HStack(spacing: Spacing.md) {
+							Image(systemName: "exclamationmark.triangle.fill")
+								.font(.title2)
+								.foregroundColor(.brandWarning500)
 
-						VStack(alignment: .leading, spacing: Spacing.xs) {
-							Text(speech.isRecording ?
-								(speech.isListening ? "识别中..." : "等待语音...") :
-								"点击开始录音")
-								.font(.bodyLarge)
-								.foregroundColor(.brandSecondary900)
+							VStack(alignment: .leading, spacing: Spacing.xs) {
+								Text("需要授权")
+									.font(.bodyLarge)
+									.fontWeight(.semibold)
+									.foregroundColor(.brandSecondary900)
 
-							// 显示录音状态和音频电平
-							if speech.isRecording {
-								HStack(spacing: Spacing.xs) {
-									// 语音状态指示器
-									Circle()
-										.fill(speech.isListening ? Color.green : Color.orange)
-										.frame(width: 8, height: 8)
+								Text("使用语音记录功能需要麦克风和语音识别权限")
+									.font(.body)
+									.foregroundColor(.brandSecondary700)
+							}
 
-									Text(speech.isListening ? "检测到语音" : "等待语音输入")
-										.font(.caption)
-										.foregroundColor(.brandSecondary500)
+							Spacer()
+						}
 
-									Spacer()
+						VStack(alignment: .leading, spacing: Spacing.md) {
+							if !speech.micAuthorized {
+								HStack(spacing: Spacing.sm) {
+									Image(systemName: "mic.slash")
+										.font(.body)
+										.foregroundColor(.brandDanger500)
+									Text("麦克风权限未授予")
+										.font(.body)
+										.foregroundColor(.brandSecondary700)
 								}
+							}
 
-								HStack(spacing: Spacing.xs) {
-									Text("音量:")
-										.font(.caption)
-										.foregroundColor(.brandSecondary500)
-
-									GeometryReader { geometry in
-										ZStack(alignment: .leading) {
-											Rectangle()
-												.fill(Color.brandSecondary200)
-												.frame(height: 4)
-
-											Rectangle()
-												.fill(speech.audioLevel > 0.8 ? Color.brandDanger500 :
-													  speech.audioLevel > 0.5 ? Color.brandWarning500 : Color.brandPrimary500)
-												.frame(width: max(2, geometry.size.width * CGFloat(speech.audioLevel)), height: 4)
-										}
-									}
-									.frame(height: 4)
-									.clipShape(Capsule())
+							if !speech.recognitionAuthorized {
+								HStack(spacing: Spacing.sm) {
+									Image(systemName: "waveform.slash")
+										.font(.body)
+										.foregroundColor(.brandDanger500)
+									Text("语音识别权限未授予")
+										.font(.body)
+										.foregroundColor(.brandSecondary700)
 								}
 							}
 						}
 
-						Spacer()
+						Button("前往设置") {
+							if let url = URL(string: UIApplication.openSettingsURLString) {
+								UIApplication.shared.open(url)
+							}
+						}
+						.primaryStyle()
 					}
-					.contentShape(Rectangle())
-					.onTapGesture { toggleRecording() }
-					Divider()
-					
-					// 可编辑的文本区域
-					TextEditor(text: $speech.transcript)
-						.font(.body)
-						.foregroundColor(.brandSecondary700)
-						.frame(minHeight: 180)
-						.disabled(speech.isRecording) // 录音时禁用编辑
+				}
+			} else {
+				// 权限已授予时显示正常内容
+				Card(shadow: true) {
+					VStack(alignment: .leading, spacing: Spacing.md) {
+						HStack(spacing: Spacing.md) {
+							Image(systemName: speech.isRecording ? "mic.fill" : "mic")
+								.font(.title2)
+								.foregroundColor(speech.isRecording ? .brandDanger500 : .brandPrimary500)
+
+							VStack(alignment: .leading, spacing: Spacing.xs) {
+								Text(speech.isRecording ?
+									(speech.isListening ? "识别中..." : "等待语音...") :
+									"点击开始录音")
+									.font(.bodyLarge)
+									.foregroundColor(.brandSecondary900)
+
+								// 显示录音状态和音频电平
+								if speech.isRecording {
+									HStack(spacing: Spacing.xs) {
+										// 语音状态指示器
+										Circle()
+											.fill(speech.isListening ? Color.green : Color.orange)
+											.frame(width: 8, height: 8)
+
+										Text(speech.isListening ? "检测到语音" : "等待语音输入")
+											.font(.caption)
+											.foregroundColor(.brandSecondary500)
+
+										Spacer()
+									}
+
+									HStack(spacing: Spacing.xs) {
+										Text("音量:")
+											.font(.caption)
+											.foregroundColor(.brandSecondary500)
+
+										GeometryReader { geometry in
+											ZStack(alignment: .leading) {
+												Rectangle()
+													.fill(Color.brandSecondary200)
+													.frame(height: 4)
+
+												Rectangle()
+													.fill(speech.audioLevel > 0.8 ? Color.brandDanger500 :
+														  speech.audioLevel > 0.5 ? Color.brandWarning500 : Color.brandPrimary500)
+													.frame(width: max(2, geometry.size.width * CGFloat(speech.audioLevel)), height: 4)
+											}
+										}
+										.frame(height: 4)
+										.clipShape(Capsule())
+									}
+								}
+							}
+
+							Spacer()
+						}
+						.contentShape(Rectangle())
+						.onTapGesture { toggleRecording() }
+						Divider()
+
+						// 可编辑的文本区域
+						TextEditor(text: $speech.transcript)
+							.font(.body)
+							.foregroundColor(.brandSecondary700)
+							.frame(minHeight: 180)
+							.disabled(speech.isRecording) // 录音时禁用编辑
+					}
 				}
 			}
 
