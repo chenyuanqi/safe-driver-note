@@ -128,7 +128,6 @@ struct KnowledgeRepositorySwiftData: KnowledgeRepository {
         let ctx = try context()
         let allCards = try allCards()
         let today = Calendar.current.startOfDay(for: Date())
-        let sessionId = DateFormatter().string(from: Date()) // 使用当前时间作为会话ID
 
         // 获取今日已标记的卡片
         let progresses = try ctx.fetch(FetchDescriptor<KnowledgeProgress>())
@@ -136,10 +135,30 @@ struct KnowledgeRepositorySwiftData: KnowledgeRepository {
             progress.markedDates.contains { Calendar.current.isDate($0, inSameDayAs: today) } ? progress.cardId : nil
         })
 
+        // 获取今日已显示的卡片记录
+        let todayShown = try ctx.fetch(FetchDescriptor<KnowledgeRecentlyShown>())
+            .filter { Calendar.current.isDate($0.shownDate, inSameDayAs: today) }
+
+        // 如果今天已经有显示记录，直接返回这些卡片（保持顺序一致）
+        if !todayShown.isEmpty {
+            // 按照sessionId排序以保持顺序一致
+            let sortedShown = todayShown.sorted { $0.sessionId < $1.sessionId }
+            let todayShownCardIds = sortedShown.map { $0.cardId }
+
+            // 按照记录的顺序返回卡片
+            let todayCards = todayShownCardIds.compactMap { cardId in
+                allCards.first { $0.id == cardId }
+            }
+
+            return todayCards
+        }
+
+        // 如果今天还没有显示记录，生成今日的固定卡片列表
+
         // 获取最近7天内显示过的卡片（避免短期重复）
         let sevenDaysAgo = Calendar.current.date(byAdding: .day, value: -7, to: today) ?? today
         let recentlyShown = try ctx.fetch(FetchDescriptor<KnowledgeRecentlyShown>())
-            .filter { $0.shownDate >= sevenDaysAgo }
+            .filter { $0.shownDate >= sevenDaysAgo && !Calendar.current.isDate($0.shownDate, inSameDayAs: today) }
         let recentlyShownCardIds = Set(recentlyShown.map { $0.cardId })
 
         // 筛选候选卡片：排除今日已标记和最近显示过的
@@ -147,24 +166,47 @@ struct KnowledgeRepositorySwiftData: KnowledgeRepository {
             !todayMarkedCardIds.contains(card.id) && !recentlyShownCardIds.contains(card.id)
         }
 
-        // 如果可用卡片不足，则允许包含一些最近显示过的卡片（但仍排除今日已标记的）
+        // 基于日期生成固定的随机种子，确保同一天多次调用返回相同的卡片
+        let dateComponents = Calendar.current.dateComponents([.year, .month, .day], from: today)
+        let seed = (dateComponents.year ?? 0) * 10000 + (dateComponents.month ?? 0) * 100 + (dateComponents.day ?? 0)
+
+        // 使用固定种子的随机打乱
+        let shuffledAvailable = availableCards.sorted { $0.id < $1.id } // 先按ID排序以确保稳定性
+            .enumerated()
+            .map { (index: $0.offset, card: $0.element, randomValue: (seed &+ $0.offset.hashValue) &* 1664525 &+ 1013904223) }
+            .sorted { $0.randomValue < $1.randomValue }
+            .map { $0.card }
+
+        // 选择今日卡片
         let finalCards: [KnowledgeCard]
-        if availableCards.count >= limit {
-            finalCards = Array(availableCards.shuffled().prefix(limit))
+        if shuffledAvailable.count >= limit {
+            finalCards = Array(shuffledAvailable.prefix(limit))
         } else {
-            // 添加一些最近显示过但未标记的卡片
+            // 如果可用卡片不足，从所有未标记的卡片中选择
             let fallbackCards = allCards.filter { card in
                 !todayMarkedCardIds.contains(card.id)
             }
-            finalCards = Array(fallbackCards.shuffled().prefix(limit))
+
+            // 同样使用固定种子打乱
+            let shuffledFallback = fallbackCards.sorted { $0.id < $1.id }
+                .enumerated()
+                .map { (index: $0.offset, card: $0.element, randomValue: (seed &+ $0.offset.hashValue) &* 1664525 &+ 1013904223) }
+                .sorted { $0.randomValue < $1.randomValue }
+                .map { $0.card }
+
+            finalCards = Array(shuffledFallback.prefix(limit))
         }
 
-        // 记录本次显示的卡片，便于下次避免重复
-        for card in finalCards {
+        // 记录今日显示的卡片
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyyMMdd"
+        let dateString = dateFormatter.string(from: today)
+
+        for (index, card) in finalCards.enumerated() {
             let recentRecord = KnowledgeRecentlyShown(
                 cardId: card.id,
-                shownDate: Date(),
-                sessionId: sessionId
+                shownDate: today,
+                sessionId: "\(dateString)_\(String(format: "%02d", index))" // 使用日期和索引作为会话ID，保持顺序
             )
             ctx.insert(recentRecord)
         }

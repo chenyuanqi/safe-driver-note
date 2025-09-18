@@ -30,6 +30,7 @@ struct HomeView: View {
     
     // 添加知识页导航相关属性
     @State private var showingKnowledgeView = false
+    @State private var selectedKnowledgeCardTitle: String? = nil
     
     // 添加自动轮播定时器
     @State private var carouselTimer: Timer?
@@ -80,8 +81,8 @@ struct HomeView: View {
                 await refreshHomeData()
             }
             .background(Color.brandSecondary50)
-            }
-        }
+            } // 关闭VStack
+        } // 关闭NavigationStack
         .onAppear { 
             vm.reload() 
             // 先请求位置权限，避免交互中触发系统弹窗导致等待
@@ -249,7 +250,7 @@ struct HomeView: View {
             Text(notificationDetailContent)
         }
         .sheet(isPresented: $showingKnowledgeView) {
-            KnowledgeTodayView()
+            KnowledgeTodayView(initialCardTitle: selectedKnowledgeCardTitle)
                 .presentationDetents([.large, .fraction(0.85)])
                 .presentationDragIndicator(.visible)
                 .presentationCornerRadius(20)
@@ -634,7 +635,8 @@ struct HomeView: View {
 	            }
 	    )
 	    .onTapGesture {
-	        // 点击卡片时跳转到知识页面
+	        // 点击卡片时跳转到知识页面，并传递当前卡片标题
+	        selectedKnowledgeCardTitle = card.title
 	        showingKnowledgeView = true
 	    }
 	}

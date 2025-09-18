@@ -7,6 +7,7 @@ enum SwipeDirection {
 
 struct KnowledgeTodayView: View {
     @StateObject private var vm = KnowledgeViewModel(repository: AppDI.shared.knowledgeRepository)
+    @State private var currentCardIndex: Int = 0  // 添加当前卡片索引
     @State private var dragOffset: CGFloat = 0
     @State private var cardRotation: Double = 0
     @State private var showingFirework = false
@@ -15,6 +16,13 @@ struct KnowledgeTodayView: View {
     @State private var cardOpacity: Double = 1.0
     @State private var isDismissing = false
     @State private var showDrivingRulesModal = false
+
+    // 添加初始卡片标题参数，用于定位显示特定卡片
+    let initialCardTitle: String?
+
+    init(initialCardTitle: String? = nil) {
+        self.initialCardTitle = initialCardTitle
+    }
 
     var body: some View {
         NavigationStack {
@@ -37,7 +45,8 @@ struct KnowledgeTodayView: View {
                                     drivingRulesSection
 
                                     // 学习卡片区域
-                                    if let card = vm.today.first {
+                                    if currentCardIndex < vm.today.count {
+                                        let card = vm.today[currentCardIndex]
                                         GeometryReader { geo in
                                             let cardHeight = geo.size.height * 0.7
                                             VStack(spacing: Spacing.lg) {
@@ -64,10 +73,20 @@ struct KnowledgeTodayView: View {
                                                                             vm.mark(card: card)
                                                                             // 立即发送通知更新首页进度
                                                                             NotificationCenter.default.post(name: .knowledgeCardMarked, object: nil)
+                                                                            // 移到下一张卡片
+                                                                            if currentCardIndex < vm.today.count - 1 {
+                                                                                currentCardIndex += 1
+                                                                            }
                                                                         })
                                                                     } else if dx < -120 { // 左滑：稍后
                                                                         dismissCard(direction: .left, action: {
-                                                                            vm.snooze(card: card)
+                                                                            // 稍后查看，移到下一张卡片
+                                                                            if currentCardIndex < vm.today.count - 1 {
+                                                                                currentCardIndex += 1
+                                                                            } else {
+                                                                                // 如果是最后一张，回到第一张
+                                                                                currentCardIndex = 0
+                                                                            }
                                                                         })
                                                                     } else {
                                                                         // 回弹
@@ -125,8 +144,16 @@ struct KnowledgeTodayView: View {
                 })
             }
         }
+        .onAppear {
+            // 如果有指定的初始卡片标题，设置对应的索引
+            if let title = initialCardTitle {
+                if let index = vm.indexOfCard(withTitle: title) {
+                    currentCardIndex = index
+                }
+            }
+        }
     }
-    
+
     // MARK: - 动画方法
     private func dismissCard(direction: SwipeDirection, action: @escaping () -> Void) {
         let targetX: CGFloat = direction == .right ? 500 : -500
