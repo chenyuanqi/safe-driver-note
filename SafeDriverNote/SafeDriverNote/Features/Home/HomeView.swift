@@ -545,6 +545,7 @@ struct HomeView: View {
 	                knowledgeCardView(card, index: index)
 	                    .opacity(index == selectedKnowledgeIndex ? 1.0 : 0.0)
 	                    .zIndex(index == selectedKnowledgeIndex ? 1.0 : 0.0)
+	                    .allowsHitTesting(index == selectedKnowledgeIndex) // 只允许当前显示的卡片接收点击
 	            }
 	        }
 	        .frame(height: 200)
