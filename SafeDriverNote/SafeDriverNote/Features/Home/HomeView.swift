@@ -704,26 +704,51 @@ struct HomeView: View {
 				.font(.title3)
 				.fontWeight(.semibold)
 				.foregroundColor(.brandSecondary900)
-			
-			VStack(spacing: Spacing.md) {
-				ForEach(vm.recentActivities.prefix(3), id: \.id) { activity in
-					recentActivityItem(activity)
-				}
-				
-				if vm.recentActivities.count > 3 {
-					NavigationLink(destination: LogListView(defaultTab: .driveRoute).environmentObject(AppDI.shared)) {
-						HStack {
-							Text("查看更多")
+
+			if vm.recentActivities.isEmpty {
+				// 空状态显示
+				Card(backgroundColor: Color.brandSecondary100.opacity(0.3), shadow: false) {
+					HStack {
+						Image(systemName: "calendar.badge.exclamationmark")
+							.font(.title2)
+							.foregroundColor(.brandSecondary400)
+
+						VStack(alignment: .leading, spacing: Spacing.xs) {
+							Text("暂无活动记录")
+								.font(.body)
+								.fontWeight(.medium)
+								.foregroundColor(.brandSecondary600)
+
+							Text("开始驾驶或创建日志后将显示在这里")
 								.font(.bodySmall)
 								.foregroundColor(.brandSecondary500)
-						
-							Spacer()
-							
-							Image(systemName: "chevron.right")
-								.font(.bodySmall)
-								.foregroundColor(.brandSecondary300)
 						}
-						.padding(.vertical, Spacing.sm)
+
+						Spacer()
+					}
+					.padding(.vertical, Spacing.md)
+				}
+			} else {
+				VStack(spacing: Spacing.md) {
+					ForEach(vm.recentActivities.prefix(3), id: \.id) { activity in
+						recentActivityItem(activity)
+					}
+
+					if vm.recentActivities.count > 3 {
+						NavigationLink(destination: LogListView(defaultTab: .driveRoute).environmentObject(AppDI.shared)) {
+							HStack {
+								Text("查看更多")
+									.font(.bodySmall)
+									.foregroundColor(.brandSecondary500)
+
+								Spacer()
+
+								Image(systemName: "chevron.right")
+									.font(.bodySmall)
+									.foregroundColor(.brandSecondary300)
+							}
+							.padding(.vertical, Spacing.sm)
+						}
 					}
 				}
 			}
