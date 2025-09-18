@@ -13,7 +13,11 @@ struct LogEditorView: View {
     @State private var tags: String = "" // 逗号或空白分隔
     // 图片附件
     @State private var selectedImages: [UIImage] = []
+    @State private var showingPhotoPicker = false
+    // 音频附件
     @State private var audioFileName: String? = nil
+    @State private var selectedAudioURL: URL? = nil
+    @State private var showingAudioPicker = false
     @State private var transcript: String? = nil
     
     // 位置获取状态
@@ -27,14 +31,16 @@ struct LogEditorView: View {
     let onSave: (LogType, String, String, String, String?, String?, String, [UIImage], String?, String?) -> Void
 
     var body: some View {
-    NavigationStack {
+        NavigationStack {
             Form {
                 typePickerSection
                 locationSection
                 detailSection
                 if type == .mistake { analysisSection }
                 tagsSection
-                attachmentSection
+                Group {
+                    attachmentSection
+                }
             }
             .navigationTitle(entry == nil ? "新建日志" : "编辑日志")
             .toolbar {
@@ -43,7 +49,29 @@ struct LogEditorView: View {
                 ToolbarItem(placement: .primaryAction) { Button("快速输入") { showingQuickInput = true } }
             }
             .onAppear(perform: prefillIfNeeded)
-            .sheet(isPresented: $showingQuickInput) { quickInputSheet }
+        }
+        .sheet(isPresented: $showingQuickInput) { quickInputSheet }
+        .sheet(isPresented: $showingPhotoPicker) {
+            PhotoPickerView(
+                selectedImages: $selectedImages,
+                maxSelection: 9 - selectedImages.count
+            )
+        }
+        .sheet(isPresented: $showingAudioPicker) {
+            AudioFilePickerView(selectedAudioURL: $selectedAudioURL)
+                .onDisappear {
+                    // 当音频选择器关闭时，处理选中的音频
+                    if let url = selectedAudioURL {
+                        // 删除旧的音频文件
+                        if let oldFileName = audioFileName {
+                            AudioStorageService.shared.deleteAudioFile(fileName: oldFileName)
+                        }
+                        // 保存新的音频文件
+                        if let fileName = AudioStorageService.shared.saveAudioFile(from: url) {
+                            audioFileName = fileName
+                        }
+                    }
+                }
         }
     }
 
@@ -76,7 +104,11 @@ struct LogEditorView: View {
         tags = e.tags.joined(separator: ", ")
         // 加载已保存的图片
         selectedImages = ImageStorageService.shared.loadImages(fileNames: e.photoLocalIds)
+        // 加载已保存的音频
         audioFileName = e.audioFileName
+        if let fileName = e.audioFileName {
+            selectedAudioURL = AudioStorageService.shared.getAudioURL(fileName: fileName)
+        }
         transcript = e.transcript
     }
 
@@ -162,39 +194,109 @@ struct LogEditorView: View {
 
     @ViewBuilder private var attachmentSection: some View {
         Section {
-            VStack(alignment: .leading, spacing: Spacing.md) {
-                // 图片选择部分
-                PhotoSelectionView(selectedImages: $selectedImages)
-
-                // 语音部分
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("语音：\(audioFileName == nil ? "未录制" : "已录制")")
-                            .font(.bodyMedium)
-                            .foregroundStyle(audioFileName == nil ? .secondary : .primary)
-                        if let t = transcript, !t.isEmpty {
-                            Text("转写预览：" + t.prefix(30) + (t.count > 30 ? "…" : ""))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    Spacer()
-                    Button("录音") {
-                        // TODO: 打开录音
-                    }
-                    .font(.bodyMedium)
-                    .foregroundColor(.brandPrimary500)
-                    .padding(.horizontal, Spacing.lg)
-                    .padding(.vertical, Spacing.sm)
-                    .background(Color.brandPrimary50)
-                    .cornerRadius(CornerRadius.md)
-                }
-            }
+            // 图片选择部分
+            PhotoSelectionView(selectedImages: $selectedImages, showingPhotoPicker: $showingPhotoPicker)
         } header: {
-            Text("附件")
+            Text("图片")
         } footer: {
             Text("最多添加9张图片，每张图片不超过10MB")
         }
+
+        Section {
+            // 语音部分
+            if audioFileName == nil {
+                // 未添加音频时的界面
+                Button(action: {
+                    showingAudioPicker = true
+                }) {
+                    HStack {
+                        Image(systemName: "waveform.circle")
+                            .font(.body)
+                            .foregroundColor(.brandPrimary500)
+                        Text("添加音频文件")
+                            .font(.bodyMedium)
+                            .foregroundColor(.brandPrimary500)
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundColor(.brandSecondary400)
+                    }
+                    .padding(.vertical, Spacing.md)
+                    .padding(.horizontal, Spacing.lg)
+                    .background(Color.brandPrimary50)
+                    .cornerRadius(CornerRadius.md)
+                }
+                .buttonStyle(PlainButtonStyle())
+            } else {
+                // 已添加音频时的界面
+                VStack(alignment: .leading, spacing: Spacing.md) {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack(spacing: Spacing.sm) {
+                                Image(systemName: "waveform.circle.fill")
+                                    .font(.body)
+                                    .foregroundColor(.brandPrimary500)
+                                Text("已添加音频")
+                                    .font(.bodyMedium)
+                                    .foregroundStyle(.primary)
+                            }
+
+                            if let fileName = audioFileName {
+                                Text(fileName.components(separatedBy: "_").last ?? fileName)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(1)
+
+                                // 显示音频时长和大小
+                                if let duration = AudioStorageService.shared.getAudioDuration(fileName: fileName),
+                                   let size = AudioStorageService.shared.getAudioFileSize(fileName: fileName) {
+                                    Text("时长: \(formatDuration(duration)) · 大小: \(String(format: "%.1f", size))MB")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                        Spacer()
+                    }
+
+                    // 操作按钮
+                    HStack(spacing: Spacing.md) {
+                        Button(action: {
+                            showingAudioPicker = true
+                        }) {
+                            Label("更换", systemImage: "arrow.triangle.2.circlepath")
+                                .font(.bodySmall)
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(.brandPrimary500)
+
+                        Button(action: {
+                            // 删除音频
+                            if let fileName = audioFileName {
+                                AudioStorageService.shared.deleteAudioFile(fileName: fileName)
+                            }
+                            audioFileName = nil
+                            selectedAudioURL = nil
+                        }) {
+                            Label("删除", systemImage: "trash")
+                                .font(.bodySmall)
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(.brandDanger500)
+                    }
+                }
+            }
+        } header: {
+            Text("语音")
+        } footer: {
+            Text("支持添加一个音频文件（MP3、M4A、WAV等格式）")
+        }
+    }
+
+    private func formatDuration(_ duration: TimeInterval) -> String {
+        let minutes = Int(duration) / 60
+        let seconds = Int(duration) % 60
+        return String(format: "%d:%02d", minutes, seconds)
     }
 }
 

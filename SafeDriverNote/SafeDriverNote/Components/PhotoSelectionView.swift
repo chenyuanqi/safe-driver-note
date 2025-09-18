@@ -3,7 +3,7 @@ import SwiftUI
 // 简化的图片选择视图
 struct PhotoSelectionView: View {
     @Binding var selectedImages: [UIImage]
-    @State private var showingPhotoPicker = false
+    @Binding var showingPhotoPicker: Bool
 
     let maxImages = 9
 
@@ -45,12 +45,6 @@ struct PhotoSelectionView: View {
                     .cornerRadius(CornerRadius.md)
                 }
             }
-        }
-        .sheet(isPresented: $showingPhotoPicker) {
-            PhotoPickerView(
-                selectedImages: $selectedImages,
-                maxSelection: maxImages - selectedImages.count
-            )
         }
     }
 }

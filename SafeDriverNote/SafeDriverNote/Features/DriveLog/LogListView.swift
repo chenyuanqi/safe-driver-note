@@ -700,14 +700,21 @@ struct LogListView: View {
                     }
 
                     // Audio Indicator
-                    if log.audioFileName != nil {
+                    if let audioFileName = log.audioFileName {
                         HStack(spacing: Spacing.sm) {
-                            Image(systemName: "waveform")
+                            Image(systemName: "waveform.circle.fill")
                                 .font(.bodySmall)
-                                .foregroundColor(.brandSecondary500)
-                            Text("语音记录")
-                                .font(.bodySmall)
-                                .foregroundColor(.brandSecondary500)
+                                .foregroundColor(.brandPrimary500)
+
+                            if let duration = AudioStorageService.shared.getAudioDuration(fileName: audioFileName) {
+                                Text("语音 · \(formatAudioDuration(duration))")
+                                    .font(.bodySmall)
+                                    .foregroundColor(.brandSecondary500)
+                            } else {
+                                Text("语音附件")
+                                    .font(.bodySmall)
+                                    .foregroundColor(.brandSecondary500)
+                            }
                         }
                     }
                     
@@ -850,11 +857,22 @@ struct LogListView: View {
     private func formatDuration(_ duration: TimeInterval) -> String {
         let hours = Int(duration) / 3600
         let minutes = (Int(duration) % 3600) / 60
-        
+
         if hours > 0 {
             return "\(hours)小时\(minutes)分钟"
         } else {
             return "\(minutes)分钟"
+        }
+    }
+
+    private func formatAudioDuration(_ duration: TimeInterval) -> String {
+        let minutes = Int(duration) / 60
+        let seconds = Int(duration) % 60
+
+        if minutes > 0 {
+            return String(format: "%d:%02d", minutes, seconds)
+        } else {
+            return "\(seconds)秒"
         }
     }
     

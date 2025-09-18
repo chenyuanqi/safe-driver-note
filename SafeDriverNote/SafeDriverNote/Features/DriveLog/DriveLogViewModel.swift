@@ -72,6 +72,10 @@ final class DriveLogViewModel: ObservableObject {
             let entry = logs[index]
             // 删除相关图片文件
             ImageStorageService.shared.deleteImages(fileNames: entry.photoLocalIds)
+            // 删除相关音频文件
+            if let audioFileName = entry.audioFileName {
+                AudioStorageService.shared.deleteAudioFile(fileName: audioFileName)
+            }
             try? repository.delete(entry)
         }
         load()
@@ -97,6 +101,9 @@ final class DriveLogViewModel: ObservableObject {
 
         // 保存新图片
         let photoFileNames = ImageStorageService.shared.saveImages(images)
+
+        // 注意：音频文件的处理已经在 LogEditorView 中完成，
+        // 这里只需要更新文件名引用即可
 
         try? repository.update(entry) { e in
             e.type = type

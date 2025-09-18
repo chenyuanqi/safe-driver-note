@@ -4,7 +4,6 @@ import PhotosUI
 struct PhotoPickerView: UIViewControllerRepresentable {
     @Binding var selectedImages: [UIImage]
     let maxSelection: Int
-    @Environment(\.presentationMode) private var presentationMode
 
     func makeUIViewController(context: Context) -> PHPickerViewController {
         var configuration = PHPickerConfiguration(photoLibrary: .shared())
