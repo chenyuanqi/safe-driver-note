@@ -3,6 +3,7 @@ import CoreLocation
 import Foundation
 import UserNotifications
 import SwiftData
+import UIKit
 
 struct HomeView: View {
     @StateObject private var vm = HomeViewModel()
@@ -112,6 +113,9 @@ struct HomeView: View {
         }
         .sheet(isPresented: $showingLogEditor) {
             LogEditorView(entry: nil) { type, detail, location, scene, cause, improvement, tags, photos, audioFileName, transcript in
+                // 保存图片
+                let photoFileNames = ImageStorageService.shared.saveImages(photos)
+
                 // 创建新的驾驶日志
                 let newEntry = LogEntry(
                     type: type,
@@ -121,7 +125,7 @@ struct HomeView: View {
                     cause: cause,
                     improvement: improvement,
                     tags: tags.isEmpty ? [] : tags.components(separatedBy: ",").map { $0.trimmingCharacters(in: .whitespaces) },
-                    photoLocalIds: photos,
+                    photoLocalIds: photoFileNames,
                     audioFileName: audioFileName,
                     transcript: transcript
                 )

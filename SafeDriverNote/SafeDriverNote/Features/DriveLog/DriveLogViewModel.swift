@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import UIKit
 
 @MainActor
 final class DriveLogViewModel: ObservableObject {
@@ -41,10 +42,14 @@ final class DriveLogViewModel: ObservableObject {
                 cause: String?,
                 improvement: String?,
                 rawTags: String,
-                photoIds: [String] = [],
+                images: [UIImage] = [],
                 audioFileName: String? = nil,
                 transcript: String? = nil) {
         let tags = normalizeTags(rawTags)
+
+        // 保存图片并获取文件名
+        let photoFileNames = ImageStorageService.shared.saveImages(images)
+
         let entry = LogEntry(type: type,
                              locationNote: locationNote,
                              scene: scene,
@@ -52,7 +57,7 @@ final class DriveLogViewModel: ObservableObject {
                              cause: type == .mistake ? (cause?.nilIfBlank) : nil,
                              improvement: type == .mistake ? (improvement?.nilIfBlank) : nil,
                              tags: tags,
-                             photoLocalIds: photoIds,
+                             photoLocalIds: photoFileNames,
                              audioFileName: audioFileName,
                              transcript: transcript)
         try? repository.add(entry)
@@ -63,7 +68,12 @@ final class DriveLogViewModel: ObservableObject {
     }
 
     func delete(at offsets: IndexSet) {
-        for index in offsets { try? repository.delete(logs[index]) }
+        for index in offsets {
+            let entry = logs[index]
+            // 删除相关图片文件
+            ImageStorageService.shared.deleteImages(fileNames: entry.photoLocalIds)
+            try? repository.delete(entry)
+        }
         load()
     }
 
@@ -77,10 +87,17 @@ final class DriveLogViewModel: ObservableObject {
                 cause: String?,
                 improvement: String?,
                 rawTags: String,
-                photoIds: [String],
+                images: [UIImage],
                 audioFileName: String?,
                 transcript: String?) {
         let tags = normalizeTags(rawTags)
+
+        // 删除旧图片
+        ImageStorageService.shared.deleteImages(fileNames: entry.photoLocalIds)
+
+        // 保存新图片
+        let photoFileNames = ImageStorageService.shared.saveImages(images)
+
         try? repository.update(entry) { e in
             e.type = type
             e.detail = detail
@@ -89,7 +106,7 @@ final class DriveLogViewModel: ObservableObject {
             e.cause = type == .mistake ? cause : nil
             e.improvement = type == .mistake ? improvement : nil
             e.tags = tags
-            e.photoLocalIds = photoIds
+            e.photoLocalIds = photoFileNames
             e.audioFileName = audioFileName
             e.transcript = transcript
         }

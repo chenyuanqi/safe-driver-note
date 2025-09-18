@@ -1,4 +1,5 @@
 import SwiftUI
+import PhotosUI
 
 struct LogEditorView: View {
     @Environment(\.dismiss) private var dismiss
@@ -10,8 +11,8 @@ struct LogEditorView: View {
     @State private var cause: String = ""
     @State private var improvement: String = ""
     @State private var tags: String = "" // 逗号或空白分隔
-    // 附件占位（未来接入图片选择与语音录制）
-    @State private var photos: [String] = [] // 临时用本地标识符 / 文件名字符串
+    // 图片附件
+    @State private var selectedImages: [UIImage] = []
     @State private var audioFileName: String? = nil
     @State private var transcript: String? = nil
     
@@ -23,7 +24,7 @@ struct LogEditorView: View {
     @State private var quickInputText: String = ""
 
     let entry: LogEntry?
-    let onSave: (LogType, String, String, String, String?, String?, String, [String], String?, String?) -> Void
+    let onSave: (LogType, String, String, String, String?, String?, String, [UIImage], String?, String?) -> Void
 
     var body: some View {
     NavigationStack {
@@ -58,7 +59,7 @@ struct LogEditorView: View {
            cause.trimmed.emptyToNil,
            improvement.trimmed.emptyToNil,
            tags,
-           photos,
+           selectedImages,
            audioFileName,
            transcript)
         dismiss()
@@ -73,7 +74,8 @@ struct LogEditorView: View {
         cause = e.cause ?? ""
         improvement = e.improvement ?? ""
         tags = e.tags.joined(separator: ", ")
-        photos = e.photoLocalIds
+        // 加载已保存的图片
+        selectedImages = ImageStorageService.shared.loadImages(fileNames: e.photoLocalIds)
         audioFileName = e.audioFileName
         transcript = e.transcript
     }
@@ -160,30 +162,38 @@ struct LogEditorView: View {
 
     @ViewBuilder private var attachmentSection: some View {
         Section {
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("图片：\(photos.count) 张")
-                    Text("语音：\(audioFileName == nil ? "无" : "已录制")")
-                        .foregroundStyle(audioFileName == nil ? .secondary : .primary)
-                    if let t = transcript, !t.isEmpty {
-                        Text("转写预览：" + t.prefix(20) + (t.count > 20 ? "…" : ""))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: Spacing.md) {
+                // 图片选择部分
+                PhotoSelectionView(selectedImages: $selectedImages)
+
+                // 语音部分
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("语音：\(audioFileName == nil ? "未录制" : "已录制")")
+                            .font(.bodyMedium)
+                            .foregroundStyle(audioFileName == nil ? .secondary : .primary)
+                        if let t = transcript, !t.isEmpty {
+                            Text("转写预览：" + t.prefix(30) + (t.count > 30 ? "…" : ""))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
                     }
-                }
-                Spacer()
-                VStack(spacing: 8) {
-                    Button("添加图片占位") { /* TODO: 打开图片选择器 */ }
-                        .buttonStyle(.bordered)
-                    Button("录音占位") { /* TODO: 打开录音 */ }
-                        .buttonStyle(.bordered)
+                    Spacer()
+                    Button("录音") {
+                        // TODO: 打开录音
+                    }
+                    .font(.bodyMedium)
+                    .foregroundColor(.brandPrimary500)
+                    .padding(.horizontal, Spacing.lg)
+                    .padding(.vertical, Spacing.sm)
+                    .background(Color.brandPrimary50)
+                    .cornerRadius(CornerRadius.md)
                 }
             }
-            .font(.subheadline)
         } header: {
-            Text("附件 (占位)")
+            Text("附件")
         } footer: {
-            Text("当前为占位 UI；后续将接入 PHPicker 与语音转写。")
+            Text("最多添加9张图片，每张图片不超过10MB")
         }
     }
 }

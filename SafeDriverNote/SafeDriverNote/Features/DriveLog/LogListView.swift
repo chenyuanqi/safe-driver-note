@@ -115,7 +115,7 @@ struct LogListView: View {
                           cause: cause,
                           improvement: improvement,
                           rawTags: tags,
-                          photoIds: photos,
+                          images: photos,
                           audioFileName: audioFileName,
                           transcript: transcript)
             }
@@ -130,7 +130,7 @@ struct LogListView: View {
                           cause: cause,
                           improvement: improvement,
                           rawTags: tags,
-                          photoIds: photos,
+                          images: photos,
                           audioFileName: audioFileName,
                           transcript: transcript)
             }
@@ -667,11 +667,48 @@ struct LogListView: View {
                         }
                     }
                     
-                    // Attachments
-                    if let attach = vm.attachmentSummary(for: log) {
-                        Text(attach)
-                            .font(.caption)
-                            .foregroundColor(.brandSecondary500)
+                    // Photos
+                    if !log.photoLocalIds.isEmpty {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: Spacing.sm) {
+                                ForEach(Array(log.photoLocalIds.prefix(4)), id: \.self) { fileName in
+                                    if let image = ImageStorageService.shared.loadImage(fileName: fileName) {
+                                        Image(uiImage: image)
+                                            .resizable()
+                                            .scaledToFill()
+                                            .frame(width: 60, height: 60)
+                                            .clipped()
+                                            .cornerRadius(CornerRadius.md)
+                                    }
+                                }
+
+                                // 显示更多图片数量
+                                if log.photoLocalIds.count > 4 {
+                                    ZStack {
+                                        RoundedRectangle(cornerRadius: CornerRadius.md)
+                                            .fill(Color.brandSecondary100)
+                                            .frame(width: 60, height: 60)
+
+                                        Text("+\(log.photoLocalIds.count - 4)")
+                                            .font(.bodyMedium)
+                                            .foregroundColor(.brandSecondary600)
+                                    }
+                                }
+                            }
+                        }
+                        .padding(.vertical, Spacing.xs)
+                    }
+
+                    // Audio Indicator
+                    if log.audioFileName != nil {
+                        HStack(spacing: Spacing.sm) {
+                            Image(systemName: "waveform")
+                                .font(.bodySmall)
+                                .foregroundColor(.brandSecondary500)
+                            Text("语音记录")
+                                .font(.bodySmall)
+                                .foregroundColor(.brandSecondary500)
+                        }
                     }
                     
                     // Tags
