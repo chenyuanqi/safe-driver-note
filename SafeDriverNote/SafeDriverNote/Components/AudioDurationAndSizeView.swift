@@ -39,10 +39,29 @@ struct AudioDurationAndSizeView: View {
     }
     
     private func loadAudioInfo() async {
+        // 添加调试信息
+        print("\n===== AudioDurationAndSizeView - 开始加载音频信息 =====")
+        print("文件名: \(fileName)")
+
+        // 列出所有音频文件
+        AudioStorageService.shared.listAllAudioFiles()
+
+        // 检查文件是否存在
+        if let url = AudioStorageService.shared.getAudioURL(fileName: fileName) {
+            print("音频文件URL: \(url.path)")
+            print("文件存在: \(FileManager.default.fileExists(atPath: url.path))")
+        } else {
+            print("⚠️ 无法获取音频文件URL: \(fileName)")
+        }
+
         async let durationTask = AudioStorageService.shared.getAudioDuration(fileName: fileName)
         let sizeResult = AudioStorageService.shared.getAudioFileSize(fileName: fileName)
 
+        print("获取到的文件大小: \(sizeResult ?? -1) MB")
+
         let durationResult = await durationTask
+        print("获取到的时长: \(durationResult ?? -1) 秒")
+
         await MainActor.run {
             self.duration = durationResult
             self.size = sizeResult

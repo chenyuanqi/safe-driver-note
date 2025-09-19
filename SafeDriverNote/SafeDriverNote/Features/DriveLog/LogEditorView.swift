@@ -17,7 +17,6 @@ struct LogEditorView: View {
     @State private var showingPhotoPicker = false
     // 音频附件
     @State private var audioFileName: String? = nil
-    @State private var selectedAudioURL: URL? = nil
     @State private var showingAudioPicker = false
     @State private var transcript: String? = nil
     
@@ -59,20 +58,7 @@ struct LogEditorView: View {
             )
         }
         .sheet(isPresented: $showingAudioPicker) {
-            AudioFilePickerView(selectedAudioURL: $selectedAudioURL)
-                .onDisappear {
-                    // 当音频选择器关闭时，处理选中的音频
-                    if let url = selectedAudioURL {
-                        // 删除旧的音频文件
-                        if let oldFileName = audioFileName {
-                            AudioStorageService.shared.deleteAudioFile(fileName: oldFileName)
-                        }
-                        // 保存新的音频文件
-                        if let fileName = AudioStorageService.shared.saveAudioFile(from: url) {
-                            audioFileName = fileName
-                        }
-                    }
-                }
+            AudioFilePickerView(audioFileName: $audioFileName)
         }
     }
 
@@ -107,9 +93,6 @@ struct LogEditorView: View {
         selectedImages = ImageStorageService.shared.loadImages(fileNames: e.photoLocalIds)
         // 加载已保存的音频
         audioFileName = e.audioFileName
-        if let fileName = e.audioFileName {
-            selectedAudioURL = AudioStorageService.shared.getAudioURL(fileName: fileName)
-        }
         transcript = e.transcript
     }
 
@@ -261,6 +244,11 @@ struct LogEditorView: View {
                     // 操作按钮
                     HStack(spacing: Spacing.md) {
                         Button(action: {
+                            // 删除旧的音频文件
+                            if let oldFileName = audioFileName {
+                                AudioStorageService.shared.deleteAudioFile(fileName: oldFileName)
+                                audioFileName = nil
+                            }
                             showingAudioPicker = true
                         }) {
                             Label("更换", systemImage: "arrow.triangle.2.circlepath")
@@ -275,7 +263,6 @@ struct LogEditorView: View {
                                 AudioStorageService.shared.deleteAudioFile(fileName: fileName)
                             }
                             audioFileName = nil
-                            selectedAudioURL = nil
                         }) {
                             Label("删除", systemImage: "trash")
                                 .font(.bodySmall)
@@ -296,6 +283,46 @@ struct LogEditorView: View {
         let minutes = Int(duration) / 60
         let seconds = Int(duration) % 60
         return String(format: "%d:%02d", minutes, seconds)
+    }
+
+    private func formatAudioFileName(_ fileName: String) -> String {
+        // 新格式：audio_月日时分秒_随机数.扩展名
+        // 例如：audio_1225143025_8f2a.mp3
+        // 显示为：12月25日 14:30 的录音
+
+        // 尝试解析新格式
+        if fileName.hasPrefix("audio_") {
+            let components = fileName.dropFirst(6).components(separatedBy: "_")
+            if components.count >= 2 {
+                let timestamp = components[0]
+                let ext = fileName.components(separatedBy: ".").last ?? "音频"
+
+                // 尝试格式化时间戳
+                if timestamp.count == 10 {  // MMddHHmmss
+                    let month = String(timestamp.prefix(2))
+                    let day = String(timestamp.dropFirst(2).prefix(2))
+                    let hour = String(timestamp.dropFirst(4).prefix(2))
+                    let minute = String(timestamp.dropFirst(6).prefix(2))
+
+                    if let monthInt = Int(month), let dayInt = Int(day),
+                       let hourInt = Int(hour), let minuteInt = Int(minute) {
+                        return "\(monthInt)月\(dayInt)日 \(String(format: "%02d:%02d", hourInt, minuteInt)) 的\(ext == "mp3" ? "录音" : "音频")"
+                    }
+                }
+            }
+        }
+
+        // 旧格式或无法解析：显示最后一部分
+        if let lastComponent = fileName.components(separatedBy: "_").last {
+            // 如果是 UUID 格式，只显示扩展名部分
+            if lastComponent.count > 20 {
+                return fileName.components(separatedBy: ".").last?.uppercased() ?? "音频文件"
+            }
+            return lastComponent
+        }
+
+        // 默认显示
+        return fileName
     }
 }
 

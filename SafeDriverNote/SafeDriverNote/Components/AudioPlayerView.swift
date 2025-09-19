@@ -13,7 +13,19 @@ class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
     init(fileName: String) {
         self.fileName = fileName
         super.init()
+        setupAudioSession()
         setupAudioPlayer()
+    }
+
+    private func setupAudioSession() {
+        do {
+            // 配置音频会话
+            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
+            try AVAudioSession.sharedInstance().setActive(true)
+            print("音频会话配置成功")
+        } catch {
+            print("音频会话配置失败: \(error)")
+        }
     }
     
     private var audioURL: URL? {
@@ -33,17 +45,29 @@ class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
         }
 
         do {
+            // 获取文件属性，用于调试
+            if let attributes = try? FileManager.default.attributesOfItem(atPath: url.path) {
+                let fileSize = attributes[.size] as? Int64 ?? 0
+                print("音频文件大小: \(fileSize) bytes")
+            }
+
+            // 尝试准备播放器
             audioPlayer = try AVAudioPlayer(contentsOf: url)
             audioPlayer?.delegate = self
+            audioPlayer?.prepareToPlay() // 预加载音频数据
             duration = audioPlayer?.duration ?? 0
-            print("音频播放器初始化成功: \(fileName), 时长: \(duration)")
+            print("音频播放器初始化成功: \(fileName), 时长: \(duration)秒")
         } catch {
-            print("无法初始化音频播放器: \(fileName), 错误: \(error)")
+            print("无法初始化音频播放器: \(fileName)")
+            print("错误详情: \(error.localizedDescription)")
+            print("文件路径: \(url.path)")
 
-            // 如果是文件名编码问题，尝试修复
-            if error.localizedDescription.contains("Cannot Open") {
-                print("检测到文件打开错误，可能是编码问题，尝试修复...")
-                AudioStorageService.shared.fixProblematicAudioFiles()
+            // 尝试使用AVAsset获取时长（作为备用方案）
+            Task { @MainActor in
+                if let duration = await AudioStorageService.shared.getAudioDuration(fileName: fileName) {
+                    self.duration = duration
+                    print("通过AVAsset获取时长成功: \(duration)秒")
+                }
             }
         }
     }
@@ -57,18 +81,34 @@ class AudioPlayerViewModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
     }
     
     private func startPlayback() {
-        guard let player = audioPlayer else { return }
-        
-        player.currentTime = currentTime
-        player.play()
-        isPlaying = true
-        
-        // 启动计时器更新进度
-        timer?.invalidate()
-        timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
-            DispatchQueue.main.async {
-                self.currentTime = player.currentTime
+        guard let player = audioPlayer else {
+            print("音频播放器未初始化，尝试重新初始化")
+            setupAudioPlayer()
+            return
+        }
+
+        do {
+            // 确保音频会话激活
+            try AVAudioSession.sharedInstance().setActive(true)
+
+            player.currentTime = currentTime
+            let success = player.play()
+            if success {
+                isPlaying = true
+                print("开始播放音频")
+
+                // 启动计时器更新进度
+                timer?.invalidate()
+                timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
+                    DispatchQueue.main.async {
+                        self.currentTime = player.currentTime
+                    }
+                }
+            } else {
+                print("播放失败")
             }
+        } catch {
+            print("激活音频会话失败: \(error)")
         }
     }
     
