@@ -751,16 +751,34 @@ struct LogListView: View {
                             Image(systemName: "car.fill")
                                 .font(.body)
                                 .foregroundColor(.brandPrimary500)
-                            
+
                             Text(Self.zhCNFormatter.string(from: route.startTime))
                                 .font(.bodySmall)
                                 .foregroundColor(.brandSecondary500)
                         }
-                        
+
                         Spacer()
-                        
+
                         Text(route.status.displayName)
                             .tagStyle(statusTagType(for: route))
+
+                        // Swipe Actions Menu
+                        Menu {
+                            Button(role: .destructive) {
+                                vm.deleteRoute(route)
+                            } label: {
+                                Label("删除", systemImage: "trash")
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis")
+                                .font(.body)
+                                .foregroundColor(.brandSecondary500)
+                                .frame(width: 32, height: 32)
+                                .background(
+                                    RoundedRectangle(cornerRadius: CornerRadius.md, style: .continuous)
+                                        .fill(Color.clear)
+                                )
+                        }
                     }
                     
                     // Content

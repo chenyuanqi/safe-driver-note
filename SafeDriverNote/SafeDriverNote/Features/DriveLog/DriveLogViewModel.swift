@@ -81,6 +81,19 @@ final class DriveLogViewModel: ObservableObject {
         load()
     }
 
+    func deleteRoute(at offsets: IndexSet) {
+        for index in offsets {
+            let route = routes[index]
+            try? routeRepository.deleteRoute(route)
+        }
+        load()
+    }
+
+    func deleteRoute(_ route: DriveRoute) {
+        try? routeRepository.deleteRoute(route)
+        load()
+    }
+
     func beginEdit(_ entry: LogEntry) { editing = entry }
 
     func update(entry: LogEntry,
