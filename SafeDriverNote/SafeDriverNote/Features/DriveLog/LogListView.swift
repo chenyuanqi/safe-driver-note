@@ -631,17 +631,17 @@ struct LogListView: View {
                         Image(systemName: log.type == .mistake ? "exclamationmark.triangle.fill" : "checkmark.circle.fill")
                             .font(.body)
                             .foregroundColor(log.type == .mistake ? .brandDanger500 : .brandPrimary500)
-                        
+
                         Text(Self.zhCNFormatter.string(from: log.createdAt))
                             .font(.bodySmall)
                             .foregroundColor(.brandSecondary500)
                     }
-                    
+
                     Spacer()
-                    
+
                     Text(log.type == .mistake ? "失误" : "成功")
                         .tagStyle(log.type == .mistake ? .error : .success)
-                    
+
                     // Swipe Actions Menu
                     Menu {
                         Button(role: .destructive) {
@@ -662,7 +662,7 @@ struct LogListView: View {
                             )
                     }
                 }
-                
+
                 // Content
                 VStack(alignment: .leading, spacing: Spacing.md) {
                     Text(cleanTitle(for: log))
@@ -670,19 +670,19 @@ struct LogListView: View {
                         .fontWeight(.medium)
                         .foregroundColor(.brandSecondary900)
                         .multilineTextAlignment(.leading)
-                    
+
                     if !log.locationNote.isEmpty || !log.scene.isEmpty {
                         HStack(spacing: Spacing.sm) {
                             Image(systemName: "location")
                                 .font(.bodySmall)
                                 .foregroundColor(.brandSecondary500)
-                            
+
                             Text("\(log.locationNote)  ·  \(log.scene)")
                                 .font(.bodySmall)
                                 .foregroundColor(.brandSecondary500)
                         }
                     }
-                    
+
                     // Photos
                     if !log.photoLocalIds.isEmpty {
                         ScrollView(.horizontal, showsIndicators: false) {
@@ -717,21 +717,7 @@ struct LogListView: View {
 
                     // Audio Indicator
                     if let audioFileName = log.audioFileName {
-                        HStack(spacing: Spacing.sm) {
-                            Image(systemName: "waveform.circle.fill")
-                                .font(.bodySmall)
-                                .foregroundColor(.brandPrimary500)
-
-                            if let duration = AudioStorageService.shared.getAudioDuration(fileName: audioFileName) {
-                                Text("语音 · \(formatAudioDuration(duration))")
-                                    .font(.bodySmall)
-                                    .foregroundColor(.brandSecondary500)
-                            } else {
-                                Text("语音附件")
-                                    .font(.bodySmall)
-                                    .foregroundColor(.brandSecondary500)
-                            }
-                        }
+                        AudioIndicatorView(audioFileName: audioFileName)
                     }
                     
                     // Tags
@@ -1326,6 +1312,45 @@ struct LogListView: View {
 
         // 添加轻微延迟以提供更好的用户体验
         try? await Task.sleep(nanoseconds: 500_000_000) // 0.5秒
+    }
+}
+
+// MARK: - AudioIndicatorView
+private struct AudioIndicatorView: View {
+    let audioFileName: String
+    @State private var duration: TimeInterval?
+
+    var body: some View {
+        HStack(spacing: Spacing.sm) {
+            Image(systemName: "waveform.circle.fill")
+                .font(.bodySmall)
+                .foregroundColor(.brandPrimary500)
+
+            if let duration = duration {
+                Text("语音 · \(Self.formatAudioDuration(duration))")
+                    .font(.bodySmall)
+                    .foregroundColor(.brandSecondary500)
+            } else {
+                Text("语音附件")
+                    .font(.bodySmall)
+                    .foregroundColor(.brandSecondary500)
+            }
+        }
+        .onAppear {
+            Task {
+                duration = await AudioStorageService.shared.getAudioDuration(fileName: audioFileName)
+            }
+        }
+    }
+
+    private static func formatAudioDuration(_ duration: TimeInterval) -> String {
+        let minutes = Int(duration) / 60
+        let seconds = Int(duration) % 60
+        if minutes > 0 {
+            return String(format: "%d:%02d", minutes, seconds)
+        } else {
+            return "\(seconds)秒"
+        }
     }
 }
 

@@ -248,12 +248,11 @@ struct LogEditorView: View {
                                     .lineLimit(1)
 
                                 // 显示音频时长和大小
-                                if let duration = AudioStorageService.shared.getAudioDuration(fileName: fileName),
-                                   let size = AudioStorageService.shared.getAudioFileSize(fileName: fileName) {
-                                    Text("时长: \(formatDuration(duration)) · 大小: \(String(format: "%.1f", size))MB")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
+                                AudioDurationAndSizeView(fileName: fileName)
+
+                                // 音频播放器
+                                AudioPlayerView(fileName: fileName)
+                                    .padding(.top, Spacing.sm)
                             }
                         }
                         Spacer()

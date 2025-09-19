@@ -1,0 +1,55 @@
+import SwiftUI
+import Foundation
+import AVFoundation
+
+struct AudioDurationAndSizeView: View {
+    let fileName: String
+    @State private var duration: TimeInterval?
+    @State private var size: Double?
+    
+    var body: some View {
+        Text(durationAndSizeText)
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .onAppear {
+                Task {
+                    await loadAudioInfo()
+                }
+            }
+    }
+    
+    private var durationAndSizeText: String {
+        if let duration = duration, let size = size {
+            return "时长: \(formatDuration(duration)) · 大小: \(String(format: "%.1f", size))MB"
+        } else if duration == nil && size == nil {
+            return "正在加载..."
+        } else if let duration = duration {
+            return "时长: \(formatDuration(duration))"
+        } else if let size = size {
+            return "大小: \(String(format: "%.1f", size))MB"
+        } else {
+            return ""
+        }
+    }
+    
+    private func formatDuration(_ duration: TimeInterval) -> String {
+        let minutes = Int(duration) / 60
+        let seconds = Int(duration) % 60
+        return String(format: "%d:%02d", minutes, seconds)
+    }
+    
+    private func loadAudioInfo() async {
+        async let durationTask = AudioStorageService.shared.getAudioDuration(fileName: fileName)
+        let sizeResult = AudioStorageService.shared.getAudioFileSize(fileName: fileName)
+
+        let durationResult = await durationTask
+        await MainActor.run {
+            self.duration = durationResult
+            self.size = sizeResult
+        }
+    }
+}
+
+#Preview {
+    AudioDurationAndSizeView(fileName: "test_audio.m4a")
+}

@@ -32,6 +32,8 @@ struct SafeDriverNoteApp: App {
         GlobalModelContext.container = sharedModelContainer
         // 首次启动播种知识卡
         DataSeeder.seedIfNeeded(context: sharedModelContainer.mainContext)
+        // 修复有问题的音频文件名
+        AudioStorageService.shared.fixProblematicAudioFiles()
     }
 
     var body: some Scene {
