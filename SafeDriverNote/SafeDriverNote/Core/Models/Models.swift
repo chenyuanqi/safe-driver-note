@@ -242,7 +242,7 @@ struct DailyCheckinSummary: Codable {
 struct RouteLocation: Codable {
     let latitude: Double
     let longitude: Double
-    let address: String
+    var address: String
     let timestamp: Date
     
     init(latitude: Double, longitude: Double, address: String, timestamp: Date = .now) {

@@ -390,14 +390,39 @@ struct HomeView: View {
 			// Primary Action - Start/End Driving
 			Button(action: {
 				if driveService.isDriving {
-					// 结束驾驶（带三次失败后手动输入）
+					// 结束驾驶
 					Task {
 						// 获取调试信息
 						debugInfoText = driveService.getDebugInfo()
 
-						// 使用带重试和超时的结束流程
-						await driveService.endDrivingWithRetries(maxAttempts: 3, perAttemptTimeout: 5)
+						// 直接结束驾驶，不等待位置
+						await driveService.endDriving()
 						await vm.loadRecentRoutes()
+
+						// 后台尝试获取终点位置并更新
+						Task.detached { @MainActor in
+							let locationService = LocationService.shared
+							do {
+								if let location = try await locationService.getCurrentLocation(timeout: 3.0) {
+									// 获取最后保存的路线
+									if let routes = try? AppDI.shared.driveRouteRepository.fetchRecentRoutes(limit: 1),
+									   let lastRoute = routes.first {
+										let address = await locationService.getLocationDescription(from: location)
+										let endLocation = RouteLocation(
+											latitude: location.coordinate.latitude,
+											longitude: location.coordinate.longitude,
+											address: address
+										)
+										// 更新路线的终点
+										try? AppDI.shared.driveRouteRepository.updateRoute(lastRoute) { r in
+											r.endLocation = endLocation
+										}
+									}
+								}
+							} catch {
+								print("后台获取终点位置失败: \(error)")
+							}
+						}
 
 						// 显示调试信息弹框
 						showingDebugInfo = true

@@ -1,6 +1,7 @@
 import Foundation
 import CoreLocation
 import Combine
+import UIKit
 
 @MainActor
 class LocationService: NSObject, ObservableObject {
@@ -20,6 +21,15 @@ class LocationService: NSObject, ObservableObject {
     private var locationTimeoutTask: Task<Void, Error>?
     private var isContinuousMode: Bool = false
 
+    // 位置缓存队列，用于弱网/无网环境下的位置记录
+    private var locationCache: [CLLocation] = []
+    private let maxCacheSize = 100 // 最大缓存位置数量
+
+    // 地址缓存，避免重复网络请求
+    private var addressCache: [String: String] = [:] // coordinate -> address
+    private let addressCacheTimeout: TimeInterval = 3600 // 1小时缓存有效期
+    private var addressCacheTimestamps: [String: Date] = [:]
+
     /// 公开属性：是否正在连续定位
     var isContinuousTracking: Bool {
         return isContinuousMode
@@ -37,10 +47,8 @@ class LocationService: NSObject, ObservableObject {
         locationManager.pausesLocationUpdatesAutomatically = false // 防止系统自动暂停
         locationManager.activityType = .automotiveNavigation // 设置为汽车导航类型
 
-        // iOS 11+ 设置在使用和始终使用期间都显示后台位置指示器
-        if #available(iOS 11.0, *) {
-            locationManager.showsBackgroundLocationIndicator = true
-        }
+        // 注意：allowsBackgroundLocationUpdates 只在 startContinuousUpdates 中设置
+        // 避免在初始化时设置导致崩溃
 
         authorizationStatus = locationManager.authorizationStatus
     }
@@ -67,31 +75,39 @@ class LocationService: NSObject, ObservableObject {
         locationManager.distanceFilter = distanceFilter // 使用传入的参数，默认为5米
         locationManager.activityType = .automotiveNavigation // 确保设置为汽车导航类型
 
-        // 仅当 Info.plist 开启了 Background Modes -> location 时，才允许后台定位
-        let backgroundModes = Bundle.main.object(forInfoDictionaryKey: "UIBackgroundModes") as? [String] ?? []
-        let canBackgroundLocation = backgroundModes.contains("location")
-        locationManager.allowsBackgroundLocationUpdates = canBackgroundLocation
-        locationManager.pausesLocationUpdatesAutomatically = false // 确保不会自动暂停
-
-        // 设置后台模式下的精度和距离过滤
-        if canBackgroundLocation {
-            // 后台模式下使用稍低的精度以节省电量，但仍保持轨迹精度
-            locationManager.desiredAccuracy = kCLLocationAccuracyNearestTenMeters
-            locationManager.distanceFilter = 10.0 // 10米更新一次
-        }
-
-        if #available(iOS 11.0, *) {
-            locationManager.showsBackgroundLocationIndicator = canBackgroundLocation
-        }
-
-        // 开始标准位置更新
+        // 先开始定位更新
         locationManager.startUpdatingLocation()
+
+        // 安全地设置后台定位（只在有权限且已经开始定位后设置）
+        if authorizationStatus == .authorizedAlways || authorizationStatus == .authorizedWhenInUse {
+            // 检查是否配置了后台模式
+            let backgroundModes = Bundle.main.object(forInfoDictionaryKey: "UIBackgroundModes") as? [String] ?? []
+            let hasBackgroundLocation = backgroundModes.contains("location")
+
+            if hasBackgroundLocation {
+                // 只在真正需要后台定位且有配置时才设置
+                DispatchQueue.main.async { [weak self] in
+                    self?.locationManager.allowsBackgroundLocationUpdates = true
+                    self?.locationManager.pausesLocationUpdatesAutomatically = false
+
+                    if #available(iOS 11.0, *) {
+                        self?.locationManager.showsBackgroundLocationIndicator = true
+                    }
+                }
+
+                // 后台模式下调整精度以节省电量
+                if UIApplication.shared.applicationState == .background {
+                    locationManager.desiredAccuracy = kCLLocationAccuracyNearestTenMeters
+                    locationManager.distanceFilter = 10.0
+                }
+            }
+        }
 
         // 同时启用显著位置变化监听作为备份（这个在后台也能工作）
         locationManager.startMonitoringSignificantLocationChanges()
 
         isContinuousMode = true
-        print("开始连续定位 - 精度: \(desiredAccuracy), 距离过滤: \(distanceFilter)米, 后台定位: \(canBackgroundLocation)")
+        print("开始连续定位 - 精度: \(desiredAccuracy), 距离过滤: \(distanceFilter)米")
     }
     
     /// 后台连续定位：停止持续更新
@@ -99,12 +115,16 @@ class LocationService: NSObject, ObservableObject {
         locationManager.stopUpdatingLocation()
         locationManager.stopMonitoringSignificantLocationChanges() // 同时停止显著位置变化监听
 
-        if #available(iOS 11.0, *) {
-            locationManager.showsBackgroundLocationIndicator = false
+        // 安全地关闭后台定位
+        DispatchQueue.main.async { [weak self] in
+            if #available(iOS 11.0, *) {
+                self?.locationManager.showsBackgroundLocationIndicator = false
+            }
+            // 恢复为默认（前台）模式
+            self?.locationManager.allowsBackgroundLocationUpdates = false
+            self?.locationManager.pausesLocationUpdatesAutomatically = true
         }
-        // 恢复为默认（前台）模式
-        locationManager.allowsBackgroundLocationUpdates = false
-        locationManager.pausesLocationUpdatesAutomatically = true
+
         isContinuousMode = false
     }
     
@@ -119,7 +139,7 @@ class LocationService: NSObject, ObservableObject {
     /// 获取当前位置（一次性，尽快返回）：
     /// - 优先返回系统缓存的最近位置（若在 staleThreshold 内）
     /// - 否则短暂开启 startUpdatingLocation，加速首次定位
-    func getCurrentLocation(timeout: TimeInterval = 8.0, staleThreshold: TimeInterval = 120.0) async throws -> CLLocation? {
+    func getCurrentLocation(timeout: TimeInterval = 15.0, staleThreshold: TimeInterval = 300.0) async throws -> CLLocation? {
         guard authorizationStatus == .authorizedWhenInUse || authorizationStatus == .authorizedAlways else {
             throw LocationError.permissionDenied
         }
@@ -196,21 +216,79 @@ class LocationService: NSObject, ObservableObject {
         }
     }
     
-    /// 从坐标获取地址描述
+    /// 从坐标获取地址描述（支持缓存和离线降级）
     func getLocationDescription(from location: CLLocation) async -> String {
-        do {
-            let placemarks = try await geocoder.reverseGeocodeLocation(location)
-            guard let placemark = placemarks.first else {
-                return "未知位置"
+        let coordinateKey = "\(location.coordinate.latitude),\(location.coordinate.longitude)"
+
+        // 1. 检查缓存
+        if let cachedAddress = getCachedAddress(for: coordinateKey) {
+            return cachedAddress
+        }
+
+        // 2. 尝试网络请求（带超时）
+        let geocodeTask = Task { () -> String? in
+            do {
+                let placemarks = try await geocoder.reverseGeocodeLocation(location)
+                guard let placemark = placemarks.first else {
+                    return nil
+                }
+
+                await MainActor.run {
+                    self.currentPlacemark = placemark
+                }
+
+                return formatPlacemark(placemark)
+            } catch {
+                return nil
             }
-            
-            await MainActor.run {
-                self.currentPlacemark = placemark
+        }
+
+        // 3. 设置超时（弱网环境下快速降级）
+        let timeoutTask = Task {
+            try? await Task.sleep(nanoseconds: 3_000_000_000) // 3秒超时
+            geocodeTask.cancel()
+        }
+
+        if let address = await geocodeTask.value {
+            timeoutTask.cancel()
+            // 缓存地址
+            cacheAddress(address, for: coordinateKey)
+            return address
+        }
+
+        timeoutTask.cancel()
+
+        // 4. 降级：返回坐标字符串
+        let fallbackAddress = String(format: "%.6f, %.6f", location.coordinate.latitude, location.coordinate.longitude)
+        // 也缓存降级地址，避免重复尝试
+        cacheAddress(fallbackAddress, for: coordinateKey)
+        return fallbackAddress
+    }
+
+    /// 获取缓存的地址
+    private func getCachedAddress(for key: String) -> String? {
+        guard let address = addressCache[key],
+              let timestamp = addressCacheTimestamps[key],
+              Date().timeIntervalSince(timestamp) < addressCacheTimeout else {
+            return nil
+        }
+        return address
+    }
+
+    /// 缓存地址
+    private func cacheAddress(_ address: String, for key: String) {
+        addressCache[key] = address
+        addressCacheTimestamps[key] = Date()
+
+        // 清理过期缓存
+        if addressCache.count > 200 {
+            let now = Date()
+            addressCacheTimestamps = addressCacheTimestamps.filter { _, timestamp in
+                now.timeIntervalSince(timestamp) < addressCacheTimeout
             }
-            
-            return formatPlacemark(placemark)
-        } catch {
-            return "未知位置"
+            addressCache = addressCache.filter { key, _ in
+                addressCacheTimestamps[key] != nil
+            }
         }
     }
     
@@ -266,6 +344,13 @@ extension LocationService: CLLocationManagerDelegate {
         }
         
         currentLocation = location
+
+        // 添加到位置缓存队列
+        locationCache.append(location)
+        if locationCache.count > maxCacheSize {
+            locationCache.removeFirst(locationCache.count - maxCacheSize)
+        }
+
         print("位置更新: (\(location.coordinate.latitude), \(location.coordinate.longitude)), 精度: \(location.horizontalAccuracy)米, 时间: \(location.timestamp)")
 
         // 发布连续定位的更新
