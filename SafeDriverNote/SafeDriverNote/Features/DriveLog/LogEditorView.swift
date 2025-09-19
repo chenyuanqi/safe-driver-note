@@ -1,5 +1,6 @@
 import SwiftUI
 import PhotosUI
+import UIKit
 
 struct LogEditorView: View {
     @Environment(\.dismiss) private var dismiss
@@ -183,8 +184,7 @@ struct LogEditorView: View {
 
     @ViewBuilder private var tagsSection: some View {
         Section {
-            TextField("输入标签，逗号或空格分隔，例如：倒车 立柱 后视镜", text: $tags)
-            TagSuggestionView(currentInput: $tags)
+            EnhancedTagInputView(text: $tags)
         } header: {
             Text("标签")
         } footer: {
