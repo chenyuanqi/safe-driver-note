@@ -8,6 +8,13 @@ struct LogListView: View {
     @State private var showingStats = false
     @State private var showingCalendar = false
     @State private var viewMode: ViewMode = .list
+    @State private var sortOrder: SortOrder = .newest
+
+    enum SortOrder: String, CaseIterable {
+        case newest = "最新优先"
+        case oldest = "最早优先"
+        case byType = "按类型排序"
+    }
 
     enum ViewMode: String, CaseIterable {
         case list = "列表"
@@ -217,9 +224,18 @@ struct LogListView: View {
                 // 只在非行驶记录时显示排序菜单
                 if selectedSegment != .driveRoute {
                     Menu {
-                        Button("最新优先") { /* Handle sort */ }
-                        Button("最早优先") { /* Handle sort */ }
-                        Button("按类型排序") { /* Handle sort */ }
+                        ForEach(SortOrder.allCases, id: \.self) { order in
+                            Button(action: {
+                                sortOrder = order
+                            }) {
+                                HStack {
+                                    Text(order.rawValue)
+                                    if sortOrder == order {
+                                        Image(systemName: "checkmark")
+                                    }
+                                }
+                            }
+                        }
                     } label: {
                         Image(systemName: "line.3.horizontal.decrease.circle")
                             .font(.bodyLarge)
@@ -904,28 +920,74 @@ struct LogListView: View {
 
     private var filteredLogs: [LogEntry] {
         let q = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        if q.isEmpty { return vm.logs }
-        return vm.logs.filter { e in
-            let hay = [e.detail, e.locationNote, e.scene, e.tags.joined(separator: " ")]
-                .joined(separator: " ")
-                .lowercased()
-            return hay.contains(q)
+        var result = vm.logs
+
+        // 搜索过滤
+        if !q.isEmpty {
+            result = result.filter { e in
+                let hay = [e.detail, e.locationNote, e.scene, e.tags.joined(separator: " ")]
+                    .joined(separator: " ")
+                    .lowercased()
+                return hay.contains(q)
+            }
         }
+
+        // 排序
+        switch sortOrder {
+        case .newest:
+            result = result.sorted { $0.createdAt > $1.createdAt }
+        case .oldest:
+            result = result.sorted { $0.createdAt < $1.createdAt }
+        case .byType:
+            result = result.sorted { lhs, rhs in
+                if lhs.type == rhs.type {
+                    return lhs.createdAt > rhs.createdAt
+                }
+                return lhs.type == .mistake && rhs.type == .success
+            }
+        }
+
+        return result
     }
     
     private var filteredRoutes: [DriveRoute] {
         let q = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
 
         // 对于"全部"tab，直接从allRoutes获取数据，否则使用vm.routes
-        let sourcRoutes = (selectedSegment == .all) ? vm.allRoutes : vm.routes
+        let sourceRoutes = (selectedSegment == .all) ? vm.allRoutes : vm.routes
+        var result = sourceRoutes
 
-        if q.isEmpty { return sourcRoutes }
-        return sourcRoutes.filter { route in
-            let startAddr = route.startLocation?.address ?? ""
-            let endAddr = route.endLocation?.address ?? ""
-            let hay = [startAddr, endAddr].joined(separator: " ").lowercased()
-            return hay.contains(q)
+        // 搜索过滤
+        if !q.isEmpty {
+            result = result.filter { route in
+                let startAddr = route.startLocation?.address ?? ""
+                let endAddr = route.endLocation?.address ?? ""
+                let hay = [startAddr, endAddr].joined(separator: " ").lowercased()
+                return hay.contains(q)
+            }
         }
+
+        // 排序（根据日志的排序设置）
+        switch sortOrder {
+        case .newest:
+            result = result.sorted { $0.startTime > $1.startTime }
+        case .oldest:
+            result = result.sorted { $0.startTime < $1.startTime }
+        case .byType:
+            // 行驶记录按状态排序
+            result = result.sorted { lhs, rhs in
+                if lhs.status == rhs.status {
+                    return lhs.startTime > rhs.startTime
+                }
+                // 活动状态优先，然后是完成，最后是取消
+                let statusOrder: [DriveStatus] = [.active, .completed, .cancelled]
+                let lhsIndex = statusOrder.firstIndex(of: lhs.status) ?? 99
+                let rhsIndex = statusOrder.firstIndex(of: rhs.status) ?? 99
+                return lhsIndex < rhsIndex
+            }
+        }
+
+        return result
     }
 
     private var groupedByDay: [(key: String, items: [LogEntry])] {
@@ -934,9 +996,24 @@ struct LogListView: View {
         df.calendar = Calendar(identifier: .gregorian)
         df.dateFormat = "yyyy年M月d日 EEEE"
         let groups = Dictionary(grouping: filteredLogs) { e in df.string(from: e.createdAt) }
-        return groups
-            .map { ($0.key, $0.value.sorted { $0.createdAt > $1.createdAt }) }
-            .sorted { lhs, rhs in lhs.items.first?.createdAt ?? .distantPast > rhs.items.first?.createdAt ?? .distantPast }
+
+        // 按日期分组后，组内已经由filteredLogs的排序决定了顺序
+        // 组之间的排序根据sortOrder
+        switch sortOrder {
+        case .newest:
+            return groups
+                .map { ($0.key, $0.value) }
+                .sorted { lhs, rhs in lhs.items.first?.createdAt ?? .distantPast > rhs.items.first?.createdAt ?? .distantPast }
+        case .oldest:
+            return groups
+                .map { ($0.key, $0.value) }
+                .sorted { lhs, rhs in lhs.items.first?.createdAt ?? .distantPast < rhs.items.first?.createdAt ?? .distantPast }
+        case .byType:
+            // 按类型排序时，日期组依然按最新优先
+            return groups
+                .map { ($0.key, $0.value) }
+                .sorted { lhs, rhs in lhs.items.first?.createdAt ?? .distantPast > rhs.items.first?.createdAt ?? .distantPast }
+        }
     }
     
     private var groupedRoutesByDay: [(key: String, items: [DriveRoute])] {
@@ -945,9 +1022,24 @@ struct LogListView: View {
         df.calendar = Calendar(identifier: .gregorian)
         df.dateFormat = "yyyy年M月d日 EEEE"
         let groups = Dictionary(grouping: filteredRoutes) { route in df.string(from: route.startTime) }
-        return groups
-            .map { ($0.key, $0.value.sorted { $0.startTime > $1.startTime }) }
-            .sorted { lhs, rhs in lhs.items.first?.startTime ?? .distantPast > rhs.items.first?.startTime ?? .distantPast }
+
+        // 组内顺序已由filteredRoutes决定
+        // 组之间的排序根据sortOrder
+        switch sortOrder {
+        case .newest:
+            return groups
+                .map { ($0.key, $0.value) }
+                .sorted { lhs, rhs in lhs.items.first?.startTime ?? .distantPast > rhs.items.first?.startTime ?? .distantPast }
+        case .oldest:
+            return groups
+                .map { ($0.key, $0.value) }
+                .sorted { lhs, rhs in lhs.items.first?.startTime ?? .distantPast < rhs.items.first?.startTime ?? .distantPast }
+        case .byType:
+            // 按类型排序时，日期组依然按最新优先
+            return groups
+                .map { ($0.key, $0.value) }
+                .sorted { lhs, rhs in lhs.items.first?.startTime ?? .distantPast > rhs.items.first?.startTime ?? .distantPast }
+        }
     }
 
     private var combinedGroupedByDay: [(key: String, items: [CombinedItem])] {
@@ -977,11 +1069,49 @@ struct LogListView: View {
             ))
         }
 
+        // 先对组合项目进行排序
+        switch sortOrder {
+        case .newest:
+            combinedItems = combinedItems.sorted { $0.date > $1.date }
+        case .oldest:
+            combinedItems = combinedItems.sorted { $0.date < $1.date }
+        case .byType:
+            combinedItems = combinedItems.sorted { lhs, rhs in
+                // 先按类型分类（日志失误优先、成功次之、路线最后）
+                switch (lhs.type, rhs.type) {
+                case (.log(let l1), .log(let l2)):
+                    if l1.type == l2.type {
+                        return l1.createdAt > l2.createdAt
+                    }
+                    return l1.type == .mistake && l2.type == .success
+                case (.log(_), .route(_)):
+                    return true
+                case (.route(_), .log(_)):
+                    return false
+                case (.route(let r1), .route(let r2)):
+                    return r1.startTime > r2.startTime
+                }
+            }
+        }
+
         // 按日期分组
         let groups = Dictionary(grouping: combinedItems) { item in df.string(from: item.date) }
-        return groups
-            .map { ($0.key, $0.value.sorted { $0.date > $1.date }) }
-            .sorted { lhs, rhs in lhs.items.first?.date ?? .distantPast > rhs.items.first?.date ?? .distantPast }
+
+        // 组之间的排序
+        switch sortOrder {
+        case .newest:
+            return groups
+                .map { ($0.key, $0.value) }
+                .sorted { lhs, rhs in lhs.items.first?.date ?? .distantPast > rhs.items.first?.date ?? .distantPast }
+        case .oldest:
+            return groups
+                .map { ($0.key, $0.value) }
+                .sorted { lhs, rhs in lhs.items.first?.date ?? .distantPast < rhs.items.first?.date ?? .distantPast }
+        case .byType:
+            return groups
+                .map { ($0.key, $0.value) }
+                .sorted { lhs, rhs in lhs.items.first?.date ?? .distantPast > rhs.items.first?.date ?? .distantPast }
+        }
     }
 
     private var list: some View {
