@@ -63,6 +63,7 @@ struct PhotoPickerView: UIViewControllerRepresentable {
 struct PhotoThumbnailView: View {
     let image: UIImage
     let onDelete: () -> Void
+    @State private var showingPreview = false
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
@@ -76,6 +77,9 @@ struct PhotoThumbnailView: View {
                     RoundedRectangle(cornerRadius: CornerRadius.md)
                         .stroke(Color.brandSecondary200, lineWidth: 1)
                 )
+                .onTapGesture {
+                    showingPreview = true
+                }
 
             Button(action: onDelete) {
                 Image(systemName: "xmark.circle.fill")
@@ -86,5 +90,35 @@ struct PhotoThumbnailView: View {
             .offset(x: 8, y: -8)
         }
         .frame(width: 80, height: 80)
+        .sheet(isPresented: $showingPreview) {
+            PhotoPreviewView(image: image)
+        }
+    }
+}
+
+// 图片预览视图
+struct PhotoPreviewView: View {
+    let image: UIImage
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                Color.black.ignoresSafeArea()
+
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFit()
+                    .ignoresSafeArea()
+            }
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("完成") {
+                        dismiss()
+                    }
+                    .foregroundColor(.white)
+                }
+            }
+        }
     }
 }
