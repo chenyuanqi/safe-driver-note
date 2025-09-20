@@ -8,6 +8,15 @@ struct ChecklistPunchDetailView: View {
     @State private var weekStats: Stats = .empty
     @State private var monthStats: Stats = .empty
     @State private var period: Period = .week
+    private let chartPalette: [Color] = [
+        .brandPrimary500,
+        .brandInfo500,
+        .brandWarning500,
+        .brandDanger500,
+        .brandSecondary500,
+        .brandPrimary600,
+        .brandInfo600
+    ]
 
     var body: some View {
         List {
@@ -48,16 +57,30 @@ struct ChecklistPunchDetailView: View {
                 if currentStats.topItems.isEmpty {
                     Text("无数据").foregroundStyle(.secondary)
                 } else {
-                    Chart(currentStats.topItems, id: \.0) { (title, count) in
+                    Chart(currentStats.topItems.enumerated().map { ($0.offset, $0.element.0, $0.element.1) }, id: \.1) { index, title, count in
                         BarMark(
                             x: .value("次数", count),
                             y: .value("项目", title)
                         )
+                        .foregroundStyle(colorForItem(at: index))
+                        .annotation(position: .trailing, alignment: .center) {
+                            Text("\(count)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                     .frame(height: 220)
 
-                    ForEach(currentStats.topItems, id: \.0) { title, count in
-                        HStack { Text(title); Spacer(); Text("\(count) 次").foregroundStyle(.secondary) }
+                    ForEach(Array(currentStats.topItems.enumerated()), id: \.element.0) { index, info in
+                        HStack(spacing: 12) {
+                            Circle()
+                                .fill(colorForItem(at: index))
+                                .frame(width: 10, height: 10)
+                            Text(info.0)
+                            Spacer()
+                            Text("\(info.1) 次")
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
             } footer: {
@@ -98,6 +121,7 @@ struct ChecklistPunchDetailView: View {
         let f = DateFormatter(); f.locale = Locale(identifier: "zh_CN"); f.dateStyle = dateStyle; f.timeStyle = timeStyle
         return f.string(from: date)
     }
+    private func colorForItem(at index: Int) -> Color { chartPalette[index % chartPalette.count] }
 
     struct Stats { let totalPunches: Int; let topItems: [(String, Int)]; static let empty = Stats(totalPunches: 0, topItems: []) }
     enum Period { case week, month }
