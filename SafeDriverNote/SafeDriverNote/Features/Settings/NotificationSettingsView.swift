@@ -1,12 +1,14 @@
 import SwiftUI
 import UserNotifications
 import Foundation
+import UIKit
 
 struct NotificationSettingsView: View {
     @State private var permissionGranted: Bool? = nil
     @State private var isLoading = false
     @State private var notificationHour = 7
     @State private var notificationMinute = 0
+    @State private var notificationsEnabled = true
     
     var body: some View {
         VStack(spacing: Spacing.xl) {
@@ -16,17 +18,17 @@ struct NotificationSettingsView: View {
             Card(shadow: true) {
                 VStack(spacing: Spacing.lg) {
                     HStack {
-                        Image(systemName: permissionGranted == true ? "bell.fill" : "bell.slash.fill")
+                        Image(systemName: isNotificationsActive ? "bell.fill" : "bell.slash.fill")
                             .font(.title2)
-                            .foregroundColor(permissionGranted == true ? .brandPrimary500 : .brandSecondary400)
+                            .foregroundColor(isNotificationsActive ? .brandPrimary500 : .brandSecondary400)
                         
                         VStack(alignment: .leading, spacing: Spacing.xs) {
-                            Text(permissionGranted == true ? "通知已开启" : "通知已关闭")
+                            Text(statusTitle)
                                 .font(.bodyLarge)
                                 .fontWeight(.semibold)
                                 .foregroundColor(.brandSecondary900)
                             
-                            Text(permissionGranted == true ? "您将每天收到安全驾驶提醒" : "您不会收到任何通知")
+                            Text(statusSubtitle)
                                 .font(.bodySmall)
                                 .foregroundColor(.brandSecondary500)
                         }
@@ -39,14 +41,26 @@ struct NotificationSettingsView: View {
                     // 操作按钮
                     Button(action: toggleNotificationPermission) {
                         HStack {
-                            Image(systemName: permissionGranted == true ? "bell.slash" : "bell")
-                            Text(permissionGranted == true ? "关闭通知" : "开启通知")
+                            Image(systemName: isNotificationsActive ? "bell.slash" : "bell")
+                            Text(isNotificationsActive ? "关闭通知" : "开启通知")
                         }
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, Spacing.md)
                     }
                     .primaryStyle()
                     .disabled(isLoading)
+                    
+                    if permissionGranted == false {
+                        Button(action: openSystemSettings) {
+                            HStack {
+                                Image(systemName: "gear")
+                                Text("前往系统设置开启通知")
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, Spacing.md)
+                        }
+                        .secondaryStyle()
+                    }
                 }
                 .padding(Spacing.lg)
             }
@@ -136,6 +150,7 @@ struct NotificationSettingsView: View {
         .navigationTitle("") // 移除导航标题
         .navigationBarTitleDisplayMode(.inline) // 隐藏标题显示
         .onAppear {
+            loadNotificationPreference()
             checkNotificationPermission()
             loadNotificationTime()
         }
@@ -154,6 +169,9 @@ struct NotificationSettingsView: View {
             let status = await UNUserNotificationCenter.current().notificationSettings()
             await MainActor.run {
                 permissionGranted = status.alertSetting == .enabled
+                if status.alertSetting != .enabled {
+                    saveNotificationPreference(false)
+                }
                 isLoading = false
             }
         }
@@ -163,22 +181,29 @@ struct NotificationSettingsView: View {
     private func toggleNotificationPermission() {
         isLoading = true
         Task {
-            if permissionGranted == true {
-                // 关闭通知
+            if isNotificationsActive {
                 await NotificationService.shared.cancelAllNotifications()
                 await MainActor.run {
-                    permissionGranted = false
+                    saveNotificationPreference(false)
                     isLoading = false
                 }
             } else {
-                // 请求权限并开启通知
-                let granted = await NotificationService.shared.requestPermission()
-                if granted {
+                if permissionGranted == true {
                     await NotificationService.shared.scheduleDailyKnowledgeReminder()
-                }
-                await MainActor.run {
-                    permissionGranted = granted
-                    isLoading = false
+                    await MainActor.run {
+                        saveNotificationPreference(true)
+                        isLoading = false
+                    }
+                } else {
+                    let granted = await NotificationService.shared.requestPermission()
+                    if granted {
+                        await NotificationService.shared.scheduleDailyKnowledgeReminder()
+                    }
+                    await MainActor.run {
+                        permissionGranted = granted
+                        saveNotificationPreference(granted)
+                        isLoading = false
+                    }
                 }
             }
         }
@@ -206,11 +231,52 @@ struct NotificationSettingsView: View {
         defaults.set(notificationMinute, forKey: "notificationMinute")
         
         // 如果通知已开启，重新设置通知
-        if permissionGranted == true {
+        if isNotificationsActive {
             Task {
                 await NotificationService.shared.scheduleDailyKnowledgeReminder()
             }
         }
+    }
+    
+    private var isNotificationsActive: Bool {
+        (permissionGranted ?? false) && notificationsEnabled
+    }
+    
+    private var statusTitle: String {
+        if permissionGranted == true {
+            return notificationsEnabled ? "通知已开启" : "通知已暂停"
+        } else if permissionGranted == false {
+            return "通知权限未开启"
+        }
+        return "正在检测通知状态"
+    }
+    
+    private var statusSubtitle: String {
+        if permissionGranted == true {
+            return notificationsEnabled ? "将按设定时间提醒您进行安全驾驶记录" : "您已在应用内关闭提醒，可随时重新开启"
+        } else if permissionGranted == false {
+            return "请前往系统设置 > 通知，允许 SafeDriverNote 推送"
+        }
+        return "..."
+    }
+    
+    private func loadNotificationPreference() {
+        let defaults = UserDefaults.standard
+        if defaults.object(forKey: "notificationsEnabled") == nil {
+            notificationsEnabled = true
+        } else {
+            notificationsEnabled = defaults.bool(forKey: "notificationsEnabled")
+        }
+    }
+    
+    private func saveNotificationPreference(_ enabled: Bool) {
+        notificationsEnabled = enabled
+        UserDefaults.standard.set(enabled, forKey: "notificationsEnabled")
+    }
+    
+    private func openSystemSettings() {
+        guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+        UIApplication.shared.open(url)
     }
 }
 
