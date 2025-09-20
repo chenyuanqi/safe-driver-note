@@ -4,15 +4,23 @@ import SwiftUI
 @MainActor
 final class KnowledgeViewModel: ObservableObject {
     @Published private(set) var today: [KnowledgeCard] = []
+    @Published private(set) var allCards: [KnowledgeCard] = []
     private let repository: KnowledgeRepository
 
     init(repository: KnowledgeRepository) {
         self.repository = repository
         loadToday()
+        loadAllCards()
     }
 
     func loadToday() {
         if let cards = try? repository.todayCards(limit: 3) { today = cards }
+    }
+
+    func loadAllCards() {
+        if let cards = try? repository.allCards() {
+            allCards = cards
+        }
     }
 
     /// 根据卡片标题调整顺序，将指定标题的卡片移到第一位
@@ -48,6 +56,7 @@ final class KnowledgeViewModel: ObservableObject {
         do {
             try await AppDI.shared.knowledgeSyncService.sync()
             loadToday()
+            loadAllCards()
         } catch {
             // 简单忽略错误，实际可加入用户提示
         }

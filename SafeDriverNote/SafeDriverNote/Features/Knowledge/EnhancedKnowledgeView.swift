@@ -56,6 +56,44 @@ struct EnhancedKnowledgeView: View {
             case .experience: return .brandPrimary600
             }
         }
+
+        private var keywords: [String] {
+            switch self {
+            case .all:
+                return []
+            case .traffic:
+                return ["交通", "法规", "路口", "高速", "匝道", "出口", "并道", "限速", "路牌", "让行", "学校", "车距"]
+            case .safety:
+                return ["安全", "雨夜", "雨天", "夜间", "雾天", "雪地", "冰面", "疲劳", "心态", "儿童", "观察", "防滑", "雨", "视线"]
+            case .maintenance:
+                return ["保养", "检查", "机油", "轮胎", "气压", "发动机", "维护", "胎压", "油"]
+            case .emergency:
+                return ["紧急", "爆胎", "刹车", "失灵", "故障", "应急", "危险"]
+            case .experience:
+                return ["技巧", "经验", "驾龄", "心得", "停车", "倒车", "习惯"]
+            }
+        }
+
+        func matches(tags: [String]) -> Bool {
+            guard self != .all else { return true }
+            let lowercasedTags = tags.map { $0.lowercased() }
+            for keyword in keywords {
+                let target = keyword.lowercased()
+                if lowercasedTags.contains(where: { $0.contains(target) }) {
+                    return true
+                }
+            }
+            return false
+        }
+
+        static func category(for tags: [String]) -> KnowledgeCategory {
+            for category in KnowledgeCategory.allCases where category != .all {
+                if category.matches(tags: tags) {
+                    return category
+                }
+            }
+            return .experience
+        }
     }
 
     enum UserLevel: String {
@@ -450,143 +488,212 @@ struct EnhancedKnowledgeView: View {
             // 搜索和筛选
             searchAndFilterBar
 
-            // 分类网格
-            categoryGrid
+            // 类目选择器
+            categorySelectorSection
 
-            // 热门知识列表
-            popularKnowledgeList
+            // 知识卡片列表
+            knowledgeCardList
         }
     }
 
     private var searchAndFilterBar: some View {
-        HStack(spacing: Spacing.md) {
+        HStack {
+            Image(systemName: "magnifyingglass")
+                .foregroundColor(.brandSecondary400)
+
+            TextField("搜索驾驶知识", text: $searchText)
+                .font(.body)
+        }
+        .padding(Spacing.md)
+        .background(Color.white)
+        .cornerRadius(CornerRadius.md)
+    }
+
+    private var categorySelectorSection: some View {
+        VStack(alignment: .leading, spacing: Spacing.sm) {
             HStack {
-                Image(systemName: "magnifyingglass")
-                    .foregroundColor(.brandSecondary400)
-
-                TextField("搜索驾驶知识", text: $searchText)
-                    .font(.body)
-            }
-            .padding(Spacing.md)
-            .background(Color.white)
-            .cornerRadius(CornerRadius.md)
-
-            Menu {
-                ForEach(KnowledgeCategory.allCases, id: \.self) { category in
-                    Button(action: { selectedCategory = category }) {
-                        Label(category.rawValue, systemImage: category.icon)
-                    }
-                }
-            } label: {
-                Image(systemName: "line.3.horizontal.decrease.circle")
-                    .font(.title3)
-                    .foregroundColor(.brandSecondary600)
-                    .frame(width: 44, height: 44)
-                    .background(Color.white)
-                    .cornerRadius(CornerRadius.md)
-            }
-        }
-    }
-
-    private var categoryGrid: some View {
-        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: Spacing.md) {
-            ForEach(KnowledgeCategory.allCases.filter { $0 != .all }, id: \.self) { category in
-                categoryCard(category)
-            }
-        }
-    }
-
-    private func categoryCard(_ category: KnowledgeCategory) -> some View {
-        Button(action: { selectedCategory = category }) {
-            VStack(spacing: Spacing.sm) {
-                Image(systemName: category.icon)
-                    .font(.title2)
-                    .foregroundColor(category.color)
-
-                Text(category.rawValue)
-                    .font(.caption)
-                    .foregroundColor(.brandSecondary700)
-
-                Text("128篇")
-                    .font(.caption2)
-                    .foregroundColor(.brandSecondary500)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, Spacing.md)
-            .background(
-                selectedCategory == category ? category.color.opacity(0.1) : Color.white
-            )
-            .cornerRadius(CornerRadius.md)
-            .overlay(
-                RoundedRectangle(cornerRadius: CornerRadius.md)
-                    .stroke(selectedCategory == category ? category.color : Color.clear, lineWidth: 2)
-            )
-        }
-        .buttonStyle(PlainButtonStyle())
-    }
-
-    private var popularKnowledgeList: some View {
-        VStack(alignment: .leading, spacing: Spacing.md) {
-            HStack {
-                Text("热门知识")
+                Text("知识类目")
                     .font(.bodyLarge)
                     .fontWeight(.semibold)
                     .foregroundColor(.brandSecondary900)
 
                 Spacer()
 
-                Button("查看全部") {
-                    // 查看全部
-                }
-                .font(.body)
-                .foregroundColor(.brandPrimary500)
+                Text("共 \(categoryCounts[.all, default: 0]) 篇")
+                    .font(.caption)
+                    .foregroundColor(.brandSecondary500)
             }
 
-            VStack(spacing: Spacing.md) {
-                ForEach(popularKnowledgeItems, id: \.title) { item in
-                    knowledgeListItem(item)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: Spacing.sm) {
+                    ForEach(KnowledgeCategory.allCases, id: \.self) { category in
+                        categoryPill(for: category)
+                    }
+                }
+                .padding(.vertical, 2)
+            }
+        }
+    }
+
+    private func categoryPill(for category: KnowledgeCategory) -> some View {
+        let isSelected = selectedCategory == category
+        let count = categoryCounts[category, default: 0]
+
+        return Button(action: { selectedCategory = category }) {
+            HStack(spacing: Spacing.xs) {
+                Image(systemName: category.icon)
+                    .font(.caption)
+                Text(category.rawValue)
+                    .font(.caption)
+                Text("\(count)")
+                    .font(.caption2)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(isSelected ? Color.white.opacity(0.2) : Color.white.opacity(0.08))
+                    .cornerRadius(CornerRadius.xs)
+            }
+            .padding(.horizontal, Spacing.sm)
+            .padding(.vertical, 8)
+            .foregroundColor(isSelected ? .white : category.color)
+            .background(
+                Capsule()
+                    .fill(isSelected ? category.color : category.color.opacity(0.12))
+            )
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+
+    private var knowledgeCardList: some View {
+        VStack(alignment: .leading, spacing: Spacing.md) {
+            HStack {
+                Text(selectedCategory == .all ? "全部知识" : selectedCategory.rawValue)
+                    .font(.bodyLarge)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.brandSecondary900)
+
+                Spacer()
+
+                Text("筛选结果 \(filteredKnowledgeCards.count) 篇")
+                    .font(.caption)
+                    .foregroundColor(.brandSecondary500)
+            }
+
+            if filteredKnowledgeCards.isEmpty {
+                VStack(spacing: Spacing.sm) {
+                    Image(systemName: "doc.text.magnifyingglass")
+                        .font(.largeTitle)
+                        .foregroundColor(.brandSecondary300)
+                    Text("没有找到匹配的知识点")
+                        .font(.body)
+                        .foregroundColor(.brandSecondary500)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(Spacing.xl)
+                .background(Color.cardBackground)
+                .cornerRadius(CornerRadius.lg)
+            } else {
+                LazyVStack(spacing: Spacing.md) {
+                    ForEach(filteredKnowledgeCards, id: \.id) { card in
+                        knowledgeCardView(card)
+                    }
                 }
             }
         }
     }
 
-    private func knowledgeListItem(_ item: KnowledgeItem) -> some View {
-        Card(shadow: false) {
-            HStack(spacing: Spacing.md) {
-                // 图标
-                Image(systemName: item.category.icon)
-                    .font(.title2)
-                    .foregroundColor(item.category.color)
-                    .frame(width: 40, height: 40)
-                    .background(item.category.color.opacity(0.1))
-                    .cornerRadius(CornerRadius.sm)
-
-                VStack(alignment: .leading, spacing: Spacing.xs) {
-                    Text(item.title)
+    private func knowledgeCardView(_ card: KnowledgeCard) -> some View {
+        let category = KnowledgeCategory.category(for: card.tags)
+        return Card(backgroundColor: category.color.opacity(0.08), shadow: true) {
+            VStack(alignment: .leading, spacing: Spacing.md) {
+                HStack(alignment: .center, spacing: Spacing.sm) {
+                    Image(systemName: category.icon)
                         .font(.body)
-                        .fontWeight(.medium)
-                        .foregroundColor(.brandSecondary900)
+                        .foregroundColor(category.color)
+                    Text(category.rawValue)
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(category.color)
 
-                    HStack(spacing: Spacing.md) {
-                        Label("\(item.viewCount)", systemImage: "eye")
-                        Label("\(item.likeCount)", systemImage: "heart")
-                        Label("\(item.difficulty)", systemImage: "star")
-                    }
-                    .font(.caption)
-                    .foregroundColor(.brandSecondary500)
+                    Spacer()
                 }
 
-                Spacer()
+                Text(card.title)
+                    .font(.bodyLarge)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.brandSecondary900)
 
-                if item.isCompleted {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.brandPrimary500)
-                } else {
-                    Image(systemName: "chevron.right")
-                        .foregroundColor(.brandSecondary400)
+                if !card.tags.isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: Spacing.xs) {
+                            ForEach(card.tags, id: \.self) { tag in
+                                tagChip(tag, color: category.color)
+                            }
+                        }
+                    }
+                }
+
+                VStack(alignment: .leading, spacing: Spacing.md) {
+                    infoRow(icon: "lightbulb", title: "要点", text: card.what)
+                    infoRow(icon: "questionmark.circle", title: "为什么", text: card.why)
+                    infoRow(icon: "hand.point.right", title: "怎么做", text: card.how)
                 }
             }
         }
+    }
+
+    private func infoRow(icon: String, title: String, text: String) -> some View {
+        VStack(alignment: .leading, spacing: Spacing.xs) {
+            Label(title, systemImage: icon)
+                .font(.caption)
+                .foregroundColor(.brandSecondary500)
+
+            Text(text)
+                .font(.body)
+                .foregroundColor(.brandSecondary700)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private func tagChip(_ tag: String, color: Color) -> some View {
+        Text(tag)
+            .font(.caption2)
+            .foregroundColor(color)
+            .padding(.horizontal, Spacing.sm)
+            .padding(.vertical, 4)
+            .background(color.opacity(0.12))
+            .cornerRadius(CornerRadius.sm)
+    }
+
+    private var categoryCounts: [KnowledgeCategory: Int] {
+        var counts: [KnowledgeCategory: Int] = [:]
+        counts[.all] = vm.allCards.count
+
+        for card in vm.allCards {
+            let category = KnowledgeCategory.category(for: card.tags)
+            counts[category, default: 0] += 1
+        }
+
+        return counts
+    }
+
+    private var filteredKnowledgeCards: [KnowledgeCard] {
+        var cards = vm.allCards
+
+        if selectedCategory != .all {
+            cards = cards.filter { selectedCategory.matches(tags: $0.tags) }
+        }
+
+        let trimmedQuery = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedQuery.isEmpty {
+            let query = trimmedQuery.lowercased()
+            cards = cards.filter { card in
+                card.title.lowercased().contains(query) ||
+                card.what.lowercased().contains(query) ||
+                card.tags.contains(where: { $0.lowercased().contains(query) })
+            }
+        }
+
+        return cards.sorted { $0.title < $1.title }
     }
 
     // MARK: - 实战练习视图
@@ -799,33 +906,6 @@ struct EnhancedKnowledgeView: View {
         )
     ]
 
-    private let popularKnowledgeItems = [
-        KnowledgeItem(
-            title: "新手上高速必知的10个要点",
-            category: .safety,
-            viewCount: 2341,
-            likeCount: 186,
-            difficulty: "初级",
-            isCompleted: true
-        ),
-        KnowledgeItem(
-            title: "自动挡车的正确使用方法",
-            category: .experience,
-            viewCount: 1893,
-            likeCount: 142,
-            difficulty: "初级",
-            isCompleted: false
-        ),
-        KnowledgeItem(
-            title: "事故快速处理流程",
-            category: .emergency,
-            viewCount: 1567,
-            likeCount: 201,
-            difficulty: "中级",
-            isCompleted: false
-        )
-    ]
-
     private let experienceItems = [
         ExperienceItem(
             author: "老王",
@@ -987,15 +1067,6 @@ struct QuickKnowledge {
     let readTime: Int
     let points: Int
     let isNew: Bool
-}
-
-struct KnowledgeItem {
-    let title: String
-    let category: EnhancedKnowledgeView.KnowledgeCategory
-    let viewCount: Int
-    let likeCount: Int
-    let difficulty: String
-    let isCompleted: Bool
 }
 
 struct ExperienceItem {
