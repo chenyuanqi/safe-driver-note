@@ -81,12 +81,15 @@ struct SettingsView: View {
                 clearCache()
             }
         } message: {
-            Text("这将清理应用的临时文件和缓存数据，确定要继续吗？")
+            VStack(alignment: .leading, spacing: Spacing.xs) {
+                Text("这将清理应用的临时文件和缓存数据，确定要继续吗？")
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .alert("清理完成", isPresented: $showingCacheCleared) {
             Button("确定") { }
         } message: {
-            Text("清理完成")
+            Text("临时文件已成功清理")
         }
         .alert("为我们评分", isPresented: $showingRatingAlert) {
             Button("确定") { }
