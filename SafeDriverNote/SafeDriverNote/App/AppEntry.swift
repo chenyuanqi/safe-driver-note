@@ -146,9 +146,11 @@ struct SafeDriverNoteApp: App {
 struct RootTabView: View {
     @EnvironmentObject private var notificationDelegate: NotificationDelegate
     @EnvironmentObject private var themeManager: ThemeManager
+    @State private var showLaunchScreen = true
 
     var body: some View {
-        TabView {
+        ZStack {
+            TabView {
             NavigationStack {
                 HomeView()
             }
@@ -200,6 +202,18 @@ struct RootTabView: View {
             .presentationDragIndicator(.visible)
         }
         .preferredColorScheme(themeManager.colorScheme)
+
+            // 启动动画层
+            if showLaunchScreen {
+                LaunchScreenView(onSkip: {
+                    withAnimation(.easeOut(duration: 0.5)) {
+                        showLaunchScreen = false
+                    }
+                })
+                .transition(.opacity)
+                .zIndex(1)
+            }
+        }
     }
 }
 
