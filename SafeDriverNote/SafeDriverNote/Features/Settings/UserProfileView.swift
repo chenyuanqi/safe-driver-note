@@ -15,6 +15,7 @@ struct UserProfileView: View {
     @State private var vehicleType = "小型汽车"
     @State private var showingImagePicker = false
     @State private var selectedImage: UIImage?
+    @State private var pendingImage: UIImage?
     @State private var avatarImage: Image?
     @State private var showingCropView = false
     @State private var userStats: UserStats?
@@ -96,7 +97,13 @@ struct UserProfileView: View {
                         .fill(Color.brandPrimary100)
                         .frame(width: 100, height: 100)
 
-                    if let avatarImage = avatarImage {
+                    if let image = selectedImage {
+                        Image(uiImage: image)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 100, height: 100)
+                            .clipShape(Circle())
+                    } else if let avatarImage = avatarImage {
                         avatarImage
                             .resizable()
                             .scaledToFill()
@@ -147,6 +154,7 @@ struct UserProfileView: View {
                 Button("删除头像", role: .destructive) {
                     avatarImage = nil
                     selectedImage = nil
+                    pendingImage = nil
                 }
             }
 
@@ -154,13 +162,13 @@ struct UserProfileView: View {
         }
         .sheet(isPresented: $showingImagePicker) {
             if sourceType == .camera {
-                CameraImagePicker(image: $selectedImage, showingCropView: $showingCropView)
+                CameraImagePicker(image: $pendingImage, showingCropView: $showingCropView)
             } else {
-                ImagePicker(image: $selectedImage, showingCropView: $showingCropView)
+                ImagePicker(image: $pendingImage, showingCropView: $showingCropView)
             }
         }
         .sheet(isPresented: $showingCropView) {
-            if let image = selectedImage {
+            if let image = pendingImage {
                 ImageCropView(
                     image: image,
                     croppedImage: $avatarImage,
@@ -168,8 +176,17 @@ struct UserProfileView: View {
                     onComplete: { croppedUIImage in
                         selectedImage = croppedUIImage
                         avatarImage = Image(uiImage: croppedUIImage)
+                        pendingImage = nil
+                    },
+                    onCancel: {
+                        pendingImage = nil
                     }
                 )
+            }
+        }
+        .onChange(of: showingCropView) { isPresented in
+            if !isPresented && pendingImage != nil {
+                pendingImage = nil
             }
         }
     }
@@ -518,6 +535,7 @@ struct UserProfileView: View {
                 await MainActor.run {
                     self.selectedImage = uiImage
                     self.avatarImage = Image(uiImage: uiImage)
+                    self.pendingImage = nil
                 }
             }
         }
@@ -647,6 +665,7 @@ struct ImageCropView: View {
     @Binding var croppedImage: Image?
     @Binding var isPresented: Bool
     var onComplete: ((UIImage) -> Void)?
+    var onCancel: (() -> Void)? = nil
 
     @State private var scale: CGFloat = 1.0
     @State private var lastScale: CGFloat = 1.0
@@ -783,6 +802,7 @@ struct ImageCropView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("取消") {
+                        onCancel?()
                         isPresented = false
                     }
                     .foregroundColor(.white)
