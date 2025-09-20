@@ -47,6 +47,42 @@ struct LaunchScreenView: View {
                 )
 
             VStack(spacing: 50) {
+                // 顶部栏：倒计时和跳过按钮
+                HStack {
+                    // 左侧：倒计时
+                    HStack(spacing: 4) {
+                        Image(systemName: "timer")
+                            .font(.system(size: 12))
+                            .foregroundColor(.white.opacity(0.6))
+
+                        Text("\(countdown)")
+                            .font(.system(size: 16, weight: .semibold, design: .monospaced))
+                            .foregroundColor(.white.opacity(0.8))
+                            .animation(.spring(), value: countdown)
+
+                        Text("秒")
+                            .font(.system(size: 12))
+                            .foregroundColor(.white.opacity(0.6))
+                    }
+
+                    Spacer()
+
+                    // 右侧：跳过按钮（无背景的文本样式）
+                    Button(action: onSkip) {
+                        HStack(spacing: 4) {
+                            Text("跳过")
+                                .font(.system(size: 14))
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 12))
+                        }
+                        .foregroundColor(.white.opacity(0.7))
+                    }
+                    .opacity(showSkipButton ? 1 : 0)
+                    .animation(.easeIn(duration: 0.3), value: showSkipButton)
+                }
+                .padding(.horizontal, 24)
+                .padding(.top, 60)
+
                 Spacer()
 
                 // 警示图标
@@ -119,83 +155,37 @@ struct LaunchScreenView: View {
 
                 Spacer()
 
-                // 倒计时和汽车动画
-                VStack(spacing: 30) {
-                    // 道路和汽车动画
-                    ZStack {
-                        // 道路
-                        RoundedRectangle(cornerRadius: 5)
-                            .fill(Color.gray.opacity(0.3))
-                            .frame(width: 200, height: 10)
+                // 汽车动画
+                ZStack {
+                    // 道路
+                    RoundedRectangle(cornerRadius: 5)
+                        .fill(Color.gray.opacity(0.3))
+                        .frame(width: 250, height: 12)
 
-                        // 中心线
-                        HStack(spacing: 10) {
-                            ForEach(0..<5) { _ in
-                                Rectangle()
-                                    .fill(Color.white.opacity(0.5))
-                                    .frame(width: 30, height: 3)
-                            }
-                        }
-
-                        // 汽车
-                        Image(systemName: "car.side.fill")
-                            .font(.system(size: 30))
-                            .foregroundColor(.white)
-                            .offset(x: isAnimating ? 80 : -80)
-                            .animation(
-                                .easeInOut(duration: 3)
-                                .repeatForever(autoreverses: true),
-                                value: isAnimating
-                            )
-                    }
-                    .opacity(textOpacity)
-                    .animation(.easeOut(duration: 1).delay(1), value: textOpacity)
-
-                    // 倒计时
+                    // 中心线
                     HStack(spacing: 15) {
-                        Image(systemName: "timer")
-                            .foregroundColor(.white.opacity(0.7))
-
-                        Text("\(countdown)")
-                            .font(.system(size: 32, weight: .bold, design: .monospaced))
-                            .foregroundColor(.white)
-                            .animation(.spring(), value: countdown)
-
-                        Text("秒")
-                            .font(.system(size: 18))
-                            .foregroundColor(.white.opacity(0.7))
-                    }
-                    .padding(.horizontal, 30)
-                    .padding(.vertical, 15)
-                    .background(
-                        Capsule()
-                            .fill(Color.white.opacity(0.1))
-                            .overlay(
-                                Capsule()
-                                    .stroke(Color.white.opacity(0.3), lineWidth: 1)
-                            )
-                    )
-
-                    // 跳过按钮
-                    Button(action: onSkip) {
-                        HStack {
-                            Text("跳过")
-                                .font(.system(size: 16, weight: .medium))
-                            Image(systemName: "chevron.right.circle.fill")
-                                .font(.system(size: 16))
+                        ForEach(0..<5) { _ in
+                            Rectangle()
+                                .fill(Color.white.opacity(0.5))
+                                .frame(width: 35, height: 3)
                         }
-                        .foregroundColor(.white.opacity(0.8))
-                        .padding(.horizontal, 20)
-                        .padding(.vertical, 10)
-                        .background(
-                            Capsule()
-                                .stroke(Color.white.opacity(0.3), lineWidth: 1)
-                        )
                     }
-                    .opacity(showSkipButton ? 1 : 0)
-                    .animation(.easeIn(duration: 0.3), value: showSkipButton)
+
+                    // 汽车
+                    Image(systemName: "car.side.fill")
+                        .font(.system(size: 36))
+                        .foregroundColor(.white)
+                        .shadow(color: .black.opacity(0.3), radius: 5, x: 0, y: 2)
+                        .offset(x: isAnimating ? 100 : -100)
+                        .animation(
+                            .easeInOut(duration: 3)
+                            .repeatForever(autoreverses: true),
+                            value: isAnimating
+                        )
                 }
-                .padding(.bottom, 50)
+                .opacity(textOpacity)
+                .animation(.easeOut(duration: 1).delay(1), value: textOpacity)
+                .padding(.bottom, 60)
             }
         }
         .onAppear {

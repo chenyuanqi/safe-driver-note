@@ -78,10 +78,10 @@ final class AudioStorageService {
 
         // 生成更短、更友好的文件名
         // 格式：audio_月日时分秒_随机数.扩展名
-        // 例如：audio_1225143025_8f2a.mp3
+        // 例如：audio_1225143025_8f2a3b5c.mp3
         let fileExtension = url.pathExtension.isEmpty ? "m4a" : url.pathExtension
         let timestamp = DateFormatter.shortAudioFileNameFormatter.string(from: Date())
-        let randomSuffix = String(UUID().uuidString.prefix(4))  // 只取UUID的前4位
+        let randomSuffix = String(UUID().uuidString.prefix(8))  // 取UUID的前8位，确保唯一性
         let safeFileName = "audio_\(timestamp)_\(randomSuffix).\(fileExtension)"
         let destinationURL = audioDirectory.appendingPathComponent(safeFileName)
 

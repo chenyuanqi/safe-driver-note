@@ -287,7 +287,7 @@ struct LogEditorView: View {
 
     private func formatAudioFileName(_ fileName: String) -> String {
         // 新格式：audio_月日时分秒_随机数.扩展名
-        // 例如：audio_1225143025_8f2a.mp3
+        // 例如：audio_1225143025_8f2a3b5c.mp3
         // 显示为：12月25日 14:30 的录音
 
         // 尝试解析新格式
