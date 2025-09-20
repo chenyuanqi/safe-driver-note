@@ -16,8 +16,8 @@ final class SpeechRecognitionService: ObservableObject {
 	private let audioEngine = AVAudioEngine()
 	private var request: SFSpeechAudioBufferRecognitionRequest?
 	private var task: SFSpeechRecognitionTask?
-	private var baseTextAtStart: String = ""
-	private var accumulatedText: String = ""
+	private var initialTranscript: String = ""
+	private var finalizedSegments: [String] = []
 	private var lastUpdateTime = Date()
 	private var silenceTimer: Timer?
 	private var voiceDetectionTimer: Timer? // 新增：语音检测定时器
@@ -47,16 +47,11 @@ final class SpeechRecognitionService: ObservableObject {
 	func start() {
 		guard recognitionAuthorized, micAuthorized, !isRecording else { return }
 		print("Starting recording. Current transcript: '\(transcript)'")
-		
-		// 保存当前 transcript 内容，防止在初始化过程中被清空
-		let savedTranscript = transcript
-		print("Saved transcript: '\(savedTranscript)'")
-		
-		// 记录启动时已有文本，后续快照基于它叠加；同时保存累计文本
-		// 确保 baseTextAtStart 始终包含当前 transcript 内容
-		baseTextAtStart = savedTranscript.isEmpty ? "" : (savedTranscript + " ")
-		accumulatedText = savedTranscript
-		print("Set baseTextAtStart: '\(baseTextAtStart)', accumulatedText: '\(accumulatedText)'")
+
+		let savedTranscript = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+		initialTranscript = savedTranscript
+		finalizedSegments = []
+		print("Saved transcript baseline: '\(savedTranscript)'")
 		
 		let request = SFSpeechAudioBufferRecognitionRequest()
 		request.shouldReportPartialResults = true
@@ -124,7 +119,13 @@ final class SpeechRecognitionService: ObservableObject {
 			self.request?.append(buffer)
 		}
 		audioEngine.prepare()
-		try? audioEngine.start()
+		do {
+			try audioEngine.start()
+		} catch {
+			print("音频引擎启动失败: \(error)")
+			isRecording = false
+			return
+		}
 		isRecording = true
 		task = speechRecognizer?.recognitionTask(with: request) { [weak self] result, error in
 			guard let self = self else { return }
@@ -141,43 +142,16 @@ final class SpeechRecognitionService: ObservableObject {
 				}
 
 				Task { @MainActor in
-					// 保存当前 transcript 内容
-					let previousTranscript = self.transcript
-					print("Previous transcript: '\(previousTranscript)'")
-					
 					if result.isFinal {
-						// 句子完成：累加并更新基线
-						// 只有当快照不为空时才更新 accumulatedText
 						if !snapshot.isEmpty {
-							self.accumulatedText = self.baseTextAtStart + snapshot
-							print("Final result. Base text: '\(self.baseTextAtStart)', snapshot: '\(snapshot)', accumulated: '\(self.accumulatedText)'")
-						} else {
-							// 如果快照为空，保留之前的 accumulatedText
-							print("Final result but empty snapshot. Keeping accumulatedText: '\(self.accumulatedText)'")
+							self.finalizedSegments.append(self.improvePunctuation(snapshot))
 						}
-						
-						// 使用 accumulatedText 更新 transcript
-						if !self.accumulatedText.isEmpty {
-							self.transcript = self.improvePunctuation(self.accumulatedText)
-							self.baseTextAtStart = self.transcript + " "
-							print("Updated transcript to: '\(self.transcript)'")
-						} else {
-							// 如果 accumulatedText 也为空，保留之前的 transcript
-							print("Keeping previous transcript as both snapshot and accumulatedText are empty")
-						}
+						self.transcript = self.combinedTranscript(includePartial: nil)
+						print("Final transcript: \(self.transcript)")
 					} else {
-						// 进行中：显示累计 + 当前快照
-						let newText = self.baseTextAtStart + snapshot
-						print("Partial result. Base text: '\(self.baseTextAtStart)', snapshot: '\(snapshot)', new text: '\(newText)'")
-						
-						// 只有当新文本不为空时才更新 transcript
-						if !newText.isEmpty {
-							self.transcript = self.improvePunctuation(newText)
-							print("Updated transcript to: '\(self.transcript)'")
-						} else {
-							// 如果新文本为空，保留之前的 transcript
-							print("Skipped update - new text is empty, keeping previous transcript: '\(self.transcript)'")
-						}
+						let partial = snapshot.isEmpty ? nil : self.improvePunctuation(snapshot)
+						self.transcript = self.combinedTranscript(includePartial: partial)
+						print("Partial transcript: \(self.transcript)")
 					}
 				}
 			}
@@ -207,39 +181,14 @@ final class SpeechRecognitionService: ObservableObject {
 		task?.cancel()
 		task = nil
 		request = nil
-		try? AVAudioSession.sharedInstance().setActive(false)
-		// 停止后保留 transcript 内容（不清空）
-		// 确保 transcript 内容被保留并优化标点
-		// 保存当前 transcript 内容，以防后续处理中被清空
-		let currentTranscript = transcript
-		print("Stopping recording. Current transcript: '\(currentTranscript)'")
-		
-		// 只有当 transcript 不为空时才更新 accumulatedText
-		if !currentTranscript.isEmpty {
-			accumulatedText = currentTranscript
-			print("Updated accumulatedText: '\(accumulatedText)'")
+		do {
+			try AVAudioSession.sharedInstance().setActive(false)
+		} catch {
+			print("Deactivate session failed: \(error)")
 		}
-		
-		// 对 transcript 进行标点优化，但不改变其内容
-		let improvedTranscript = improvePunctuation(currentTranscript)
-		print("Improved transcript: '\(improvedTranscript)'")
-		
-		// 确保即使优化后的文本也不为空时才更新
-		if !improvedTranscript.isEmpty {
-			transcript = improvedTranscript
-			print("Set transcript to improved version")
-		}
-		// 如果 transcript 为空但 accumulatedText 不为空，恢复 accumulatedText
-		else if currentTranscript.isEmpty && !accumulatedText.isEmpty {
-			transcript = accumulatedText
-			print("Restored transcript from accumulatedText")
-		}
-		// 如果当前 transcript 不为空但优化后为空，保留当前 transcript
-		else if !currentTranscript.isEmpty && improvedTranscript.isEmpty {
-			transcript = currentTranscript
-			print("Kept original transcript as improved version was empty")
-		}
-		
+
+		finalizedSegments = finalizedSegments.filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+		transcript = combinedTranscript(includePartial: nil)
 		print("Final transcript: '\(transcript)'")
 	}
 	
@@ -465,12 +414,27 @@ final class SpeechRecognitionService: ObservableObject {
 		
 		return result
 	}
-	
+
+	private func combinedTranscript(includePartial partial: String?) -> String {
+		var segments: [String] = []
+		let cleanedInitial = initialTranscript.trimmingCharacters(in: .whitespacesAndNewlines)
+		if !cleanedInitial.isEmpty {
+			segments.append(cleanedInitial)
+		}
+		let finalized = finalizedSegments.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
+		segments.append(contentsOf: finalized)
+		if let partial = partial?.trimmingCharacters(in: .whitespacesAndNewlines), !partial.isEmpty {
+			segments.append(partial)
+		}
+		if segments.isEmpty { return "" }
+		return segments.joined(separator: segments.count > 1 ? "\n" : "")
+	}
+
 	// 清空 transcript 内容
 	func clearTranscript() {
 		transcript = ""
-		accumulatedText = ""
-		baseTextAtStart = ""
+		initialTranscript = ""
+		finalizedSegments = []
 		silenceTimer?.invalidate()
 		silenceTimer = nil
 		voiceDetectionTimer?.invalidate()
