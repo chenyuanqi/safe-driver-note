@@ -1,6 +1,8 @@
 import SwiftUI
 import Foundation
 import PhotosUI
+import UniformTypeIdentifiers
+import ImageIO
 
 struct UserProfileView: View {
     @Environment(\.dismiss) private var dismiss
@@ -556,33 +558,50 @@ struct ImagePicker: UIViewControllerRepresentable {
 
             guard let provider = results.first?.itemProvider else { return }
 
-            if provider.canLoadObject(ofClass: UIImage.self) {
-                provider.loadObject(ofClass: UIImage.self) { image, error in
+            let identifier = UTType.image.identifier
+            if provider.hasItemConformingToTypeIdentifier(identifier) {
+                provider.loadDataRepresentation(forTypeIdentifier: identifier) { data, error in
                     if let error = error {
-                        print("Error loading image: \(error)")
+                        print("Error loading image data: \(error)")
                         return
                     }
 
-                    DispatchQueue.main.async {
-                        if let uiImage = image as? UIImage {
-                            // 限制图片大小以提高性能
-                            let maxDimension: CGFloat = 2000
-                            if uiImage.size.width > maxDimension || uiImage.size.height > maxDimension {
-                                let scale = min(maxDimension / uiImage.size.width, maxDimension / uiImage.size.height)
-                                let newSize = CGSize(width: uiImage.size.width * scale, height: uiImage.size.height * scale)
+                    guard let data = data else { return }
 
-                                UIGraphicsBeginImageContextWithOptions(newSize, false, 0.0)
-                                uiImage.draw(in: CGRect(origin: .zero, size: newSize))
-                                self.parent.image = UIGraphicsGetImageFromCurrentImageContext() ?? uiImage
-                                UIGraphicsEndImageContext()
-                            } else {
-                                self.parent.image = uiImage
-                            }
+                    let maxDimension: CGFloat = 1200
+                    let processedImage = self.downscaleImage(data: data, maxDimension: maxDimension)
+
+                    DispatchQueue.main.async {
+                        if let image = processedImage {
+                            self.parent.image = image
                             self.parent.showingCropView = true
                         }
                     }
                 }
             }
+        }
+
+        private func downscaleImage(data: Data, maxDimension: CGFloat) -> UIImage? {
+            let options: [CFString: Any] = [
+                kCGImageSourceShouldCache: false
+            ]
+
+            guard let source = CGImageSourceCreateWithData(data as CFData, options as CFDictionary) else {
+                return UIImage(data: data)
+            }
+
+            let downsampleOptions: [CFString: Any] = [
+                kCGImageSourceCreateThumbnailFromImageAlways: true,
+                kCGImageSourceShouldCacheImmediately: true,
+                kCGImageSourceCreateThumbnailWithTransform: true,
+                kCGImageSourceThumbnailMaxPixelSize: maxDimension
+            ]
+
+            if let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, downsampleOptions as CFDictionary) {
+                return UIImage(cgImage: cgImage)
+            }
+
+            return UIImage(data: data)
         }
     }
 }
@@ -638,7 +657,7 @@ struct ImageCropView: View {
     @State private var lastScale: CGFloat = 1.0
     @State private var offset: CGSize = .zero
     @State private var lastOffset: CGSize = .zero
-    @State private var cropSize: CGFloat = 300
+    @State private var cropDiameter: CGFloat = 260
     @State private var imageSize: CGSize = .zero
 
     var body: some View {
@@ -646,15 +665,15 @@ struct ImageCropView: View {
             GeometryReader { geometry in
                 let availableWidth = geometry.size.width
                 let availableHeight = geometry.size.height
-                let actualCropSize = min(availableWidth - 40, cropSize)
+                let controlsHeight: CGFloat = 180
+                let cropAreaSize = max(180, min(availableWidth - 40, availableHeight - controlsHeight))
+                let circleSize = min(cropAreaSize * 0.85, 220)
+                let cropContainerHeight = max(cropAreaSize, availableHeight - controlsHeight)
 
                 VStack(spacing: 0) {
-                    // 裁剪区域
                     ZStack {
-                        // 背景
                         Color.black
 
-                        // 图片层
                         Image(uiImage: image)
                             .resizable()
                             .aspectRatio(contentMode: .fill)
@@ -665,84 +684,74 @@ struct ImageCropView: View {
                             .scaleEffect(scale)
                             .offset(offset)
                             .onAppear {
-                                setupInitialImageSize(geometry: geometry, cropSize: actualCropSize)
+                                setupInitialImageSize(cropDiameter: circleSize)
+                                scale = 1.0
+                                lastScale = 1.0
+                                offset = .zero
+                                lastOffset = .zero
                             }
                             .gesture(
                                 DragGesture()
                                     .onChanged { value in
-                                        self.offset = CGSize(
+                                        offset = CGSize(
                                             width: lastOffset.width + value.translation.width,
                                             height: lastOffset.height + value.translation.height
                                         )
                                     }
                                     .onEnded { _ in
-                                        self.lastOffset = self.offset
+                                        lastOffset = offset
                                     }
                             )
                             .gesture(
                                 MagnificationGesture()
                                     .onChanged { value in
-                                        let delta = value / self.lastScale
-                                        self.lastScale = value
-                                        self.scale *= delta
+                                        let delta = value / lastScale
+                                        lastScale = value
+                                        scale = max(0.5, min(3.0, scale * delta))
                                     }
                                     .onEnded { _ in
-                                        self.lastScale = 1.0
+                                        lastScale = 1.0
                                     }
                             )
 
-                        // 遮罩层 - 创建圆形窗口效果
-                        GeometryReader { _ in
-                            Rectangle()
-                                .fill(Color.black.opacity(0.6))
-                                .frame(width: availableWidth, height: availableHeight)
-                                .mask(
-                                    ZStack {
-                                        Rectangle()
-                                            .fill(Color.white)
-
-                                        Circle()
-                                            .fill(Color.black)
-                                            .frame(width: actualCropSize, height: actualCropSize)
-                                            .position(x: availableWidth / 2, y: availableHeight / 2)
-                                    }
-                                )
-                                .allowsHitTesting(false)
-                        }
-
-                        // 圆形边框
-                        Circle()
-                            .stroke(Color.white, lineWidth: 2)
-                            .frame(width: actualCropSize, height: actualCropSize)
-                            .position(x: availableWidth / 2, y: availableHeight / 2 - 40)
+                        Color.black.opacity(0.55)
+                            .overlay(
+                                Circle()
+                                    .frame(width: circleSize, height: circleSize)
+                                    .blendMode(.destinationOut)
+                            )
+                            .compositingGroup()
                             .allowsHitTesting(false)
 
-                        // 网格线（可选的辅助线）
+                        Circle()
+                            .stroke(Color.white, lineWidth: 2)
+                            .frame(width: circleSize, height: circleSize)
+                            .allowsHitTesting(false)
+
                         Circle()
                             .stroke(Color.white.opacity(0.3), lineWidth: 0.5)
-                            .frame(width: actualCropSize, height: actualCropSize)
+                            .frame(width: circleSize, height: circleSize)
                             .overlay(
-                                // 十字辅助线
                                 ZStack {
                                     Rectangle()
                                         .fill(Color.white.opacity(0.3))
-                                        .frame(width: 0.5, height: actualCropSize)
+                                        .frame(width: 0.5, height: circleSize)
                                     Rectangle()
                                         .fill(Color.white.opacity(0.3))
-                                        .frame(width: actualCropSize, height: 0.5)
+                                        .frame(width: circleSize, height: 0.5)
                                 }
                             )
-                            .position(x: availableWidth / 2, y: availableHeight / 2 - 40)
                             .allowsHitTesting(false)
                     }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .frame(width: cropAreaSize, height: cropAreaSize)
+                    .frame(maxWidth: .infinity, maxHeight: cropContainerHeight, alignment: .top)
+                    .padding(.top, Spacing.lg)
 
-                    // 缩放控制
                     VStack(spacing: Spacing.lg) {
                         HStack(spacing: Spacing.xl) {
                             Button(action: {
                                 withAnimation {
-                                    scale = max(0.5, scale - 0.1)
+                                    scale = max(0.6, scale - 0.1)
                                 }
                             }) {
                                 Image(systemName: "minus.circle.fill")
@@ -750,7 +759,7 @@ struct ImageCropView: View {
                                     .foregroundColor(.white)
                             }
 
-                            Slider(value: $scale, in: 0.5...3.0)
+                            Slider(value: $scale, in: 0.6...3.0)
                                 .accentColor(.white)
 
                             Button(action: {
@@ -770,7 +779,8 @@ struct ImageCropView: View {
                             .foregroundColor(.white.opacity(0.8))
                     }
                     .padding(.vertical, Spacing.xl)
-                    .background(Color.black.opacity(0.8))
+                    .frame(maxWidth: .infinity)
+                    .background(Color.black.opacity(0.82))
                 }
             }
             .background(Color.black)
@@ -804,7 +814,7 @@ struct ImageCropView: View {
         }
     }
 
-    private func setupInitialImageSize(geometry: GeometryProxy, cropSize: CGFloat) {
+    private func setupInitialImageSize(cropDiameter: CGFloat) {
         let imageAspectRatio = image.size.width / image.size.height
         let cropAspectRatio: CGFloat = 1.0 // 圆形裁剪框是正方形
 
@@ -813,20 +823,21 @@ struct ImageCropView: View {
 
         if imageAspectRatio > cropAspectRatio {
             // 图片比裁剪框更宽，以高度为准
-            height = cropSize
+            height = cropDiameter
             width = height * imageAspectRatio
         } else {
             // 图片比裁剪框更高，以宽度为准
-            width = cropSize
+            width = cropDiameter
             height = width / imageAspectRatio
         }
 
         self.imageSize = CGSize(width: width, height: height)
+        self.cropDiameter = cropDiameter
     }
 
     private func calculateImageSize() -> CGSize {
         if imageSize == .zero {
-            return CGSize(width: 300, height: 300)
+            return CGSize(width: cropDiameter, height: cropDiameter)
         }
         return imageSize
     }
@@ -848,16 +859,17 @@ struct ImageCropView: View {
             // 计算图片在裁剪框中的位置
             let scaledImageSize = CGSize(
                 width: imageSize.width * scale,
-                height: imageSize.height * scale
-            )
+            height: imageSize.height * scale
+        )
 
-            // 计算绘制位置（基于300的裁剪框大小）
-            let scaleFactor = outputSize.width / cropSize
-            let drawX = (outputSize.width - scaledImageSize.width * scaleFactor) / 2 + (offset.width * scaleFactor)
-            let drawY = (outputSize.height - scaledImageSize.height * scaleFactor) / 2 + (offset.height * scaleFactor)
+        // 计算绘制位置（基于300的裁剪框大小）
+        let effectiveDiameter = cropDiameter > 0 ? cropDiameter : 260
+        let scaleFactor = outputSize.width / effectiveDiameter
+        let drawX = (outputSize.width - scaledImageSize.width * scaleFactor) / 2 + (offset.width * scaleFactor)
+        let drawY = (outputSize.height - scaledImageSize.height * scaleFactor) / 2 + (offset.height * scaleFactor)
 
-            // 绘制图像
-            let drawRect = CGRect(
+        // 绘制图像
+        let drawRect = CGRect(
                 x: drawX,
                 y: drawY,
                 width: scaledImageSize.width * scaleFactor,
