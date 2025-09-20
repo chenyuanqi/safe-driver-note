@@ -21,6 +21,7 @@ struct ChecklistView: View {
     @State private var dailySummary: DailyCheckinSummary? = nil
     @State private var showPunchSuccessAlert = false
     @State private var lastPunchScore = 0
+    @Environment(\.colorScheme) private var colorScheme
     
     init(initialMode: ChecklistViewModel.Mode? = nil) {
         self.initialMode = initialMode
@@ -268,9 +269,9 @@ struct ChecklistView: View {
             Divider()
             checklistItemsList
         }
-        .background(Color.white)
+        .background(cardBackgroundColor)
         .cornerRadius(CornerRadius.lg)
-        .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 2)
+        .shadow(color: cardShadowColor, radius: 8, x: 0, y: 2)
     }
 
     private var checklistCardHeader: some View {
@@ -299,7 +300,7 @@ struct ChecklistView: View {
         }
         .padding(.horizontal, Spacing.lg)
         .padding(.vertical, Spacing.md)
-        .background(Color.gray.opacity(0.1))
+        .background(cardHeaderBackgroundColor)
     }
 
     private var checklistItemsList: some View {
@@ -310,6 +311,7 @@ struct ChecklistView: View {
                 if index < min(3, currentModeItems.count - 1) {
                     Divider()
                         .padding(.leading, 48)
+                        .background(Color.separatorColor.opacity(colorScheme == .dark ? 0.4 : 1))
                 }
             }
 
@@ -327,12 +329,12 @@ struct ChecklistView: View {
             HStack(spacing: 12) {
                 ZStack {
                     Circle()
-                        .fill(Color.brandPrimary100)
+                        .fill(circleBackgroundColor)
                         .frame(width: 24, height: 24)
                     Text("\(index + 1)")
                         .font(.caption)
                         .fontWeight(.semibold)
-                        .foregroundColor(.brandPrimary600)
+                        .foregroundColor(circleTextColor)
                 }
 
                 Text(item.title)
@@ -358,15 +360,15 @@ struct ChecklistView: View {
                 Spacer()
                 Text("查看全部 \(currentModeItems.count) 项")
                     .font(.bodySmall)
-                    .foregroundColor(.brandPrimary500)
+                    .foregroundColor(expandButtonForeground)
                 Image(systemName: "chevron.right")
                     .font(.caption)
-                    .foregroundColor(.brandPrimary500)
+                    .foregroundColor(expandButtonForeground)
                 Spacer()
             }
             .padding(.vertical, Spacing.sm)
         }
-        .background(Color.brandPrimary50)
+        .background(expandButtonBackground)
     }
 
     private var managementSectionFooter: some View {
@@ -382,6 +384,34 @@ struct ChecklistView: View {
         .padding(.horizontal, 4)
     }
     
+    private var cardBackgroundColor: Color {
+        Color.cardBackground.opacity(colorScheme == .dark ? 0.9 : 1.0)
+    }
+    
+    private var cardShadowColor: Color {
+        colorScheme == .dark ? Color.black.opacity(0.2) : Color.black.opacity(0.05)
+    }
+    
+    private var cardHeaderBackgroundColor: Color {
+        colorScheme == .dark ? Color.brandSecondary700.opacity(0.45) : Color.brandSecondary100
+    }
+    
+    private var expandButtonBackground: Color {
+        colorScheme == .dark ? Color.brandSecondary700.opacity(0.4) : Color.brandPrimary50
+    }
+    
+    private var expandButtonForeground: Color {
+        colorScheme == .dark ? Color.white.opacity(0.85) : Color.brandPrimary500
+    }
+    
+    private var circleBackgroundColor: Color {
+        colorScheme == .dark ? Color.brandPrimary500.opacity(0.25) : Color.brandPrimary100
+    }
+    
+    private var circleTextColor: Color {
+        colorScheme == .dark ? Color.brandPrimary100 : Color.brandPrimary600
+    }
+
     // 计算属性
     private var currentModeItems: [ChecklistItem] {
         return vm.mode == .pre ? vm.itemsPre : vm.itemsPost
