@@ -1,5 +1,6 @@
 import SwiftUI
 import Foundation
+import UIKit
 
 struct DataExportView: View {
     @Environment(\.dismiss) private var dismiss
@@ -13,6 +14,8 @@ struct DataExportView: View {
     @State private var showingExportComplete = false
     @State private var showingError = false
     @State private var errorMessage = ""
+    @State private var exportedFileURL: URL? = nil
+    @State private var showingShareSheet = false
 
     // 数据统计
     @State private var routeCount = 0
@@ -69,17 +72,32 @@ struct DataExportView: View {
                 loadDataCounts()
             }
             .alert("导出完成", isPresented: $showingExportComplete) {
-                Button("确定") {
+                Button("查看文件") {
                     showingExportComplete = false
-                    dismiss()
+                    if let url = exportedFileURL {
+                        exportedFileURL = url
+                        showingShareSheet = true
+                    }
+                }
+                Button("关闭", role: .cancel) {
+                    showingExportComplete = false
                 }
             } message: {
-                Text("您的数据已成功导出到文件app，可以通过邮件、AirDrop等方式分享。")
+                Text("数据已导出到“文件”App的应用目录。您也可以立即分享或保存到其他位置。")
             }
             .alert("导出失败", isPresented: $showingError) {
                 Button("确定") { }
             } message: {
                 Text(errorMessage)
+            }
+            .sheet(isPresented: $showingShareSheet, onDismiss: {
+                exportedFileURL = nil
+            }) {
+                if let url = exportedFileURL {
+                    ShareSheet(activityItems: [url])
+                } else {
+                    Text("未找到导出文件")
+                }
             }
         }
     }
@@ -340,17 +358,19 @@ struct DataExportView: View {
     private func loadDataCounts() {
         Task {
             do {
-                // 加载各类数据的数量
-                let routes = try di.driveRouteRepository.fetchAllRoutes()
-                let logs = try di.logRepository.fetchAll()
-                let checklists = try di.checklistRepository.fetchAllPunches(mode: nil)
-                let knowledge = try di.knowledgeRepository.allCards()
+                let counts = try await MainActor.run { () -> (Int, Int, Int, Int) in
+                    let routes = try di.driveRouteRepository.fetchAllRoutes()
+                    let logs = try di.logRepository.fetchAll()
+                    let checklists = try di.checklistRepository.fetchAllPunches(mode: nil)
+                    let knowledge = try di.knowledgeRepository.allCards()
+                    return (routes.count, logs.count, checklists.count, knowledge.count)
+                }
 
                 await MainActor.run {
-                    self.routeCount = routes.count
-                    self.logCount = logs.count
-                    self.checklistCount = checklists.count
-                    self.knowledgeCount = knowledge.count
+                    self.routeCount = counts.0
+                    self.logCount = counts.1
+                    self.checklistCount = counts.2
+                    self.knowledgeCount = counts.3
                 }
             } catch {
                 await MainActor.run {
@@ -369,28 +389,28 @@ struct DataExportView: View {
             do {
                 // 1. 收集选中的数据
                 var exportData: [String: Any] = [:]
-                exportData["exportDate"] = Date()
+                exportData["exportDate"] = isoString(from: Date())
                 exportData["appVersion"] = "1.0.0"
 
                 if exportDrivingRoutes {
-                    let routes = try di.driveRouteRepository.fetchAllRoutes()
+                    let routes = try await MainActor.run { try di.driveRouteRepository.fetchAllRoutes() }
                     exportData["drivingRoutes"] = routes.map { route in
                         [
                             "id": route.id.uuidString,
                             "startLocation": route.startLocation?.address ?? "",
                             "endLocation": route.endLocation?.address ?? "",
-                            "startTime": route.startTime,
-                            "endTime": route.endTime as Any,
-                            "distance": route.distance as Any,
-                            "duration": route.duration as Any,
+                            "startTime": isoString(from: route.startTime),
+                            "endTime": route.endTime.map { isoString(from: $0) } ?? "",
+                            "distance": route.distance ?? 0,
+                            "durationSeconds": route.duration ?? 0,
                             "status": route.status.rawValue,
-                            "notes": route.notes as Any
+                            "notes": route.notes ?? ""
                         ]
                     }
                 }
 
                 if exportDrivingLogs {
-                    let logs = try di.logRepository.fetchAll()
+                    let logs = try await MainActor.run { try di.logRepository.fetchAll() }
                     exportData["drivingLogs"] = logs.map { log in
                         [
                             "id": log.id.uuidString,
@@ -398,19 +418,19 @@ struct DataExportView: View {
                             "locationNote": log.locationNote,
                             "scene": log.scene,
                             "detail": log.detail,
-                            "cause": log.cause as Any,
-                            "improvement": log.improvement as Any,
+                            "cause": log.cause ?? "",
+                            "improvement": log.improvement ?? "",
                             "tags": log.tags,
-                            "createdAt": log.createdAt,
+                            "createdAt": isoString(from: log.createdAt),
                             "photoLocalIds": log.photoLocalIds,
-                            "audioFileName": log.audioFileName as Any,
-                            "transcript": log.transcript as Any
+                            "audioFileName": log.audioFileName ?? "",
+                            "transcript": log.transcript ?? ""
                         ]
                     }
                 }
 
                 if exportChecklistRecords {
-                    let records = try di.checklistRepository.fetchAllPunches(mode: nil)
+                    let records = try await MainActor.run { try di.checklistRepository.fetchAllPunches(mode: nil) }
                     exportData["checklistRecords"] = records.map { record in
                         [
                             "id": record.id.uuidString,
@@ -418,15 +438,14 @@ struct DataExportView: View {
                             "checkedItemIds": record.checkedItemIds.map { $0.uuidString },
                             "isQuickComplete": record.isQuickComplete,
                             "score": record.score,
-                            "locationNote": record.locationNote as Any,
-                            "createdAt": record.createdAt
+                            "locationNote": record.locationNote ?? "",
+                            "createdAt": isoString(from: record.createdAt)
                         ]
                     }
                 }
 
                 if exportKnowledgeProgress {
-                    // 由于KnowledgeRepository没有fetchAllProgress方法，我们从所有卡片中获取
-                    let cards = try di.knowledgeRepository.allCards()
+                    let cards = try await MainActor.run { try di.knowledgeRepository.allCards() }
                     exportData["knowledgeProgress"] = cards.map { card in
                         [
                             "id": card.id,
@@ -445,6 +464,7 @@ struct DataExportView: View {
 
                 await MainActor.run {
                     self.isExporting = false
+                    self.exportedFileURL = fileURL
                     self.showingExportComplete = true
                 }
 
@@ -465,20 +485,22 @@ struct DataExportView: View {
         case .json:
             let fileURL = documentsPath.appendingPathComponent("\(fileName).json")
             let jsonData = try JSONSerialization.data(withJSONObject: data, options: .prettyPrinted)
+            try removeExistingFile(at: fileURL)
             try jsonData.write(to: fileURL)
             return fileURL
 
         case .csv:
             let fileURL = documentsPath.appendingPathComponent("\(fileName).csv")
             let csvContent = try generateCSVContent(from: data)
+            try removeExistingFile(at: fileURL)
             try csvContent.write(to: fileURL, atomically: true, encoding: .utf8)
             return fileURL
 
         case .pdf:
             let fileURL = documentsPath.appendingPathComponent("\(fileName).pdf")
-            // 简化版PDF生成 - 实际应用中可以使用更复杂的PDF生成库
             let textContent = generateTextReport(from: data)
-            try textContent.write(to: fileURL.appendingPathExtension("txt"), atomically: true, encoding: .utf8)
+            try removeExistingFile(at: fileURL)
+            try renderPDF(textContent: textContent, to: fileURL)
             return fileURL
         }
     }
@@ -539,13 +561,63 @@ struct DataExportView: View {
         return formatter.string(from: date)
     }
 
-    private func formatDateForCSV(_ dateObj: Any?) -> String {
-        guard let date = dateObj as? Date else { return "" }
+    private func formatDateForCSV(_ value: Any?) -> String {
+        if let string = value as? String {
+            return string
+        }
+        if let date = value as? Date {
+            let formatter = DateFormatter()
+            formatter.locale = Locale(identifier: "zh_CN")
+            formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
+            return formatter.string(from: date)
+        }
+        return ""
+    }
+
+    private func isoString(from date: Date) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "zh_CN")
         formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
         return formatter.string(from: date)
     }
+
+    private func removeExistingFile(at url: URL) throws {
+        if FileManager.default.fileExists(atPath: url.path) {
+            try FileManager.default.removeItem(at: url)
+        }
+    }
+
+    private func renderPDF(textContent: String, to url: URL) throws {
+        let pageRect = CGRect(x: 0, y: 0, width: 595, height: 842)
+        let renderer = UIGraphicsPDFRenderer(bounds: pageRect)
+        try renderer.writePDF(to: url) { context in
+            context.beginPage()
+
+            let paragraphStyle = NSMutableParagraphStyle()
+            paragraphStyle.lineBreakMode = .byWordWrapping
+            paragraphStyle.alignment = .left
+
+            let attributes: [NSAttributedString.Key: Any] = [
+                .font: UIFont.systemFont(ofSize: 14),
+                .paragraphStyle: paragraphStyle
+            ]
+
+            let textRect = pageRect.insetBy(dx: 32, dy: 32)
+            textContent.draw(in: textRect, withAttributes: attributes)
+        }
+    }
+}
+
+// MARK: - Share Sheet
+struct ShareSheet: UIViewControllerRepresentable {
+    let activityItems: [Any]
+    let applicationActivities: [UIActivity]? = nil
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: activityItems, applicationActivities: applicationActivities)
+    }
+
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) { }
 }
 
 #Preview {
