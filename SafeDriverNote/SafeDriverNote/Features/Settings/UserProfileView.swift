@@ -3,6 +3,7 @@ import Foundation
 import PhotosUI
 import UniformTypeIdentifiers
 import ImageIO
+import UIKit
 
 struct UserProfileView: View {
     @Environment(\.dismiss) private var dismiss
@@ -569,39 +570,17 @@ struct ImagePicker: UIViewControllerRepresentable {
                     guard let data = data else { return }
 
                     let maxDimension: CGFloat = 1200
-                    let processedImage = self.downscaleImage(data: data, maxDimension: maxDimension)
+                    let processedImage = downsampleImage(data: data, maxDimension: maxDimension)
 
                     DispatchQueue.main.async {
                         if let image = processedImage {
-                            self.parent.image = image
+                            let finalImage = resizeImageIfNeeded(image, maxDimension: maxDimension)
+                            self.parent.image = finalImage
                             self.parent.showingCropView = true
                         }
                     }
                 }
             }
-        }
-
-        private func downscaleImage(data: Data, maxDimension: CGFloat) -> UIImage? {
-            let options: [CFString: Any] = [
-                kCGImageSourceShouldCache: false
-            ]
-
-            guard let source = CGImageSourceCreateWithData(data as CFData, options as CFDictionary) else {
-                return UIImage(data: data)
-            }
-
-            let downsampleOptions: [CFString: Any] = [
-                kCGImageSourceCreateThumbnailFromImageAlways: true,
-                kCGImageSourceShouldCacheImmediately: true,
-                kCGImageSourceCreateThumbnailWithTransform: true,
-                kCGImageSourceThumbnailMaxPixelSize: maxDimension
-            ]
-
-            if let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, downsampleOptions as CFDictionary) {
-                return UIImage(cgImage: cgImage)
-            }
-
-            return UIImage(data: data)
         }
     }
 }
@@ -634,14 +613,30 @@ struct CameraImagePicker: UIViewControllerRepresentable {
 
         func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
             if let image = info[.originalImage] as? UIImage {
-                parent.image = image
-                parent.showingCropView = true
+                imageProcessingQueue.async {
+                    let maxDimension: CGFloat = 1200
+                    let processedImage: UIImage
+                    if let data = image.jpegData(compressionQuality: 0.9), let downsampled = downsampleImage(data: data, maxDimension: maxDimension) {
+                        processedImage = downsampled
+                    } else {
+                        processedImage = resizeImageIfNeeded(image, maxDimension: maxDimension)
+                    }
+
+                    DispatchQueue.main.async {
+                        self.parent.image = processedImage
+                        self.parent.showingCropView = true
+                    }
+                }
             }
-            parent.dismiss()
+            DispatchQueue.main.async {
+                self.parent.dismiss()
+            }
         }
 
         func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
-            parent.dismiss()
+            DispatchQueue.main.async {
+                self.parent.dismiss()
+            }
         }
     }
 }
@@ -882,6 +877,45 @@ struct ImageCropView: View {
         return croppedUIImage
     }
 }
+
+private func resizeImageIfNeeded(_ image: UIImage, maxDimension: CGFloat = 1200) -> UIImage {
+    let maxSide = max(image.size.width, image.size.height)
+    guard maxSide > maxDimension else { return image }
+
+    let scale = maxDimension / maxSide
+    let newSize = CGSize(width: image.size.width * scale, height: image.size.height * scale)
+    let renderer = UIGraphicsImageRenderer(size: newSize)
+    return renderer.image { _ in
+        image.draw(in: CGRect(origin: .zero, size: newSize))
+    }
+}
+
+private func downsampleImage(data: Data, maxDimension: CGFloat) -> UIImage? {
+    autoreleasepool {
+        let options: [CFString: Any] = [
+            kCGImageSourceShouldCache: false
+        ]
+
+        guard let source = CGImageSourceCreateWithData(data as CFData, options as CFDictionary) else {
+            return UIImage(data: data)
+        }
+
+        let downsampleOptions: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceShouldCacheImmediately: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceThumbnailMaxPixelSize: maxDimension
+        ]
+
+        if let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, downsampleOptions as CFDictionary) {
+            return UIImage(cgImage: cgImage)
+        }
+
+        return UIImage(data: data)
+    }
+}
+
+private let imageProcessingQueue = DispatchQueue(label: "com.safedrivernote.imageProcessing", qos: .userInitiated)
 
 #Preview {
     UserProfileView()

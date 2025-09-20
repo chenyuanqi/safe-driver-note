@@ -403,6 +403,8 @@
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "为保证行程记录的完整性，我们会在后台持续记录行驶路线位置。";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "我们需要位置权限来为您的驾驶日志和打卡记录自动标记地点，帮助您更好地记录驾驶经历。";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "用于语音记录与语音识别，帮助您快速添加日志。";
+				INFOPLIST_KEY_NSCameraUsageDescription = "更换头像时需要使用摄像头拍照。";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "用于选择或更新您的头像照片。";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "用于将您的语音转换为文本，便于AI整理日志内容。";
 				INFOPLIST_KEY_UIBackgroundModes = location;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -436,6 +438,8 @@
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "为保证行程记录的完整性，我们会在后台持续记录行驶路线位置。";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "我们需要位置权限来为您的驾驶日志和打卡记录自动标记地点，帮助您更好地记录驾驶经历。";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "用于语音记录与语音识别，帮助您快速添加日志。";
+				INFOPLIST_KEY_NSCameraUsageDescription = "更换头像时需要使用摄像头拍照。";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "用于选择或更新您的头像照片。";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "用于将您的语音转换为文本，便于AI整理日志内容。";
 				INFOPLIST_KEY_UIBackgroundModes = location;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
