@@ -4,7 +4,8 @@ import MapKit
 struct DriveRouteDetailView: View {
     let route: DriveRoute
     @EnvironmentObject private var di: AppDI
-    
+    @State private var showFullScreenMap = false
+
     var body: some View {
         ScrollView {
             VStack(spacing: Spacing.lg) {
@@ -178,20 +179,54 @@ struct DriveRouteDetailView: View {
                     Image(systemName: "map")
                         .font(.title3)
                         .foregroundColor(Color.brandPrimary500)
-                    
+
                     Text("路线地图")
                         .font(.headline)
                         .fontWeight(.semibold)
                         .foregroundColor(Color.brandSecondary900)
-                    
+
                     Spacer()
+
+                    // 全屏按钮
+                    Button(action: {
+                        showFullScreenMap = true
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "arrow.up.left.and.arrow.down.right")
+                                .font(.caption)
+                            Text("全屏")
+                                .font(.caption)
+                        }
+                        .foregroundColor(Color.brandPrimary500)
+                    }
                 }
-                
-                // 地图视图
+
+                // 地图视图 - 可点击放大
                 RouteMapView(route: route)
                     .frame(height: 200)
                     .clipShape(RoundedRectangle(cornerRadius: CornerRadius.lg, style: .continuous))
+                    .onTapGesture {
+                        showFullScreenMap = true
+                    }
+                    .overlay(
+                        // 点击提示图标
+                        VStack {
+                            Spacer()
+                            HStack {
+                                Spacer()
+                                Image(systemName: "hand.tap.fill")
+                                    .foregroundColor(.white)
+                                    .padding(8)
+                                    .background(Color.black.opacity(0.5))
+                                    .clipShape(Circle())
+                                    .padding(8)
+                            }
+                        }
+                    )
             }
+        }
+        .fullScreenCover(isPresented: $showFullScreenMap) {
+            FullScreenMapView(route: route, isPresented: $showFullScreenMap)
         }
     }
     
@@ -468,6 +503,344 @@ struct RouteMapView: View {
         )
         
         cameraPosition = .region(region)
+    }
+}
+
+// MARK: - Full Screen Map View
+struct FullScreenMapView: View {
+    let route: DriveRoute
+    @Binding var isPresented: Bool
+    @State private var cameraPosition: MapCameraPosition = .automatic
+    @State private var selectedMapStyle: Int = 0 // 0: standard, 1: imagery, 2: hybrid
+    @State private var showDetails = true
+
+    private var currentMapStyle: MapStyle {
+        switch selectedMapStyle {
+        case 1:
+            return .imagery
+        case 2:
+            return .hybrid
+        default:
+            return .standard
+        }
+    }
+
+    var body: some View {
+        ZStack {
+            // 全屏地图
+            Map(position: $cameraPosition) {
+                Group {
+                    // 添加起始位置标记
+                    if let startLocation = route.startLocation {
+                        Annotation("出发地", coordinate: CLLocationCoordinate2D(latitude: startLocation.latitude, longitude: startLocation.longitude)) {
+                            VStack(spacing: 4) {
+                                Image(systemName: "location.circle.fill")
+                                    .font(.title2)
+                                    .foregroundColor(Color.brandPrimary500)
+                                    .background(Circle().fill(Color.white).frame(width: 28, height: 28))
+                                Text("起点")
+                                    .font(.caption2)
+                                    .fontWeight(.semibold)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(Color.brandPrimary500)
+                                    .foregroundColor(.white)
+                                    .clipShape(Capsule())
+                            }
+                        }
+                    }
+
+                    // 添加结束位置标记
+                    if let endLocation = route.endLocation {
+                        Annotation("到达地", coordinate: CLLocationCoordinate2D(latitude: endLocation.latitude, longitude: endLocation.longitude)) {
+                            VStack(spacing: 4) {
+                                Image(systemName: "flag.circle.fill")
+                                    .font(.title2)
+                                    .foregroundColor(Color.brandDanger500)
+                                    .background(Circle().fill(Color.white).frame(width: 28, height: 28))
+                                Text("终点")
+                                    .font(.caption2)
+                                    .fontWeight(.semibold)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(Color.brandDanger500)
+                                    .foregroundColor(.white)
+                                    .clipShape(Capsule())
+                            }
+                        }
+                    }
+
+                    // 添加路线
+                    if let waypoints = route.waypoints, !waypoints.isEmpty {
+                        let coordinates = createCoordinatesWithWaypoints(waypoints)
+                        MapPolyline(coordinates: coordinates)
+                            .stroke(Color.brandPrimary500, style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round))
+                    } else if let startLocation = route.startLocation, let endLocation = route.endLocation {
+                        MapPolyline(coordinates: [
+                            CLLocationCoordinate2D(latitude: startLocation.latitude, longitude: startLocation.longitude),
+                            CLLocationCoordinate2D(latitude: endLocation.latitude, longitude: endLocation.longitude)
+                        ])
+                        .stroke(Color.brandPrimary500, style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round))
+                    }
+                }
+            }
+            .mapStyle(currentMapStyle)
+            .ignoresSafeArea()
+            .onAppear {
+                updateCameraPosition()
+            }
+
+            // 顶部控制栏
+            VStack {
+                HStack {
+                    // 关闭按钮
+                    Button(action: { isPresented = false }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.title)
+                            .foregroundColor(Color.brandSecondary700)
+                            .background(Circle().fill(Color.white))
+                    }
+                    .padding()
+
+                    Spacer()
+
+                    // 地图样式切换
+                    HStack(spacing: 12) {
+                        Button(action: { selectedMapStyle = 0 }) {
+                            Image(systemName: "map")
+                                .padding(8)
+                                .background(selectedMapStyle == 0 ? Color.brandPrimary500 : Color.white)
+                                .foregroundColor(selectedMapStyle == 0 ? .white : Color.brandSecondary700)
+                                .clipShape(Circle())
+                        }
+
+                        Button(action: { selectedMapStyle = 1 }) {
+                            Image(systemName: "globe.americas")
+                                .padding(8)
+                                .background(selectedMapStyle == 1 ? Color.brandPrimary500 : Color.white)
+                                .foregroundColor(selectedMapStyle == 1 ? .white : Color.brandSecondary700)
+                                .clipShape(Circle())
+                        }
+
+                        Button(action: { selectedMapStyle = 2 }) {
+                            Image(systemName: "map.fill")
+                                .padding(8)
+                                .background(selectedMapStyle == 2 ? Color.brandPrimary500 : Color.white)
+                                .foregroundColor(selectedMapStyle == 2 ? .white : Color.brandSecondary700)
+                                .clipShape(Circle())
+                        }
+                    }
+                    .padding()
+                }
+
+                Spacer()
+
+                // 底部信息面板
+                if showDetails {
+                    VStack(alignment: .leading, spacing: 12) {
+                        // 拖动指示器
+                        HStack {
+                            Spacer()
+                            Capsule()
+                                .fill(Color.brandSecondary300)
+                                .frame(width: 40, height: 4)
+                            Spacer()
+                        }
+                        .padding(.top, 8)
+
+                        // 路线信息
+                        HStack {
+                            VStack(alignment: .leading) {
+                                Text("驾驶路线")
+                                    .font(.headline)
+                                    .fontWeight(.semibold)
+                                Text(formatRouteTitle())
+                                    .font(.caption)
+                                    .foregroundColor(Color.brandSecondary600)
+                                    .lineLimit(2)
+                            }
+
+                            Spacer()
+
+                            // 隐藏按钮
+                            Button(action: {
+                                withAnimation(.spring()) {
+                                    showDetails = false
+                                }
+                            }) {
+                                Image(systemName: "chevron.down.circle")
+                                    .foregroundColor(Color.brandSecondary500)
+                            }
+                        }
+
+                        // 统计信息
+                        HStack(spacing: 32) {
+                            if let duration = route.duration {
+                                VStack(alignment: .leading) {
+                                    Text("时长")
+                                        .font(.caption)
+                                        .foregroundColor(Color.brandSecondary500)
+                                    Text(formatDuration(duration))
+                                        .font(.body)
+                                        .fontWeight(.semibold)
+                                }
+                            }
+
+                            if let distance = route.distance {
+                                VStack(alignment: .leading) {
+                                    Text("距离")
+                                        .font(.caption)
+                                        .foregroundColor(Color.brandSecondary500)
+                                    Text(formatDistance(distance))
+                                        .font(.body)
+                                        .fontWeight(.semibold)
+                                }
+                            }
+
+                            VStack(alignment: .leading) {
+                                Text("状态")
+                                    .font(.caption)
+                                    .foregroundColor(Color.brandSecondary500)
+                                Text(route.status.displayName)
+                                    .font(.body)
+                                    .fontWeight(.semibold)
+                            }
+                        }
+                    }
+                    .padding()
+                    .background(Color.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                    .shadow(radius: 10)
+                    .padding()
+                    .transition(.move(edge: .bottom))
+                }
+
+                // 显示详情按钮（当隐藏时）
+                if !showDetails {
+                    Button(action: {
+                        withAnimation(.spring()) {
+                            showDetails = true
+                        }
+                    }) {
+                        Image(systemName: "info.circle.fill")
+                            .font(.title2)
+                            .foregroundColor(Color.brandPrimary500)
+                            .background(Circle().fill(Color.white))
+                            .padding()
+                    }
+                }
+            }
+        }
+        .preferredColorScheme(.light)
+    }
+
+    // 辅助方法
+    private func createCoordinatesWithWaypoints(_ waypoints: [RouteLocation]) -> [CLLocationCoordinate2D] {
+        var coordinates: [CLLocationCoordinate2D] = []
+
+        if let startLocation = route.startLocation {
+            coordinates.append(CLLocationCoordinate2D(
+                latitude: startLocation.latitude,
+                longitude: startLocation.longitude
+            ))
+        }
+
+        for waypoint in waypoints {
+            coordinates.append(CLLocationCoordinate2D(
+                latitude: waypoint.latitude,
+                longitude: waypoint.longitude
+            ))
+        }
+
+        if let endLocation = route.endLocation {
+            coordinates.append(CLLocationCoordinate2D(
+                latitude: endLocation.latitude,
+                longitude: endLocation.longitude
+            ))
+        }
+
+        return coordinates
+    }
+
+    private func updateCameraPosition() {
+        var coordinates: [CLLocationCoordinate2D] = []
+
+        if let startLocation = route.startLocation {
+            coordinates.append(CLLocationCoordinate2D(latitude: startLocation.latitude, longitude: startLocation.longitude))
+        }
+
+        if let waypoints = route.waypoints, !waypoints.isEmpty {
+            for waypoint in waypoints {
+                coordinates.append(CLLocationCoordinate2D(latitude: waypoint.latitude, longitude: waypoint.longitude))
+            }
+        }
+
+        if let endLocation = route.endLocation {
+            coordinates.append(CLLocationCoordinate2D(latitude: endLocation.latitude, longitude: endLocation.longitude))
+        }
+
+        guard !coordinates.isEmpty else { return }
+
+        var minLat = coordinates[0].latitude
+        var maxLat = coordinates[0].latitude
+        var minLon = coordinates[0].longitude
+        var maxLon = coordinates[0].longitude
+
+        for coordinate in coordinates {
+            minLat = min(minLat, coordinate.latitude)
+            maxLat = max(maxLat, coordinate.latitude)
+            minLon = min(minLon, coordinate.longitude)
+            maxLon = max(maxLon, coordinate.longitude)
+        }
+
+        let centerLat = (minLat + maxLat) / 2
+        let centerLon = (minLon + maxLon) / 2
+
+        let latDelta = max(maxLat - minLat, 0.01)
+        let lonDelta = max(maxLon - minLon, 0.01)
+
+        let span = MKCoordinateSpan(
+            latitudeDelta: latDelta * 1.3,
+            longitudeDelta: lonDelta * 1.3
+        )
+
+        let region = MKCoordinateRegion(
+            center: CLLocationCoordinate2D(latitude: centerLat, longitude: centerLon),
+            span: span
+        )
+
+        cameraPosition = .region(region)
+    }
+
+    private func formatRouteTitle() -> String {
+        if let start = route.startLocation?.address, let end = route.endLocation?.address {
+            return "\(start) → \(end)"
+        } else if let start = route.startLocation?.address {
+            return "从 \(start) 出发"
+        } else if let end = route.endLocation?.address {
+            return "抵达 \(end)"
+        } else {
+            return "驾驶记录"
+        }
+    }
+
+    private func formatDuration(_ duration: TimeInterval) -> String {
+        let hours = Int(duration) / 3600
+        let minutes = (Int(duration) % 3600) / 60
+
+        if hours > 0 {
+            return "\(hours)小时\(minutes)分钟"
+        } else {
+            return "\(minutes)分钟"
+        }
+    }
+
+    private func formatDistance(_ distance: Double) -> String {
+        if distance >= 1000 {
+            return String(format: "%.1f公里", distance / 1000)
+        } else {
+            return String(format: "%.0f米", distance)
+        }
     }
 }
 
