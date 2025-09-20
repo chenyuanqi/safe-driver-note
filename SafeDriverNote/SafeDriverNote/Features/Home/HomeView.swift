@@ -322,7 +322,7 @@ struct HomeView: View {
 				) {
 					// 安全评分说明
 					statusExplanationTitle = "安全评分"
-					statusExplanationContent = "基于您本月的驾驶记录计算得出。满分100分，每有一次失误记录会扣减相应分数。持续保持良好的驾驶习惯可以提高安全评分。"
+					statusExplanationContent = "安全评分基于您近期的驾驶表现自动计算，范围 0-100 分。\n\n计算规则：\n• 初始基础分 50 分\n• 每条成功驾驶日志 +5 分\n• 每条失误驾驶日志 -3 分\n• 每次检查打卡得分按 10:1 折算后加入（如打卡 80 分即 +8 分）\n• 每条完成的驾驶路线 +2 分\n• 最终结果会限制在 0-100 分之间\n\n坚持完成检查、减少失误，分数就会持续提升。"
 					showingStatusExplanation = true
 				}
 				
@@ -979,6 +979,7 @@ final class HomeViewModel: ObservableObject {
     @Published private(set) var todayKnowledgeCards: [KnowledgeCardData] = []
     @Published private(set) var todayKnowledgeCompleted: Bool = false
     @Published private(set) var todayLearnedCount: Int = 0  // 今天已学习的卡片数量
+    @Published private(set) var userStats: UserStats? = nil
         
     init() { reload() }
     
@@ -1001,6 +1002,10 @@ final class HomeViewModel: ObservableObject {
         
         // Load recent activities (combine logs and routes)
         updateRecentActivities()
+
+        if let stats = try? AppDI.shared.userProfileRepository.calculateUserStats() {
+            self.userStats = stats
+        }
     }
     
     func loadRecentRoutes() async {
@@ -1167,12 +1172,18 @@ final class HomeViewModel: ObservableObject {
 	
 	// MARK: - New Properties for Redesign
 	var safetyScore: String {
+		if let stats = userStats {
+			return "\(stats.safetyScore)分"
+		}
 		guard monthTotal > 0 else { return "--" }
 		let score = max(60, min(100, 100 - (monthMistakes * 10)))
 		return "\(score)分"
 	}
 	
 	var consecutiveDays: Int {
+		if let stats = userStats {
+			return stats.currentStreakDays
+		}
 		// Calculate consecutive days with records
 		let calendar = Calendar.current
 		let today = Date()
