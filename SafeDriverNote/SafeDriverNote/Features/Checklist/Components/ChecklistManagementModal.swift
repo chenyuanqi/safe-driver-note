@@ -15,6 +15,8 @@ struct ChecklistManagementModal: View {
     @State private var showingEditForm = false
     @State private var showingDeleteAlert = false
     @State private var itemToDelete: ChecklistItem?
+    private let initialItemToEdit: ChecklistItem?
+    @State private var hasShownInitialEdit = false
     
     let onSave: ([ChecklistItem]) -> Void
     
@@ -22,11 +24,13 @@ struct ChecklistManagementModal: View {
         isPresented: Binding<Bool>,
         mode: ChecklistViewModel.Mode,
         items: [ChecklistItem],
+        itemToEdit: ChecklistItem? = nil,
         onSave: @escaping ([ChecklistItem]) -> Void
     ) {
         self._isPresented = isPresented
         self.mode = mode
         self._items = State(initialValue: items.sorted { ($0.sortOrder ?? 0) < ($1.sortOrder ?? 0) })
+        self.initialItemToEdit = itemToEdit
         self.onSave = onSave
     }
     
@@ -75,8 +79,11 @@ struct ChecklistManagementModal: View {
         } message: {
             Text("确定要删除这个检查项吗？此操作无法撤销。")
         }
+        .onAppear {
+            triggerInitialEditIfNeeded()
+        }
     }
-    
+
     private var headerSection: some View {
         VStack(spacing: Spacing.lg) {
             HStack {
@@ -288,6 +295,18 @@ struct ChecklistManagementModal: View {
         editingDescription = item.itemDescription ?? ""
         editingPriority = item.priority
         showingEditForm = true
+    }
+
+    private func triggerInitialEditIfNeeded() {
+        guard !hasShownInitialEdit else { return }
+        guard let targetItem = initialItemToEdit else { return }
+        hasShownInitialEdit = true
+
+        if let match = items.first(where: { $0.id == targetItem.id }) {
+            editItem(match)
+        } else {
+            editItem(targetItem)
+        }
     }
     
     private func saveItem(isEditing: Bool) {

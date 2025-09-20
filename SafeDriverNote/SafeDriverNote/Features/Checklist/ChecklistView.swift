@@ -6,7 +6,7 @@ struct ChecklistView: View {
     @StateObject private var vm: ChecklistViewModel
     @State private var showingAdd = false
     @State private var newTitle: String = ""
-    @State private var editingItem: ChecklistItem? = nil
+    @State private var itemPendingEdit: ChecklistItem? = nil
     @State private var showingPunch = false
     @State private var tempSelectedIds = Set<UUID>()
     @State private var showingHistory = false
@@ -53,7 +53,7 @@ struct ChecklistView: View {
                 .refreshable {
                     await refreshChecklistData()
                 }
-                .background(Color.brandSecondary50)
+                .background(Color.gray.opacity(0.1))
             }
             
             // 打卡弹框
@@ -85,6 +85,7 @@ struct ChecklistView: View {
                     isPresented: $showingManagement,
                     mode: vm.mode,
                     items: currentModeItems,
+                    itemToEdit: itemPendingEdit,
                     onSave: handleManagementSave
                 )
             }
@@ -166,6 +167,11 @@ struct ChecklistView: View {
         } message: {
             Text("成功记录本次打卡，得分 \(lastPunchScore)分！")
         }
+        .onChange(of: showingManagement) { isPresented in
+            if !isPresented {
+                itemPendingEdit = nil
+            }
+        }
     }
     
     private var modeSwitchSection: some View {
@@ -239,49 +245,141 @@ struct ChecklistView: View {
     
     private var managementSection: some View {
         VStack(alignment: .leading, spacing: Spacing.lg) {
-            HStack {
-                Text("管理检查项")
-                    .font(.title3)
+            managementSectionHeader
+            checklistCard
+            managementSectionFooter
+        }
+    }
+
+    private var managementSectionHeader: some View {
+        HStack {
+            Label("管理检查项", systemImage: "checklist")
+                .font(.title3)
+                .fontWeight(.semibold)
+                .foregroundColor(.brandSecondary900)
+
+            Spacer()
+        }
+    }
+
+    private var checklistCard: some View {
+        VStack(spacing: 0) {
+            checklistCardHeader
+            Divider()
+            checklistItemsList
+        }
+        .background(Color.white)
+        .cornerRadius(CornerRadius.lg)
+        .shadow(color: Color.black.opacity(0.05), radius: 8, x: 0, y: 2)
+    }
+
+    private var checklistCardHeader: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(vm.mode == .pre ? "出行前检查" : "归来后检查")
+                    .font(.bodyMedium)
                     .fontWeight(.semibold)
                     .foregroundColor(.brandSecondary900)
-                
-                Spacer()
-                
-                Button("编辑") {
-                    showingManagement = true
-                }
-                .font(.bodyMedium)
-                .fontWeight(.medium)
-                .foregroundColor(.brandPrimary500)
+
+                Text("共 \(currentModeItems.count) 项")
+                    .font(.caption)
+                    .foregroundColor(.brandSecondary500)
             }
-            
-            // 显示当前模式的检查项数量
-            VStack(alignment: .leading, spacing: Spacing.sm) {
-                ForEach(currentModeItems.prefix(3), id: \.id) { item in
-                    HStack {
-                        Image(systemName: "checkmark.circle")
-                            .font(.body)
-                            .foregroundColor(.brandSecondary400)
-                        
-                        Text(item.title)
-                            .font(.bodyMedium)
-                            .foregroundColor(.brandSecondary700)
-                        
-                        Spacer()
-                    }
-                }
-                
-                if currentModeItems.count > 3 {
-                    Text("及其他 \(currentModeItems.count - 3) 项...")
-                        .font(.bodySmall)
-                        .foregroundColor(.brandSecondary500)
-                        .padding(.leading, 24) // 对齐图标
-                }
+
+            Spacer()
+
+            HStack(spacing: 4) {
+                Circle()
+                    .fill(Color.green)
+                    .frame(width: 6, height: 6)
+                Text("已配置")
+                    .font(.caption)
+                    .foregroundColor(.green)
             }
-            .padding(Spacing.lg)
-            .background(Color.cardBackground)
-            .cornerRadius(CornerRadius.lg)
         }
+        .padding(.horizontal, Spacing.lg)
+        .padding(.vertical, Spacing.md)
+        .background(Color.gray.opacity(0.1))
+    }
+
+    private var checklistItemsList: some View {
+        VStack(spacing: 0) {
+            ForEach(Array(currentModeItems.prefix(4).enumerated()), id: \.element.id) { index, item in
+                checklistItemRow(item: item, index: index)
+
+                if index < min(3, currentModeItems.count - 1) {
+                    Divider()
+                        .padding(.leading, 48)
+                }
+            }
+
+            if currentModeItems.count > 4 {
+                expandMoreButton
+            }
+        }
+    }
+
+    private func checklistItemRow(item: ChecklistItem, index: Int) -> some View {
+        Button {
+            itemPendingEdit = item
+            showingManagement = true
+        } label: {
+            HStack(spacing: 12) {
+                ZStack {
+                    Circle()
+                        .fill(Color.brandPrimary100)
+                        .frame(width: 24, height: 24)
+                    Text("\(index + 1)")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.brandPrimary600)
+                }
+
+                Text(item.title)
+                    .font(.bodyMedium)
+                    .foregroundColor(.brandSecondary700)
+                    .lineLimit(1)
+
+                Spacer()
+
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.caption)
+                    .foregroundColor(.green)
+            }
+            .padding(.horizontal, Spacing.lg)
+            .padding(.vertical, Spacing.sm)
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+
+    private var expandMoreButton: some View {
+        Button(action: { showingManagement = true }) {
+            HStack {
+                Spacer()
+                Text("查看全部 \(currentModeItems.count) 项")
+                    .font(.bodySmall)
+                    .foregroundColor(.brandPrimary500)
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundColor(.brandPrimary500)
+                Spacer()
+            }
+            .padding(.vertical, Spacing.sm)
+        }
+        .background(Color.brandPrimary50)
+    }
+
+    private var managementSectionFooter: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "info.circle")
+                .font(.caption)
+                .foregroundColor(.brandSecondary400)
+
+            Text("点击检查项即可编辑、调整或删除")
+                .font(.caption)
+                .foregroundColor(.brandSecondary500)
+        }
+        .padding(.horizontal, 4)
     }
     
     // 计算属性
