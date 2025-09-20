@@ -46,8 +46,8 @@ struct LaunchScreenView: View {
                     value: pulseAnimation
                 )
 
-            VStack(spacing: 50) {
-                // 顶部栏：倒计时和跳过按钮
+            // 顶部栏：倒计时和跳过按钮（放在VStack外面，使用绝对定位）
+            VStack {
                 HStack {
                     // 左侧：倒计时
                     HStack(spacing: 4) {
@@ -81,7 +81,13 @@ struct LaunchScreenView: View {
                     .animation(.easeIn(duration: 0.3), value: showSkipButton)
                 }
                 .padding(.horizontal, 24)
-                .padding(.top, 60)
+                .padding(.top, 50) // 调整到更靠近顶部
+
+                Spacer()
+            }
+            .ignoresSafeArea() // 忽略安全区域
+
+            VStack(spacing: 50) {
 
                 Spacer()
 
