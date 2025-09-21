@@ -86,7 +86,7 @@ struct LocationPermissionGuideView: View {
 			}
 
 			Button("暂不设置") { dismiss() }
-			.compactStyle(color: .brandSecondary400)
+			.foregroundColor(.brandSecondary500)
 		}
 	}
 
@@ -115,5 +115,4 @@ struct LocationPermissionGuideView: View {
 #Preview {
 	LocationPermissionGuideView()
 }
-
 

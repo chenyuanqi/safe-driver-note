@@ -64,12 +64,19 @@ struct VoiceNoteView: View {
 							}
 						}
 
-						Button("前往设置") {
-							if let url = URL(string: UIApplication.openSettingsURLString) {
-								UIApplication.shared.open(url)
+						HStack(spacing: Spacing.md) {
+							Button("立即授权") {
+								Task { await speech.requestPermissions() }
 							}
+							.primaryStyle()
+
+							Button("前往设置") {
+								if let url = URL(string: UIApplication.openSettingsURLString) {
+									UIApplication.shared.open(url)
+								}
+							}
+							.secondaryStyle()
 						}
-						.primaryStyle()
 					}
 				}
 			} else {
@@ -152,9 +159,6 @@ struct VoiceNoteView: View {
 		}
 		.padding(Spacing.pagePadding)
 		.background(Color.brandSecondary50)
-		.onAppear { 
-			Task { await speech.requestPermissions() }
-		}
 		.alert("错误", isPresented: $showError) {
 			Button("知道了") { }
 		} message: { Text(errorMessage) }

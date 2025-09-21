@@ -4,10 +4,15 @@ import Foundation
 import UserNotifications
 import SwiftData
 import UIKit
+import AVFoundation
+import AVFAudio
+
+private let permissionOnboardingShownKey = "PermissionOnboardingShownKey"
 
 struct HomeView: View {
     @StateObject private var vm = HomeViewModel()
     @StateObject private var driveService = AppDI.shared.driveService
+    @ObservedObject private var locationService = LocationService.shared
     @State private var selectedKnowledgeIndex = 0
     @State private var showingLogEditor = false
     @State private var showingSafetyAlert = false
@@ -37,9 +42,6 @@ struct HomeView: View {
     @State private var carouselTimer: Timer?
     
     // 添加通知权限弹框相关属性
-    @State private var showingNotificationPermissionAlert = false
-    @State private var notificationPermissionGranted: Bool? = nil
-
     // 添加通知详情相关属性
     @State private var showingNotificationDetail = false
     @State private var notificationDetailTitle = ""
@@ -48,6 +50,7 @@ struct HomeView: View {
     // 添加调试信息弹框
     @State private var showingDebugInfo = false
     @State private var debugInfoText = ""
+    @State private var showingPermissionOnboarding = false
 
     var body: some View {
         NavigationStack {
@@ -86,15 +89,11 @@ struct HomeView: View {
         } // 关闭NavigationStack
         .onAppear { 
             vm.reload() 
-            // 先请求位置权限，避免交互中触发系统弹窗导致等待
-            LocationService.shared.requestLocationPermission()
+            presentPermissionOnboardingIfNeeded()
             Task {
                 await vm.loadRecentRoutes()
                 // 获取当前位置（一次性，不并发重复调用）
                 await updateCurrentLocation()
-                
-                // 检查通知权限状态
-                await checkNotificationPermission()
             }
             
             // 添加通知监听
@@ -105,6 +104,17 @@ struct HomeView: View {
                 await clearNotificationBadges()
             }
 
+        }
+        .sheet(isPresented: $showingPermissionOnboarding) {
+            PermissionOnboardingView(onComplete: { preference in
+                showingPermissionOnboarding = false
+                handlePermissionRequests(preference: preference)
+            }, onLater: {
+                showingPermissionOnboarding = false
+                markPermissionOnboardingShown()
+            })
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
         }
         .onDisappear {
             // 移除通知观察者
@@ -238,16 +248,6 @@ struct HomeView: View {
         }
         .sheet(isPresented: $showingPermissionGuide) {
             LocationPermissionGuideView()
-        }
-        .alert("通知权限", isPresented: $showingNotificationPermissionAlert) {
-            Button("暂不开启") { 
-                showingNotificationPermissionAlert = false
-            }
-            Button("去开启") { 
-                requestNotificationPermission()
-            }
-        } message: {
-            Text("开启通知权限，您将每天收到安全驾驶提醒，祝您今天开车安全第一！")
         }
         .alert(notificationDetailTitle, isPresented: $showingNotificationDetail) {
             Button("知道了") { }
@@ -867,38 +867,71 @@ struct HomeView: View {
         stopAutoCarousel()
         startAutoCarousel()
     }
-    
-    /// 检查通知权限状态并在未授予权限时显示弹框
-    private func checkNotificationPermission() async {
-        let settings = await UNUserNotificationCenter.current().notificationSettings()
-        await MainActor.run {
-            notificationPermissionGranted = settings.alertSetting == .enabled
-            
-            // 如果通知权限未授予，显示权限请求弹框
-            if notificationPermissionGranted != true {
-                showingNotificationPermissionAlert = true
-            }
+
+    private func presentPermissionOnboardingIfNeeded() {
+        let defaults = UserDefaults.standard
+        if !defaults.bool(forKey: permissionOnboardingShownKey) {
+            showingPermissionOnboarding = true
         }
     }
-    
-    /// 请求通知权限
-    private func requestNotificationPermission() {
+
+    private func markPermissionOnboardingShown() {
+        UserDefaults.standard.set(true, forKey: permissionOnboardingShownKey)
+    }
+
+    private func handlePermissionRequests(preference: LocationPermissionPreference) {
+        markPermissionOnboardingShown()
         Task {
-            let granted = await NotificationService.shared.requestPermission()
-            await MainActor.run {
-                notificationPermissionGranted = granted
-                showingNotificationPermissionAlert = false
-                
-                // 如果权限被授予，设置每日提醒
-                if granted {
-                    Task {
-                        await NotificationService.shared.scheduleDailyKnowledgeReminder()
+            let locService = LocationService.shared
+            switch preference {
+            case .whileInUse:
+                locService.requestWhenInUseAuthorization()
+            case .always:
+                locService.requestAlwaysAuthorization()
+            }
+
+            let notificationsGranted = await NotificationService.shared.requestPermission()
+            if notificationsGranted {
+                await NotificationService.shared.scheduleDailyKnowledgeReminder()
+            }
+
+            _ = await requestMicrophonePermission()
+        }
+    }
+
+    private func requestMicrophonePermission() async -> Bool {
+        if #available(iOS 17.0, *) {
+            let current = AVAudioApplication.shared.recordPermission
+            switch current {
+            case .granted:
+                return true
+            case .denied:
+                return false
+            case .undetermined:
+                return await AVAudioApplication.requestRecordPermission()
+            @unknown default:
+                return false
+            }
+        } else {
+            let session = AVAudioSession.sharedInstance()
+            switch session.recordPermission {
+            case .granted:
+                return true
+            case .denied:
+                return false
+            case .undetermined:
+                return await withCheckedContinuation { continuation in
+                    session.requestRecordPermission { granted in
+                        continuation.resume(returning: granted)
                     }
                 }
+            @unknown default:
+                return false
             }
         }
     }
     
+    /// 检查通知权限状态并在未授予权限时显示弹框
     /// 清除通知红点
     private func clearNotificationBadges() async {
         await NotificationService.shared.clearBadges()
@@ -923,11 +956,106 @@ struct HomeView: View {
         // 更新当前位置
         await updateCurrentLocation()
 
-        // 检查通知权限状态
-        await checkNotificationPermission()
-
         // 添加轻微延迟以提供更好的用户体验
         try? await Task.sleep(nanoseconds: 500_000_000) // 0.5秒
+    }
+}
+
+private enum LocationPermissionPreference: String, CaseIterable, Identifiable {
+    case whileInUse
+    case always
+
+    var id: String { rawValue }
+}
+
+private struct PermissionOnboardingView: View {
+    @State private var locationPreference: LocationPermissionPreference = .always
+    let onComplete: (LocationPermissionPreference) -> Void
+    let onLater: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.xxxl) {
+            VStack(alignment: .leading, spacing: Spacing.md) {
+                Text("首次使用前，请授权必要权限")
+                    .font(.title3)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.brandSecondary900)
+
+                Text("我们会在行驶中记录位置轨迹、发送安全提醒，并支持语音记录。以下权限将帮助我们提供完整的驾驶助手体验。")
+                    .font(.body)
+                    .foregroundColor(.brandSecondary700)
+                    .multilineTextAlignment(.leading)
+            }
+
+            VStack(alignment: .leading, spacing: Spacing.lg) {
+                PermissionRow(title: "位置", description: "记录行程路线并在后台持续定位，建议选择“始终允许”。")
+
+                VStack(alignment: .leading, spacing: Spacing.sm) {
+                    Text("位置权限偏好")
+                        .font(.bodySmall)
+                        .foregroundColor(.brandSecondary600)
+
+                    Picker("位置权限", selection: $locationPreference) {
+                        Text("始终允许").tag(LocationPermissionPreference.always)
+                        Text("仅使用期间允许").tag(LocationPermissionPreference.whileInUse)
+                    }
+                    .pickerStyle(.segmented)
+                }
+
+                PermissionRow(title: "通知", description: "接收每日安全提醒和行程状态通知。")
+                PermissionRow(title: "麦克风", description: "用于语音记事和语音转写功能。")
+            }
+
+            VStack(spacing: Spacing.md) {
+                Button {
+                    onComplete(locationPreference)
+                } label: {
+                    Text("立即授权")
+                        .font(.bodyLarge)
+                        .fontWeight(.semibold)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, Spacing.md)
+                        .background(Color.brandPrimary500)
+                        .foregroundColor(.white)
+                        .cornerRadius(CornerRadius.lg)
+                }
+
+                Button {
+                    onLater()
+                } label: {
+                    Text("暂不处理")
+                        .font(.body)
+                        .foregroundColor(.brandSecondary600)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, Spacing.sm)
+                }
+            }
+
+            Text("您可以随时在“设置 > 隐私与安全”中修改这些权限。")
+                .font(.caption)
+                .foregroundColor(.brandSecondary500)
+        }
+        .padding(Spacing.xxxl)
+        .background(Color(.systemBackground))
+    }
+}
+
+private struct PermissionRow: View {
+    let title: String
+    let description: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.sm) {
+            Text(title)
+                .font(.bodyLarge)
+                .fontWeight(.semibold)
+                .foregroundColor(.brandSecondary900)
+
+            Text(description)
+                .font(.body)
+                .foregroundColor(.brandSecondary600)
+                .multilineTextAlignment(.leading)
+        }
     }
 }
 

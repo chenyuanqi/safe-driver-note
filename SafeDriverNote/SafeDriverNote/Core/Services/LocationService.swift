@@ -68,6 +68,16 @@ class LocationService: NSObject, ObservableObject {
             break
         }
     }
+
+    /// 显式请求“使用期间”权限
+    func requestWhenInUseAuthorization() {
+        locationManager.requestWhenInUseAuthorization()
+    }
+
+    /// 尝试直接请求“始终允许”权限（iOS 会自动引导完成所需的两步授权流程）
+    func requestAlwaysAuthorization() {
+        locationManager.requestAlwaysAuthorization()
+    }
     
     /// 后台连续定位：开始持续更新
     func startContinuousUpdates(desiredAccuracy: CLLocationAccuracy = kCLLocationAccuracyBestForNavigation, distanceFilter: CLLocationDistance = 5.0) {
