@@ -55,7 +55,16 @@ struct StartDrivingConfirmationView: View {
             }
         }
         .padding(Spacing.pagePadding)
-        .background(Color.white)
+        .background(
+            RoundedRectangle(cornerRadius: CornerRadius.xl, style: .continuous)
+                .fill(Color.cardBackground)
+        )
+        .shadow(
+            color: Shadow.xl.color,
+            radius: Shadow.xl.radius,
+            x: Shadow.xl.x,
+            y: Shadow.xl.y
+        )
     }
 }
 
