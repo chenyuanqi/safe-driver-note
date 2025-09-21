@@ -39,6 +39,23 @@ struct SafeDriverNoteApp: App {
         // 修复有问题的音频文件名
         AudioStorageService.shared.fixProblematicAudioFiles()
         appDelegate.registerQuickActionManager(quickActionManager)
+        SceneDelegate.quickActionManager = quickActionManager
+    }
+
+    // 快速操作相关的处理方法
+    private func handleURL(_ url: URL) {
+        print("🔗 Handling URL: \(url)")
+        if let actionType = QuickActionType.allCases.first(where: { url.absoluteString.contains($0.rawValue) }) {
+            print("🔗 Found matching action type: \(actionType)")
+            quickActionManager.trigger(actionType)
+        }
+    }
+
+    private func handleSceneShortcut(_ shortcutItem: UIApplicationShortcutItem) {
+        print("🎯 Scene shortcut received: \(shortcutItem.type)")
+        if let actionType = QuickActionType(rawValue: shortcutItem.type) {
+            quickActionManager.trigger(actionType)
+        }
     }
 
     var body: some Scene {
@@ -48,6 +65,7 @@ struct SafeDriverNoteApp: App {
                 .environmentObject(notificationDelegate)
                 .environmentObject(themeManager)
                 .environmentObject(quickActionManager)
+                .handlesExternalEvents(preferring: Set(QuickActionType.allCases.map { $0.rawValue }), allowing: Set(QuickActionType.allCases.map { $0.rawValue }))
                 .onAppear {
                     appDelegate.registerQuickActionManager(quickActionManager)
                     // 设置通知代理
@@ -67,6 +85,21 @@ struct SafeDriverNoteApp: App {
                 }
                 .onChange(of: scenePhase) { oldPhase, newPhase in
                     handleScenePhaseChange(from: oldPhase, to: newPhase)
+                }
+                .onOpenURL { url in
+                    print("🔗 App opened with URL: \(url)")
+                    handleURL(url)
+                }
+                .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { userActivity in
+                    print("🔗 App opened with web browsing activity")
+                }
+                .onReceive(NotificationCenter.default.publisher(for: UIScene.willConnectNotification)) { notification in
+                    print("🔗 Scene will connect notification received")
+                    if let scene = notification.object as? UIWindowScene,
+                       let shortcutItem = scene.session.stateRestorationActivity?.userInfo?["shortcutItem"] as? UIApplicationShortcutItem {
+                        print("🔗 Found shortcut item in scene: \(shortcutItem.type)")
+                        handleSceneShortcut(shortcutItem)
+                    }
                 }
         }
         .modelContainer(sharedModelContainer)
@@ -156,6 +189,7 @@ struct RootTabView: View {
     @EnvironmentObject private var quickActionManager: QuickActionManager
     @State private var showLaunchScreen = true
     @State private var selectedTab: RootTab = .home
+    @State private var quickActionDebugMessage: String?
 
     var body: some View {
         ZStack {
@@ -219,13 +253,13 @@ struct RootTabView: View {
             .preferredColorScheme(themeManager.colorScheme)
             .onChange(of: quickActionManager.requestedAction) { action in
                 guard let action else { return }
-                routeToTab(for: action)
-                quickActionManager.clear()
+                print("[QuickAction] RootTabView observed change -> \(action.rawValue)")
+                routeToTab(for: action, source: "onChange")
             }
             .onAppear {
                 if let action = quickActionManager.requestedAction {
-                    routeToTab(for: action)
-                    quickActionManager.clear()
+                    print("[QuickAction] RootTabView onAppear pending action -> \(action.rawValue)")
+                    routeToTab(for: action, source: "onAppear")
                 }
             }
 
@@ -238,17 +272,38 @@ struct RootTabView: View {
                 .transition(.opacity)
                 .zIndex(1)
             }
+
+            if let debugMessage = quickActionDebugMessage {
+                VStack {
+                    QuickActionDebugBanner(message: debugMessage)
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .transition(.move(edge: .top).combined(with: .opacity))
+                .zIndex(2)
+                .allowsHitTesting(false)
+            }
         }
     }
 
-    private func routeToTab(for action: QuickActionType) {
-        switch action {
-        case .startDriving:
+    private func routeToTab(for action: QuickActionType, source: String) {
+        print("[QuickAction] routeToTab source=\(source) action=\(action.rawValue)")
+        withAnimation(.easeInOut) {
+            // 目前三个动作都依赖 HomeView 内部的通知处理逻辑
             selectedTab = .home
-        case .quickChecklist:
-            selectedTab = .checklist
-        case .drivingRules:
-            selectedTab = .knowledge
+        }
+
+        showDebugBanner("触发: \(action.displayName) • 来源: \(source)")
+    }
+
+    private func showDebugBanner(_ message: String) {
+        print("[QuickAction] debug banner -> \(message)")
+        quickActionDebugMessage = message
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            withAnimation(.easeOut) {
+                quickActionDebugMessage = nil
+            }
         }
     }
 }
@@ -315,4 +370,25 @@ final class NotificationDelegate: NSObject, UNUserNotificationCenterDelegate, Ob
 
         showNotificationDetail = true
     }
+}
+
+#if DEBUG
+private struct QuickActionDebugBanner: View {
+    let message: String
+
+    var body: some View {
+        Text(message)
+            .font(.caption2)
+            .foregroundColor(.white)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(Color.black.opacity(0.8))
+            .clipShape(Capsule())
+            .padding(.top, 48)
+    }
+}
+#endif
+
+extension Notification.Name {
+    static let openDrivingRules = Notification.Name("OpenDrivingRules")
 }

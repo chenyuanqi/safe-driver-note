@@ -16,12 +16,14 @@ struct KnowledgeTodayView: View {
     @State private var cardOpacity: Double = 1.0
     @State private var isDismissing = false
     @State private var showDrivingRulesModal = false
+    private let showDrivingRulesOnAppear: Bool
 
     // 添加初始卡片标题参数，用于定位显示特定卡片
     let initialCardTitle: String?
 
-    init(initialCardTitle: String? = nil) {
+    init(initialCardTitle: String? = nil, showDrivingRulesOnAppear: Bool = false) {
         self.initialCardTitle = initialCardTitle
+        self.showDrivingRulesOnAppear = showDrivingRulesOnAppear
     }
 
     var body: some View {
@@ -151,6 +153,12 @@ struct KnowledgeTodayView: View {
                     currentCardIndex = index
                 }
             }
+            if showDrivingRulesOnAppear {
+                showDrivingRulesModal = true
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .openDrivingRules)) { _ in
+            showDrivingRulesModal = true
         }
     }
 

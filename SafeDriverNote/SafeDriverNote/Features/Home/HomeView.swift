@@ -13,6 +13,7 @@ struct HomeView: View {
     @StateObject private var vm = HomeViewModel()
     @StateObject private var driveService = AppDI.shared.driveService
     @ObservedObject private var locationService = LocationService.shared
+    @EnvironmentObject private var quickActionManager: QuickActionManager
     @State private var selectedKnowledgeIndex = 0
     @State private var showingLogEditor = false
     @State private var showingSafetyAlert = false
@@ -52,6 +53,10 @@ struct HomeView: View {
     @State private var debugInfoText = ""
     @State private var showingPermissionOnboarding = false
 
+    // 快速操作弹框
+    @State private var showingQuickChecklist = false
+    @State private var knowledgeShouldShowDrivingRules = false
+
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
@@ -89,7 +94,11 @@ struct HomeView: View {
         } // 关闭NavigationStack
         .onAppear { 
             vm.reload() 
+            print("[QuickAction] HomeView onAppear, current action: \(String(describing: quickActionManager.requestedAction))")
             presentPermissionOnboardingIfNeeded()
+            if let action = quickActionManager.requestedAction {
+                handleQuickAction(action)
+            }
             Task {
                 await vm.loadRecentRoutes()
                 // 获取当前位置（一次性，不并发重复调用）
@@ -104,6 +113,11 @@ struct HomeView: View {
                 await clearNotificationBadges()
             }
 
+        }
+        .onChange(of: quickActionManager.requestedAction) { action in
+            guard let action else { return }
+            print("[QuickAction] HomeView observed action change -> \(action.rawValue)")
+            handleQuickAction(action)
         }
         .sheet(isPresented: $showingPermissionOnboarding) {
             PermissionOnboardingView(onComplete: { preference in
@@ -193,58 +207,29 @@ struct HomeView: View {
             Text(driveErrorMessage)
         }
         .sheet(isPresented: $showingManualLocationSheet) {
-            NavigationStack {
-                VStack(alignment: .leading, spacing: Spacing.lg) {
+            VStack(spacing: Spacing.lg) {
+                // Header with buttons
+                HStack {
+                    Button("取消") { showingManualLocationSheet = false }
+                    Spacer()
                     Text(manualStartOrEnd == "start" ? "输入起点位置" : "输入终点位置")
                         .font(.title3)
                         .fontWeight(.semibold)
-                    TextField("如：上海市人民广场或经纬度 31.23,121.47", text: $manualAddress)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled(true)
                     Spacer()
-                }
-                .padding()
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("取消") { showingManualLocationSheet = false }
+                    Button("保存") {
+                        handleManualLocationSave()
                     }
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("保存") {
-                            Task { @MainActor in
-                                let ls = LocationService.shared
-                                // 支持“lat,lon”直接输入
-                                let trimmed = manualAddress.trimmingCharacters(in: .whitespacesAndNewlines)
-                                var location: CLLocation?
-                                if let comma = trimmed.firstIndex(of: ",") {
-                                    let latStr = String(trimmed[..<comma]).trimmingCharacters(in: .whitespaces)
-                                    let lonStr = String(trimmed[trimmed.index(after: comma)...]).trimmingCharacters(in: .whitespaces)
-                                    if let lat = Double(latStr), let lon = Double(lonStr) {
-                                        location = CLLocation(latitude: lat, longitude: lon)
-                                    }
-                                }
-                                if location == nil {
-                                    do { location = try await ls.geocodeAddress(trimmed) } catch { location = nil }
-                                }
-                                if let loc = location {
-                                    let address = await ls.getLocationDescription(from: loc)
-                                    let routeLoc = RouteLocation(latitude: loc.coordinate.latitude, longitude: loc.coordinate.longitude, address: address)
-                                    if manualStartOrEnd == "start" {
-                                        await driveService.startDriving(with: routeLoc)
-                                        await vm.loadRecentRoutes()
-                                    } else {
-                                        await driveService.endDriving(with: routeLoc)
-                                        manualEndTries = 0
-                                        await vm.loadRecentRoutes()
-                                    }
-                                }
-                                manualAddress = ""
-                                showingManualLocationSheet = false
-                            }
-                        }
-                        .disabled(manualAddress.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                    }
+                    .disabled(manualAddress.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
+
+                TextField("如：上海市人民广场或经纬度 31.23,121.47", text: $manualAddress)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled(true)
+                    .textFieldStyle(RoundedBorderTextFieldStyle())
+
+                Spacer()
             }
+            .padding()
         }
         .sheet(isPresented: $showingPermissionGuide) {
             LocationPermissionGuideView()
@@ -255,10 +240,13 @@ struct HomeView: View {
             Text(notificationDetailContent)
         }
         .sheet(isPresented: $showingKnowledgeView) {
-            KnowledgeTodayView(initialCardTitle: selectedKnowledgeCardTitle)
-                .presentationDetents([.large, .fraction(0.85)])
-                .presentationDragIndicator(.visible)
-                .presentationCornerRadius(20)
+            KnowledgeTodayView(
+                initialCardTitle: selectedKnowledgeCardTitle,
+                showDrivingRulesOnAppear: knowledgeShouldShowDrivingRules
+            )
+            .presentationDetents([.large, .fraction(0.85)])
+            .presentationDragIndicator(.visible)
+            .presentationCornerRadius(20)
         }
         .alert("驾驶调试信息", isPresented: $showingDebugInfo) {
             Button("复制") {
@@ -267,6 +255,28 @@ struct HomeView: View {
             Button("关闭", role: .cancel) { }
         } message: {
             Text(debugInfoText)
+        }
+        .sheet(isPresented: $showingQuickChecklist) {
+            NavigationStack {
+                VStack {
+                    HStack {
+                        Spacer()
+                        Button("完成") {
+                            showingQuickChecklist = false
+                        }
+                    }
+                    .padding()
+
+                    ChecklistView(initialMode: .pre)
+                }
+            }
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
+        }
+        .onChange(of: showingKnowledgeView) { isPresented in
+            if !isPresented {
+                knowledgeShouldShowDrivingRules = false
+            }
         }
     }
 
@@ -291,15 +301,144 @@ struct HomeView: View {
             queue: .main
         ) { _ in
             // 重新加载今日学习卡片
-            vm.loadTodayKnowledgeCards()
+            Task { @MainActor in
+                vm.loadTodayKnowledgeCards()
+            }
         }
+
     }
     
     // 移除通知监听
     private func removeNotificationObservers() {
         NotificationCenter.default.removeObserver(self)
     }
-	
+
+    private func handleQuickAction(_ action: QuickActionType) {
+        print("[QuickAction] HomeView handleQuickAction -> \(action.rawValue)")
+        switch action {
+        case .startDriving:
+            handleQuickActionStartDriving()
+        case .quickChecklist:
+            handleQuickActionQuickChecklist()
+        case .drivingRules:
+            handleQuickActionDrivingRules()
+        }
+        quickActionManager.clear(action)
+    }
+
+    // 处理快速操作开始驾驶
+    private func handleQuickActionStartDriving() {
+        print("[QuickAction] handleQuickActionStartDriving")
+        if driveService.isDriving {
+            // 如果已经在驾驶，显示提示信息
+            driveErrorMessage = "您已经在驾驶记录中，当前行程正在进行。"
+            showingDriveError = true
+        } else {
+            // 如果没有在驾驶，则直接开始驾驶
+            Task {
+                // 检查权限状态
+                let status = LocationService.shared.authorizationStatus
+                if status == .denied || status == .restricted || status == .notDetermined {
+                    await MainActor.run {
+                        driveErrorMessage = "需要位置权限才能开始驾驶记录，请到设置中开启位置权限。"
+                        showingDriveError = true
+                    }
+                    return
+                }
+
+                // 直接开始驾驶，无需确认
+                let locationService = LocationService.shared
+                do {
+                    if let location = try await locationService.getCurrentLocation(timeout: 5.0) {
+                        let address = await locationService.getLocationDescription(from: location)
+                        let routeLocation = RouteLocation(
+                            latitude: location.coordinate.latitude,
+                            longitude: location.coordinate.longitude,
+                            address: address
+                        )
+                        await driveService.startDriving(with: routeLocation)
+                        await vm.loadRecentRoutes()
+
+                        // 显示成功提示
+                        await MainActor.run {
+                            driveErrorMessage = "驾驶记录已开始，安全第一！"
+                            showingDriveError = true
+                        }
+                    } else {
+                        // 定位失败，仍然开始驾驶但无起点
+                        await driveService.startDriving()
+                        await vm.loadRecentRoutes()
+
+                        await MainActor.run {
+                            driveErrorMessage = "驾驶记录已开始（未获取到起点位置）"
+                            showingDriveError = true
+                        }
+                    }
+                } catch {
+                    // 定位失败，仍然开始驾驶但无起点
+                    await driveService.startDriving()
+                    await vm.loadRecentRoutes()
+
+                    await MainActor.run {
+                        driveErrorMessage = "驾驶记录已开始（未获取到起点位置）"
+                        showingDriveError = true
+                    }
+                }
+            }
+        }
+    }
+
+    // 处理快速操作行前检查
+    private func handleQuickActionQuickChecklist() {
+        print("[QuickAction] handleQuickActionQuickChecklist")
+        showingQuickChecklist = true
+    }
+
+    // 处理快速操作开车守则
+    private func handleQuickActionDrivingRules() {
+        print("[QuickAction] handleQuickActionDrivingRules")
+        if showingKnowledgeView {
+            NotificationCenter.default.post(name: .openDrivingRules, object: nil)
+        } else {
+            knowledgeShouldShowDrivingRules = true
+            showingKnowledgeView = true
+        }
+    }
+
+    // 处理手动位置保存
+    private func handleManualLocationSave() {
+        Task { @MainActor in
+            let ls = LocationService.shared
+            // 支持"lat,lon"直接输入
+            let trimmed = manualAddress.trimmingCharacters(in: .whitespacesAndNewlines)
+            var location: CLLocation?
+            if let comma = trimmed.firstIndex(of: ",") {
+                let latStr = String(trimmed[..<comma]).trimmingCharacters(in: .whitespaces)
+                let lonStr = String(trimmed[trimmed.index(after: comma)...]).trimmingCharacters(in: .whitespaces)
+                if let lat = Double(latStr), let lon = Double(lonStr) {
+                    location = CLLocation(latitude: lat, longitude: lon)
+                }
+            }
+            if location == nil {
+                do { location = try await ls.geocodeAddress(trimmed) } catch { location = nil }
+            }
+            if let loc = location {
+                let address = await ls.getLocationDescription(from: loc)
+                let routeLoc = RouteLocation(latitude: loc.coordinate.latitude, longitude: loc.coordinate.longitude, address: address)
+                if manualStartOrEnd == "start" {
+                    await driveService.startDriving(with: routeLoc)
+                    await vm.loadRecentRoutes()
+                } else {
+                    await driveService.endDriving(with: routeLoc)
+                    manualEndTries = 0
+                    await vm.loadRecentRoutes()
+                }
+            }
+            manualAddress = ""
+            showingManualLocationSheet = false
+        }
+    }
+
 	// MARK: - Status Panel
 	private var statusPanel: some View {
 		VStack(alignment: .leading, spacing: Spacing.lg) {
@@ -368,12 +507,11 @@ struct HomeView: View {
 					Spacer()
 				}
 				.padding()
-				.toolbar {
-					ToolbarItem(placement: .confirmationAction) {
-						Button("知道了") {
-							showingStatusExplanation = false
-						}
+				.overlay(alignment: .topTrailing) {
+					Button("知道了") {
+						showingStatusExplanation = false
 					}
+					.padding()
 				}
 			}
 			.presentationDetents([.medium])
