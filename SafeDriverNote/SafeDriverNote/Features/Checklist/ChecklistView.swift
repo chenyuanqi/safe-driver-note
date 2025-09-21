@@ -144,7 +144,10 @@ struct ChecklistView: View {
                     .navigationTitle("历史打卡")
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: .beginChecklistAutoPrompt)) { _ in
+        .onReceive(NotificationCenter.default.publisher(for: .beginChecklistAutoPrompt)) { notification in
+            if let targetMode = notification.object as? ChecklistViewModel.Mode {
+                vm.mode = targetMode
+            }
             showingPunch = true
         }
         .alert("确认删除", isPresented: $showingDeleteAlert) {

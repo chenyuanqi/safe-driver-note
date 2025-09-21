@@ -289,7 +289,7 @@ struct RootTabView: View {
     private func routeToTab(for action: QuickActionType, source: String) {
         print("[QuickAction] routeToTab source=\(source) action=\(action.rawValue)")
         withAnimation(.easeInOut) {
-            // 目前三个动作都依赖 HomeView 内部的通知处理逻辑
+            // 快捷操作统一回到首页，由 HomeView 处理后续流程
             selectedTab = .home
         }
 

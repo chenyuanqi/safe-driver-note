@@ -57,6 +57,7 @@ struct HomeView: View {
     // 快速操作弹框
     @State private var showingQuickChecklist = false
     @State private var quickChecklistAutoPrompt = false
+    @State private var quickChecklistMode: ChecklistViewModel.Mode = .pre
     @State private var knowledgeShouldShowDrivingRules = false
 
     var body: some View {
@@ -262,7 +263,8 @@ struct HomeView: View {
             NavigationStack {
                 QuickChecklistContainerView(
                     isPresented: $showingQuickChecklist,
-                    autoPrompt: quickChecklistAutoPrompt
+                    autoPrompt: quickChecklistAutoPrompt,
+                    mode: quickChecklistMode
                 )
             }
             .presentationDetents([.large])
@@ -319,8 +321,10 @@ struct HomeView: View {
         switch action {
         case .startDriving:
             handleQuickActionStartDriving()
-        case .quickChecklist:
-            handleQuickActionQuickChecklist()
+        case .quickChecklistPre:
+            handleQuickActionQuickChecklist(mode: .pre)
+        case .quickChecklistPost:
+            handleQuickActionQuickChecklist(mode: .post)
         case .drivingRules:
             handleQuickActionDrivingRules()
         }
@@ -401,10 +405,11 @@ struct HomeView: View {
     }
 
     // 处理快速操作行前检查
-    private func handleQuickActionQuickChecklist() {
-        print("[QuickAction] handleQuickActionQuickChecklist")
+    private func handleQuickActionQuickChecklist(mode: ChecklistViewModel.Mode) {
+        print("[QuickAction] handleQuickActionQuickChecklist -> \(mode == .pre ? "pre" : "post")")
+        quickChecklistMode = mode
         if showingQuickChecklist {
-            NotificationCenter.default.post(name: .beginChecklistAutoPrompt, object: nil)
+            NotificationCenter.default.post(name: .beginChecklistAutoPrompt, object: mode)
         } else {
             quickChecklistAutoPrompt = true
             showingQuickChecklist = true
@@ -1119,14 +1124,15 @@ struct HomeView: View {
 private struct QuickChecklistContainerView: View {
     @Binding var isPresented: Bool
     let autoPrompt: Bool
+    let mode: ChecklistViewModel.Mode
     @State private var autoPromptFlag: Bool = false
 
     var body: some View {
-        ChecklistView(initialMode: .pre)
+        ChecklistView(initialMode: mode)
             .onAppear {
                 autoPromptFlag = autoPrompt
                 if autoPromptFlag {
-                    NotificationCenter.default.post(name: .beginChecklistAutoPrompt, object: nil)
+                    NotificationCenter.default.post(name: .beginChecklistAutoPrompt, object: mode)
                 }
             }
             .onDisappear {

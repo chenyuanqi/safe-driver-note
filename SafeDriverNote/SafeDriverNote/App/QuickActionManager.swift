@@ -4,13 +4,15 @@ import Combine
 
 enum QuickActionType: String, CaseIterable, Equatable {
     case startDriving = "com.chenyuanqi.SafeDriverNote.startDriving"
-    case quickChecklist = "com.chenyuanqi.SafeDriverNote.quickChecklist"
+    case quickChecklistPre = "com.chenyuanqi.SafeDriverNote.quickChecklistPre"
+    case quickChecklistPost = "com.chenyuanqi.SafeDriverNote.quickChecklistPost"
     case drivingRules = "com.chenyuanqi.SafeDriverNote.drivingRules"
 
     var displayName: String {
         switch self {
         case .startDriving: return "开始驾驶"
-        case .quickChecklist: return "行前检查"
+        case .quickChecklistPre: return "行前检查"
+        case .quickChecklistPost: return "行后检查"
         case .drivingRules: return "开车守则"
         }
     }
@@ -21,7 +23,8 @@ enum QuickActionType: String, CaseIterable, Equatable {
         case .startDriving:
             let driveService = AppDI.shared.driveService
             return driveService.isDriving ? "结束驾驶" : "开始驾驶"
-        case .quickChecklist: return "行前检查"
+        case .quickChecklistPre: return "行前检查"
+        case .quickChecklistPost: return "行后检查"
         case .drivingRules: return "开车守则"
         }
     }
@@ -29,7 +32,8 @@ enum QuickActionType: String, CaseIterable, Equatable {
     var subtitle: String? {
         switch self {
         case .startDriving: return "立即开启行程记录"
-        case .quickChecklist: return "快速打卡准备驾驶"
+        case .quickChecklistPre: return "快速打卡准备驾驶"
+        case .quickChecklistPost: return "行程结束后快速复盘"
         case .drivingRules: return "查看安全驾驶要点"
         }
     }
@@ -40,7 +44,8 @@ enum QuickActionType: String, CaseIterable, Equatable {
         case .startDriving:
             let driveService = AppDI.shared.driveService
             return driveService.isDriving ? "停止当前行程记录" : "立即开启行程记录"
-        case .quickChecklist: return "快速打卡准备驾驶"
+        case .quickChecklistPre: return "快速打卡准备驾驶"
+        case .quickChecklistPost: return "行程结束后快速复盘"
         case .drivingRules: return "查看安全驾驶要点"
         }
     }
@@ -48,7 +53,8 @@ enum QuickActionType: String, CaseIterable, Equatable {
     var systemImageName: String {
         switch self {
         case .startDriving: return "car.fill"
-        case .quickChecklist: return "speedometer"
+        case .quickChecklistPre: return "speedometer"
+        case .quickChecklistPost: return "checkmark.circle"
         case .drivingRules: return "book"
         }
     }
@@ -59,7 +65,8 @@ enum QuickActionType: String, CaseIterable, Equatable {
         case .startDriving:
             let driveService = AppDI.shared.driveService
             return driveService.isDriving ? "stop.circle" : "car.fill"
-        case .quickChecklist: return "speedometer"
+        case .quickChecklistPre: return "speedometer"
+        case .quickChecklistPost: return "checkmark.circle"
         case .drivingRules: return "book"
         }
     }
