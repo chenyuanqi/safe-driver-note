@@ -1,6 +1,6 @@
 # 开发路线图（iOS）
 
-> 项目：安全驾驶日记（Safe Driver Note）
+> 项目：安全驾驶日志（Safe Driver Note）
 > 版本：v0.1（迭代更新中）
 > 平台：iOS 17+，iPhone 优先
 

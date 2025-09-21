@@ -1,6 +1,6 @@
 # 文档索引（docs）
 
-> 项目：安全驾驶日记（Safe Driver Note）
+> 项目：安全驾驶日志（Safe Driver Note）
 
 ## 文档导航
 - [开发路线图（Roadmap）](./roadmap.md)

@@ -49,9 +49,6 @@ struct HomeView: View {
     @State private var notificationDetailTitle = ""
     @State private var notificationDetailContent = ""
 
-    // 添加调试信息弹框
-    @State private var showingDebugInfo = false
-    @State private var debugInfoText = ""
     @State private var showingPermissionOnboarding = false
 
     // 快速操作弹框
@@ -249,14 +246,6 @@ struct HomeView: View {
             .presentationDetents([.large, .fraction(0.85)])
             .presentationDragIndicator(.visible)
             .presentationCornerRadius(20)
-        }
-        .alert("驾驶调试信息", isPresented: $showingDebugInfo) {
-            Button("复制") {
-                UIPasteboard.general.string = debugInfoText
-            }
-            Button("关闭", role: .cancel) { }
-        } message: {
-            Text(debugInfoText)
         }
         .sheet(isPresented: $showingQuickChecklist) {
             NavigationStack {
@@ -460,6 +449,11 @@ struct HomeView: View {
         Task {
             await driveService.endDriving()
             await vm.loadRecentRoutes()
+            await MainActor.run {
+                driveAlertTitle = "驾驶记录已结束"
+                driveErrorMessage = "驾驶记录已结束，辛苦了！"
+                showingDriveError = true
+            }
         }
     }
 

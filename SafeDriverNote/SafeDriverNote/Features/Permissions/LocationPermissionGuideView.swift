@@ -63,7 +63,7 @@ struct LocationPermissionGuideView: View {
 				.foregroundColor(.brandSecondary900)
 			VStack(alignment: .leading, spacing: 8) {
 				Label("打开“设置 > 隐私与安全 > 定位服务”", systemImage: "1.circle")
-				Label("找到“安全驾驶日记”，将权限改为“始终”", systemImage: "2.circle")
+				Label("找到“安全驾驶日志”，将权限改为“始终”", systemImage: "2.circle")
 				Label("建议开启“精确位置”，提高记录准确度", systemImage: "3.circle")
 			}
 			.font(.body)

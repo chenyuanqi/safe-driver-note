@@ -399,7 +399,7 @@
 				DEVELOPMENT_TEAM = L2S3Q4VNNN;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "安全驾驶日记";
+				INFOPLIST_KEY_CFBundleDisplayName = "安全驾驶日志";
 				INFOPLIST_KEY_NSCameraUsageDescription = "更换头像时需要使用摄像头拍照。";
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "为保证行程记录的完整性，我们会在后台持续记录行驶路线位置。";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "我们需要位置权限来为您的驾驶日志和打卡记录自动标记地点，帮助您更好地记录驾驶经历。";
@@ -434,7 +434,7 @@
 				DEVELOPMENT_TEAM = L2S3Q4VNNN;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "安全驾驶日记";
+				INFOPLIST_KEY_CFBundleDisplayName = "安全驾驶日志";
 				INFOPLIST_KEY_NSCameraUsageDescription = "更换头像时需要使用摄像头拍照。";
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "为保证行程记录的完整性，我们会在后台持续记录行驶路线位置。";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "我们需要位置权限来为您的驾驶日志和打卡记录自动标记地点，帮助您更好地记录驾驶经历。";

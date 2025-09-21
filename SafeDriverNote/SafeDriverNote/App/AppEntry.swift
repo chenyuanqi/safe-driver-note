@@ -28,6 +28,7 @@ struct SafeDriverNoteApp: App {
     @StateObject private var notificationDelegate = NotificationDelegate()
     @StateObject private var themeManager = ThemeManager.shared
     @StateObject private var quickActionManager: QuickActionManager
+    @State private var showLaunchScreen = true
     @Environment(\.scenePhase) private var scenePhase
 
     init() {
@@ -60,47 +61,50 @@ struct SafeDriverNoteApp: App {
 
     var body: some Scene {
         WindowGroup {
-            RootTabView()
-                .environmentObject(AppDI.shared)
-                .environmentObject(notificationDelegate)
-                .environmentObject(themeManager)
-                .environmentObject(quickActionManager)
-                .handlesExternalEvents(preferring: Set(QuickActionType.allCases.map { $0.rawValue }), allowing: Set(QuickActionType.allCases.map { $0.rawValue }))
-                .onAppear {
-                    appDelegate.registerQuickActionManager(quickActionManager)
-                    // 设置通知代理
-                    UNUserNotificationCenter.current().delegate = notificationDelegate
+            ZStack {
+                Color.pageBackground.ignoresSafeArea()
 
-                    // 应用启动时设置通知
-                    Task {
-                        await setupNotifications()
+                RootTabView()
+                    .environmentObject(AppDI.shared)
+                    .environmentObject(notificationDelegate)
+                    .environmentObject(themeManager)
+                    .environmentObject(quickActionManager)
+                    .handlesExternalEvents(preferring: Set(QuickActionType.allCases.map { $0.rawValue }), allowing: Set(QuickActionType.allCases.map { $0.rawValue }))
+                    .onAppear {
+                        appDelegate.registerQuickActionManager(quickActionManager)
+                        UNUserNotificationCenter.current().delegate = notificationDelegate
+
+                        Task { await setupNotifications() }
+                        Task { await clearNotificationBadges() }
+
+                        checkForDelayedAlert()
                     }
-                    // 应用启动时清除通知红点
-                    Task {
-                        await clearNotificationBadges()
+                    .onChange(of: scenePhase) { oldPhase, newPhase in
+                        handleScenePhaseChange(from: oldPhase, to: newPhase)
+                    }
+                    .onOpenURL { url in
+                        handleURL(url)
+                    }
+                    .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { userActivity in
+                        // no-op
+                    }
+                    .onReceive(NotificationCenter.default.publisher(for: UIScene.willConnectNotification)) { notification in
+                        if let scene = notification.object as? UIWindowScene,
+                           let shortcutItem = scene.session.stateRestorationActivity?.userInfo?["shortcutItem"] as? UIApplicationShortcutItem {
+                            handleSceneShortcut(shortcutItem)
+                        }
                     }
 
-                    // 检查是否需要显示延时提醒
-                    checkForDelayedAlert()
+                if showLaunchScreen {
+                    LaunchScreenView(onSkip: {
+                        withAnimation(.easeOut(duration: 0.4)) {
+                            showLaunchScreen = false
+                        }
+                    })
+                    .transition(.opacity)
+                    .zIndex(1)
                 }
-                .onChange(of: scenePhase) { oldPhase, newPhase in
-                    handleScenePhaseChange(from: oldPhase, to: newPhase)
-                }
-                .onOpenURL { url in
-                    print("🔗 App opened with URL: \(url)")
-                    handleURL(url)
-                }
-                .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { userActivity in
-                    print("🔗 App opened with web browsing activity")
-                }
-                .onReceive(NotificationCenter.default.publisher(for: UIScene.willConnectNotification)) { notification in
-                    print("🔗 Scene will connect notification received")
-                    if let scene = notification.object as? UIWindowScene,
-                       let shortcutItem = scene.session.stateRestorationActivity?.userInfo?["shortcutItem"] as? UIApplicationShortcutItem {
-                        print("🔗 Found shortcut item in scene: \(shortcutItem.type)")
-                        handleSceneShortcut(shortcutItem)
-                    }
-                }
+            }
         }
         .modelContainer(sharedModelContainer)
     }
@@ -187,7 +191,6 @@ struct RootTabView: View {
     @EnvironmentObject private var notificationDelegate: NotificationDelegate
     @EnvironmentObject private var themeManager: ThemeManager
     @EnvironmentObject private var quickActionManager: QuickActionManager
-    @State private var showLaunchScreen = true
     @State private var selectedTab: RootTab = .home
 
     var body: some View {
@@ -258,16 +261,6 @@ struct RootTabView: View {
                 if let action = quickActionManager.requestedAction {
                     routeToTab(for: action, source: "onAppear")
                 }
-            }
-
-            if showLaunchScreen {
-                LaunchScreenView(onSkip: {
-                    withAnimation(.easeOut(duration: 0.5)) {
-                        showLaunchScreen = false
-                    }
-                })
-                .transition(.opacity)
-                .zIndex(1)
             }
         }
     }
