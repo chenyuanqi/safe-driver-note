@@ -144,6 +144,9 @@ struct ChecklistView: View {
                     .navigationTitle("历史打卡")
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .beginChecklistAutoPrompt)) { _ in
+            showingPunch = true
+        }
         .alert("确认删除", isPresented: $showingDeleteAlert) {
             Button("取消", role: .cancel) { }
             Button("删除", role: .destructive) {

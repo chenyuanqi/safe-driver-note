@@ -22,6 +22,7 @@ struct HomeView: View {
     @State private var currentLocationDescription = "获取位置中..."
     @State private var isLocationUpdating = false
     @State private var showingDriveError = false
+    @State private var driveAlertTitle = "驾驶提醒"
     @State private var driveErrorMessage = ""
     @State private var manualLocationTries = 0
     @State private var manualEndTries = 0
@@ -55,6 +56,7 @@ struct HomeView: View {
 
     // 快速操作弹框
     @State private var showingQuickChecklist = false
+    @State private var quickChecklistAutoPrompt = false
     @State private var knowledgeShouldShowDrivingRules = false
 
     var body: some View {
@@ -201,7 +203,7 @@ struct HomeView: View {
             .presentationDetents([.height(220)])
             .presentationDragIndicator(.visible)
         }
-        .alert("驾驶服务错误", isPresented: $showingDriveError) {
+        .alert(driveAlertTitle, isPresented: $showingDriveError) {
             Button("知道了") { }
         } message: {
             Text(driveErrorMessage)
@@ -258,20 +260,18 @@ struct HomeView: View {
         }
         .sheet(isPresented: $showingQuickChecklist) {
             NavigationStack {
-                VStack {
-                    HStack {
-                        Spacer()
-                        Button("完成") {
-                            showingQuickChecklist = false
-                        }
-                    }
-                    .padding()
-
-                    ChecklistView(initialMode: .pre)
-                }
+                QuickChecklistContainerView(
+                    isPresented: $showingQuickChecklist,
+                    autoPrompt: quickChecklistAutoPrompt
+                )
             }
             .presentationDetents([.large])
             .presentationDragIndicator(.visible)
+        }
+        .onChange(of: showingQuickChecklist) { isPresented in
+            if !isPresented {
+                quickChecklistAutoPrompt = false
+            }
         }
         .onChange(of: showingKnowledgeView) { isPresented in
             if !isPresented {
@@ -289,6 +289,7 @@ struct HomeView: View {
             queue: .main
         ) { notification in
             if let errorMessage = notification.object as? String {
+                driveAlertTitle = "驾驶服务错误"
                 driveErrorMessage = errorMessage
                 showingDriveError = true
             }
@@ -330,9 +331,16 @@ struct HomeView: View {
     private func handleQuickActionStartDriving() {
         print("[QuickAction] handleQuickActionStartDriving")
         if driveService.isDriving {
-            // 如果已经在驾驶，显示提示信息
-            driveErrorMessage = "您已经在驾驶记录中，当前行程正在进行。"
-            showingDriveError = true
+            print("[QuickAction] current trip in progress, ending via quick action")
+            Task {
+                await driveService.endDriving()
+                await vm.loadRecentRoutes()
+                await MainActor.run {
+                    driveAlertTitle = "驾驶记录已结束"
+                    driveErrorMessage = "驾驶记录已结束，辛苦了！"
+                    showingDriveError = true
+                }
+            }
         } else {
             // 如果没有在驾驶，则直接开始驾驶
             Task {
@@ -340,6 +348,7 @@ struct HomeView: View {
                 let status = LocationService.shared.authorizationStatus
                 if status == .denied || status == .restricted || status == .notDetermined {
                     await MainActor.run {
+                        driveAlertTitle = "需要位置权限"
                         driveErrorMessage = "需要位置权限才能开始驾驶记录，请到设置中开启位置权限。"
                         showingDriveError = true
                     }
@@ -361,6 +370,7 @@ struct HomeView: View {
 
                         // 显示成功提示
                         await MainActor.run {
+                            driveAlertTitle = "驾驶记录已开始"
                             driveErrorMessage = "驾驶记录已开始，安全第一！"
                             showingDriveError = true
                         }
@@ -370,6 +380,7 @@ struct HomeView: View {
                         await vm.loadRecentRoutes()
 
                         await MainActor.run {
+                            driveAlertTitle = "驾驶记录已开始"
                             driveErrorMessage = "驾驶记录已开始（未获取到起点位置）"
                             showingDriveError = true
                         }
@@ -380,6 +391,7 @@ struct HomeView: View {
                     await vm.loadRecentRoutes()
 
                     await MainActor.run {
+                        driveAlertTitle = "驾驶记录已开始"
                         driveErrorMessage = "驾驶记录已开始（未获取到起点位置）"
                         showingDriveError = true
                     }
@@ -391,7 +403,12 @@ struct HomeView: View {
     // 处理快速操作行前检查
     private func handleQuickActionQuickChecklist() {
         print("[QuickAction] handleQuickActionQuickChecklist")
-        showingQuickChecklist = true
+        if showingQuickChecklist {
+            NotificationCenter.default.post(name: .beginChecklistAutoPrompt, object: nil)
+        } else {
+            quickChecklistAutoPrompt = true
+            showingQuickChecklist = true
+        }
     }
 
     // 处理快速操作开车守则
@@ -1096,6 +1113,32 @@ struct HomeView: View {
 
         // 添加轻微延迟以提供更好的用户体验
         try? await Task.sleep(nanoseconds: 500_000_000) // 0.5秒
+    }
+}
+
+private struct QuickChecklistContainerView: View {
+    @Binding var isPresented: Bool
+    let autoPrompt: Bool
+    @State private var autoPromptFlag: Bool = false
+
+    var body: some View {
+        ChecklistView(initialMode: .pre)
+            .onAppear {
+                autoPromptFlag = autoPrompt
+                if autoPromptFlag {
+                    NotificationCenter.default.post(name: .beginChecklistAutoPrompt, object: nil)
+                }
+            }
+            .onDisappear {
+                autoPromptFlag = false
+            }
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("关闭") {
+                        isPresented = false
+                    }
+                }
+            }
     }
 }
 

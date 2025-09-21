@@ -391,4 +391,5 @@ private struct QuickActionDebugBanner: View {
 
 extension Notification.Name {
     static let openDrivingRules = Notification.Name("OpenDrivingRules")
+    static let beginChecklistAutoPrompt = Notification.Name("BeginChecklistAutoPrompt")
 }
