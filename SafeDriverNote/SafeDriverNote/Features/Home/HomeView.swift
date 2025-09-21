@@ -551,61 +551,23 @@ struct HomeView: View {
 				.foregroundColor(.brandSecondary900)
 			
 			// Primary Action - Start/End Driving
-			Button(action: {
-				if driveService.isDriving {
-					// 结束驾驶
-					Task {
-						// 获取调试信息
-						debugInfoText = driveService.getDebugInfo()
-
-						// 直接结束驾驶，不等待位置
-						await driveService.endDriving()
-						await vm.loadRecentRoutes()
-
-						// 后台尝试获取终点位置并更新
-						Task.detached { @MainActor in
-							let locationService = LocationService.shared
-							do {
-								if let location = try await locationService.getCurrentLocation(timeout: 3.0) {
-									// 获取最后保存的路线
-									if let routes = try? AppDI.shared.driveRouteRepository.fetchRecentRoutes(limit: 1),
-									   let lastRoute = routes.first {
-										let address = await locationService.getLocationDescription(from: location)
-										let endLocation = RouteLocation(
-											latitude: location.coordinate.latitude,
-											longitude: location.coordinate.longitude,
-											address: address
-										)
-										// 更新路线的终点
-										try? AppDI.shared.driveRouteRepository.updateRoute(lastRoute) { r in
-											r.endLocation = endLocation
-										}
-									}
-								}
-							} catch {
-								print("后台获取终点位置失败: \(error)")
-							}
-						}
-
-						// 显示调试信息弹框
-						showingDebugInfo = true
-					}
-				} else {
-					// 权限引导：如果仅使用期间或被拒绝，先弹权限引导页
-					let status = LocationService.shared.authorizationStatus
-					if status == .denied || status == .restricted || status == .notDetermined || status == .authorizedWhenInUse {
-						showingPermissionGuide = true
-					} else {
-						// 开始驾驶前显示确认对话框
-						showingDriveConfirmation = true
-					}
-				}
-			}) {
-				Card(backgroundColor: driveService.isDriving ? .brandDanger500 : .brandPrimary500, shadow: true) {
-					HStack(spacing: Spacing.lg) {
-						if driveService.isStartingDrive || driveService.isEndingDrive {
-							ProgressView()
-								.progressViewStyle(CircularProgressViewStyle(tint: .white))
+            Button(action: {
+                if driveService.isDriving {
+                    showEndConfirmation = true
+                } else {
+                    let status = LocationService.shared.authorizationStatus
+                    if status == .denied || status == .restricted || status == .notDetermined || status == .authorizedWhenInUse {
+                        showingPermissionGuide = true
+                    } else {
+                        showingDriveConfirmation = true
+                    }
+                }
+            }) {
+                Card(backgroundColor: driveService.isDriving ? .brandDanger500 : .brandPrimary500, shadow: true) {
+                    HStack(spacing: Spacing.lg) {
+                        if driveService.isStartingDrive || driveService.isEndingDrive {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
 								.scaleEffect(0.8)
 						} else {
 							Image(systemName: driveService.isDriving ? "stop.circle" : "car")
@@ -614,38 +576,26 @@ struct HomeView: View {
 						}
 						
 						VStack(alignment: .leading, spacing: Spacing.xs) {
-							Text(driveService.isDriving ? "结束驾驶" : "开始驾驶")
-							.font(.bodyLarge)
-							.fontWeight(.semibold)
-							.foregroundColor(.white)
-								
-							if driveService.isDriving, let route = driveService.currentRoute {
-								Text("已驾驶 \(driveService.currentDrivingTime) · 记录\(driveService.currentWaypointCount)个点")
-									.font(.bodySmall)
-									.foregroundColor(.white.opacity(0.8))
+                            Text(driveService.isDriving ? "结束驾驶" : "开始驾驶")
+                                .font(.bodyLarge)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.white)
 
-								// 显示当前位置
-								Text(currentLocationDescription)
-									.font(.bodySmall)
-									.foregroundColor(.white.opacity(0.8))
-							} else if !driveService.isDriving {
-								// 显示当前位置
-								Text(currentLocationDescription)
-									.font(.bodySmall)
-									.foregroundColor(.white.opacity(0.8))
-							}
-						}
-						
-						Spacer()
-						
-						Image(systemName: "chevron.right")
+                            Text(driveService.isDriving ? "当前行程正在记录中…" : currentLocationDescription)
+                                .font(.bodySmall)
+                                .foregroundColor(.white.opacity(0.8))
+                        }
+
+                        Spacer()
+
+                        Image(systemName: "chevron.right")
 							.font(.body)
 							.foregroundColor(.white.opacity(0.8))
 					}
 				}
 			}
 			.buttonStyle(PlainButtonStyle())
-			.disabled(driveService.isStartingDrive || driveService.isEndingDrive)
+            .disabled(driveService.isStartingDrive || driveService.isEndingDrive)
 			// 移除额外的 onTapGesture，避免并发位置请求
 			
 			// Secondary Actions
