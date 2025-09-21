@@ -1,6 +1,7 @@
 import SwiftUI
 import Foundation
 import UIKit
+import SwiftData
 
 struct DataExportView: View {
     @Environment(\.dismiss) private var dismiss
@@ -387,80 +388,9 @@ struct DataExportView: View {
 
         Task {
             do {
-                // 1. 收集选中的数据
-                var exportData: [String: Any] = [:]
-                exportData["exportDate"] = isoString(from: Date())
-                exportData["appVersion"] = "1.0.0"
-
-                if exportDrivingRoutes {
-                    let routes = try await MainActor.run { try di.driveRouteRepository.fetchAllRoutes() }
-                    exportData["drivingRoutes"] = routes.map { route in
-                        [
-                            "id": route.id.uuidString,
-                            "startLocation": route.startLocation?.address ?? "",
-                            "endLocation": route.endLocation?.address ?? "",
-                            "startTime": isoString(from: route.startTime),
-                            "endTime": route.endTime.map { isoString(from: $0) } ?? "",
-                            "distance": route.distance ?? 0,
-                            "durationSeconds": route.duration ?? 0,
-                            "status": route.status.rawValue,
-                            "notes": route.notes ?? ""
-                        ]
-                    }
-                }
-
-                if exportDrivingLogs {
-                    let logs = try await MainActor.run { try di.logRepository.fetchAll() }
-                    exportData["drivingLogs"] = logs.map { log in
-                        [
-                            "id": log.id.uuidString,
-                            "type": log.type.rawValue,
-                            "locationNote": log.locationNote,
-                            "scene": log.scene,
-                            "detail": log.detail,
-                            "cause": log.cause ?? "",
-                            "improvement": log.improvement ?? "",
-                            "tags": log.tags,
-                            "createdAt": isoString(from: log.createdAt),
-                            "photoLocalIds": log.photoLocalIds,
-                            "audioFileName": log.audioFileName ?? "",
-                            "transcript": log.transcript ?? ""
-                        ]
-                    }
-                }
-
-                if exportChecklistRecords {
-                    let records = try await MainActor.run { try di.checklistRepository.fetchAllPunches(mode: nil) }
-                    exportData["checklistRecords"] = records.map { record in
-                        [
-                            "id": record.id.uuidString,
-                            "mode": record.mode.rawValue,
-                            "checkedItemIds": record.checkedItemIds.map { $0.uuidString },
-                            "isQuickComplete": record.isQuickComplete,
-                            "score": record.score,
-                            "locationNote": record.locationNote ?? "",
-                            "createdAt": isoString(from: record.createdAt)
-                        ]
-                    }
-                }
-
-                if exportKnowledgeProgress {
-                    let cards = try await MainActor.run { try di.knowledgeRepository.allCards() }
-                    exportData["knowledgeProgress"] = cards.map { card in
-                        [
-                            "id": card.id,
-                            "title": card.title,
-                            "what": card.what,
-                            "why": card.why,
-                            "how": card.how,
-                            "tags": card.tags
-                        ]
-                    }
-                }
-
-                // 2. 根据格式转换数据
-                let fileName = "SafeDriverNote_Export_\(formatDate(Date()))"
-                let fileURL = try await saveExportData(exportData, fileName: fileName, format: exportFormat)
+                let backup = try await buildBackupEnvelope()
+                let fileName = "SafeDriverNote_Backup_\(formatDate(Date()))"
+                let fileURL = try await saveExportData(backup, fileName: fileName, format: exportFormat)
 
                 await MainActor.run {
                     self.isExporting = false
@@ -471,23 +401,81 @@ struct DataExportView: View {
             } catch {
                 await MainActor.run {
                     self.isExporting = false
-                    self.errorMessage = "导出失败：\(error.localizedDescription)"
+                    if let backupError = error as? BackupError {
+                        self.errorMessage = backupError.localizedDescription
+                    } else {
+                        self.errorMessage = "导出失败：\(error.localizedDescription)"
+                    }
                     self.showingError = true
                 }
             }
         }
     }
 
-    private func saveExportData(_ data: [String: Any], fileName: String, format: ExportFormat) async throws -> URL {
+    private func buildBackupEnvelope() async throws -> BackupEnvelope {
+        try await MainActor.run {
+            guard let context = GlobalModelContext.context else { throw BackupError.contextUnavailable }
+
+            var envelope = BackupEnvelope(
+                metadata: BackupMetadata(
+                    exportedAt: Date(),
+                    appVersion: currentAppVersion()
+                )
+            )
+
+            if exportDrivingRoutes {
+                let routes = try context.fetch(FetchDescriptor<DriveRoute>())
+                envelope.drivingRoutes = routes.map(DriveRouteBackup.init)
+            }
+
+            if exportDrivingLogs {
+                let logs = try context.fetch(FetchDescriptor<LogEntry>())
+                envelope.drivingLogs = logs.map(DrivingLogBackup.init)
+            }
+
+            if exportChecklistRecords {
+                let records = try context.fetch(FetchDescriptor<ChecklistRecord>())
+                envelope.checklistRecords = records.map(ChecklistRecordBackup.init)
+
+                let items = try context.fetch(FetchDescriptor<ChecklistItem>())
+                envelope.checklistItems = items.map(ChecklistItemBackup.init)
+
+                let punches = try context.fetch(FetchDescriptor<ChecklistPunch>())
+                envelope.checklistPunches = punches.map(ChecklistPunchBackup.init)
+            }
+
+            if exportKnowledgeProgress {
+                let progresses = try context.fetch(FetchDescriptor<KnowledgeProgress>())
+                envelope.knowledgeProgress = progresses.map(KnowledgeProgressBackup.init)
+
+                let cards = try context.fetch(FetchDescriptor<KnowledgeCard>())
+                envelope.knowledgeCards = cards.map(KnowledgeCardBackup.init)
+            }
+
+            let profiles = try context.fetch(FetchDescriptor<UserProfile>())
+            envelope.userProfile = profiles.first.map(UserProfileBackup.init)
+
+            return envelope
+        }
+    }
+
+    private func saveExportData(_ data: BackupEnvelope, fileName: String, format: ExportFormat) async throws -> URL {
         let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
 
         switch format {
         case .json:
             let fileURL = documentsPath.appendingPathComponent("\(fileName).json")
-            let jsonData = try JSONSerialization.data(withJSONObject: data, options: .prettyPrinted)
-            try removeExistingFile(at: fileURL)
-            try jsonData.write(to: fileURL)
-            return fileURL
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+            encoder.dateEncodingStrategy = .iso8601
+            do {
+                let jsonData = try encoder.encode(data)
+                try removeExistingFile(at: fileURL)
+                try jsonData.write(to: fileURL)
+                return fileURL
+            } catch {
+                throw BackupError.encodingFailed
+            }
 
         case .csv:
             let fileURL = documentsPath.appendingPathComponent("\(fileName).csv")
@@ -505,24 +493,50 @@ struct DataExportView: View {
         }
     }
 
-    private func generateCSVContent(from data: [String: Any]) throws -> String {
+    private func generateCSVContent(from backup: BackupEnvelope) throws -> String {
         var csvLines: [String] = []
+        csvLines.append("数据类型,ID,标题/位置,详情,时间,附加信息")
 
-        // CSV标题行
-        csvLines.append("数据类型,ID,类型,位置,场景,详情,日期,标签")
-
-        // 处理驾驶日志
-        if let logs = data["drivingLogs"] as? [[String: Any]] {
+        if let logs = backup.drivingLogs {
             for log in logs {
                 let line = [
                     "驾驶日志",
-                    log["id"] as? String ?? "",
-                    log["type"] as? String ?? "",
-                    log["locationNote"] as? String ?? "",
-                    log["scene"] as? String ?? "",
-                    log["detail"] as? String ?? "",
-                    formatDateForCSV(log["createdAt"]),
-                    (log["tags"] as? [String])?.joined(separator: ";") ?? ""
+                    log.id.uuidString,
+                    sanitizeCSV(log.scene),
+                    sanitizeCSV(log.detail),
+                    iso8601String(from: log.createdAt),
+                    sanitizeCSV(log.tags.joined(separator: ";"))
+                ].joined(separator: ",")
+                csvLines.append(line)
+            }
+        }
+
+        if let routes = backup.drivingRoutes {
+            for route in routes {
+                let title = route.startLocation?.address ?? "行程"
+                let detail = route.endLocation?.address ?? ""
+                let info = "状态: \(route.status.rawValue)"
+                let line = [
+                    "驾驶路线",
+                    route.id.uuidString,
+                    sanitizeCSV(title),
+                    sanitizeCSV(detail),
+                    iso8601String(from: route.startTime),
+                    sanitizeCSV(info)
+                ].joined(separator: ",")
+                csvLines.append(line)
+            }
+        }
+
+        if let punches = backup.checklistPunches {
+            for punch in punches {
+                let line = [
+                    "检查打卡",
+                    punch.id.uuidString,
+                    punch.mode.rawValue,
+                    sanitizeCSV(punch.locationNote ?? ""),
+                    iso8601String(from: punch.createdAt),
+                    "得分: \(punch.score)"
                 ].joined(separator: ",")
                 csvLines.append(line)
             }
@@ -531,24 +545,43 @@ struct DataExportView: View {
         return csvLines.joined(separator: "\n")
     }
 
-    private func generateTextReport(from data: [String: Any]) -> String {
+    private func generateTextReport(from backup: BackupEnvelope) -> String {
         var report = "=== 安全驾驶助手数据导出报告 ===\n"
-        report += "导出时间：\(formatDate(Date()))\n\n"
+        report += "导出时间：\(formatDate(Date()))\n"
+        report += "应用版本：\(backup.metadata.appVersion)\n\n"
 
-        if let routes = data["drivingRoutes"] as? [[String: Any]] {
+        if let routes = backup.drivingRoutes {
             report += "驾驶路线记录（\(routes.count)条）：\n"
             for route in routes {
-                report += "- \(route["startLocation"] ?? "") → \(route["endLocation"] ?? "")\n"
+                let start = route.startLocation?.address ?? "未知起点"
+                let end = route.endLocation?.address ?? "未知终点"
+                report += "• \(start) → \(end) [状态: \(route.status.displayName)]\n"
             }
             report += "\n"
         }
 
-        if let logs = data["drivingLogs"] as? [[String: Any]] {
+        if let logs = backup.drivingLogs {
             report += "驾驶日志（\(logs.count)条）：\n"
             for log in logs {
-                report += "- [\(log["type"] ?? "")] \(log["scene"] ?? ""): \(log["detail"] ?? "")\n"
+                report += "• [\(log.type == .success ? "成功" : "失误")] \(log.scene)：\(log.detail)\n"
             }
             report += "\n"
+        }
+
+        if let punches = backup.checklistPunches {
+            report += "检查打卡（\(punches.count)次）：\n"
+            for punch in punches {
+                report += "• \(punch.mode == .pre ? "行前" : "行后")检查，得分 \(punch.score) 分\n"
+            }
+            report += "\n"
+        }
+
+        if let knowledge = backup.knowledgeProgress {
+            report += "知识学习记录：已标记 \(knowledge.count) 个知识点。\n\n"
+        }
+
+        if let profile = backup.userProfile {
+            report += "用户资料：\(profile.userName)，驾龄 \(profile.drivingYears) 年。\n"
         }
 
         return report
@@ -561,24 +594,22 @@ struct DataExportView: View {
         return formatter.string(from: date)
     }
 
-    private func formatDateForCSV(_ value: Any?) -> String {
-        if let string = value as? String {
-            return string
-        }
-        if let date = value as? Date {
-            let formatter = DateFormatter()
-            formatter.locale = Locale(identifier: "zh_CN")
-            formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
-            return formatter.string(from: date)
-        }
-        return ""
+    private func iso8601String(from date: Date) -> String {
+        ISO8601DateFormatter().string(from: date)
     }
 
-    private func isoString(from date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "zh_CN")
-        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
-        return formatter.string(from: date)
+    private func sanitizeCSV(_ value: String) -> String {
+        var sanitized = value.replacingOccurrences(of: "\n", with: " ")
+        sanitized = sanitized.replacingOccurrences(of: "\r", with: " ")
+        sanitized = sanitized.replacingOccurrences(of: "\"", with: "\"\"")
+        if sanitized.contains(",") {
+            sanitized = "\"\(sanitized)\""
+        }
+        return sanitized
+    }
+
+    private func currentAppVersion() -> String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
     }
 
     private func removeExistingFile(at url: URL) throws {

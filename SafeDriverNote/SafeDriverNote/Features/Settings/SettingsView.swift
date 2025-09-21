@@ -6,6 +6,7 @@ struct SettingsView: View {
     @State private var showingHelpGuide = false
     @State private var showingAbout = false
     @State private var showingDataExport = false
+    @State private var showingDataImport = false
     @State private var showingThemeSelector = false
     @State private var showingLocationPermission = false
     @State private var showingiCloudSync = false
@@ -63,6 +64,9 @@ struct SettingsView: View {
         }
         .sheet(isPresented: $showingDataExport) {
             DataExportView()
+        }
+        .sheet(isPresented: $showingDataImport) {
+            DataImportView()
         }
         .sheet(isPresented: $showingThemeSelector) {
             ThemeSelectorView()
@@ -245,6 +249,19 @@ struct SettingsView: View {
                         icon: "square.and.arrow.up",
                         title: "导出数据",
                         subtitle: "导出您的驾驶记录和日志",
+                        color: .brandInfo500
+                    )
+                }
+
+                Divider().padding(.leading, 52)
+
+                Button(action: {
+                    showingDataImport = true
+                }) {
+                    settingsRow(
+                        icon: "square.and.arrow.down",
+                        title: "导入数据",
+                        subtitle: "从备份恢复应用数据",
                         color: .brandInfo500
                     )
                 }
