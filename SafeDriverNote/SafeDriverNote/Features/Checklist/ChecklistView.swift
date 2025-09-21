@@ -491,6 +491,7 @@ struct ChecklistView: View {
         // 添加轻微延迟以提供更好的用户体验
         try? await Task.sleep(nanoseconds: 500_000_000) // 0.5秒
     }
+
 }
 
 #Preview {

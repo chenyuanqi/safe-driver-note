@@ -455,4 +455,6 @@ struct FireworkParticle {
     var opacity: Double
 }
 
-#Preview { KnowledgeTodayView() }
+#Preview {
+    KnowledgeTodayView()
+}

@@ -48,7 +48,7 @@ struct HomeView: View {
     // 添加调试信息弹框
     @State private var showingDebugInfo = false
     @State private var debugInfoText = ""
-    
+
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
@@ -104,6 +104,7 @@ struct HomeView: View {
             Task {
                 await clearNotificationBadges()
             }
+
         }
         .onDisappear {
             // 移除通知观察者
@@ -268,7 +269,7 @@ struct HomeView: View {
             Text(debugInfoText)
         }
     }
-    
+
     // 添加通知监听
     private func setupNotificationObservers() {
         // 监听驾驶服务错误通知
@@ -1240,4 +1241,6 @@ final class HomeViewModel: ObservableObject {
 	}
 }
 
-#Preview { HomeView() }
+#Preview {
+    HomeView()
+}

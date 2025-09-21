@@ -24,16 +24,21 @@ let sharedModelContainer: ModelContainer = {
 
 @main
 struct SafeDriverNoteApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var notificationDelegate = NotificationDelegate()
     @StateObject private var themeManager = ThemeManager.shared
+    @StateObject private var quickActionManager: QuickActionManager
     @Environment(\.scenePhase) private var scenePhase
 
     init() {
+        let quickActionManager = QuickActionManager()
+        self._quickActionManager = StateObject(wrappedValue: quickActionManager)
         GlobalModelContext.container = sharedModelContainer
         // 首次启动播种知识卡
         DataSeeder.seedIfNeeded(context: sharedModelContainer.mainContext)
         // 修复有问题的音频文件名
         AudioStorageService.shared.fixProblematicAudioFiles()
+        appDelegate.registerQuickActionManager(quickActionManager)
     }
 
     var body: some Scene {
@@ -42,7 +47,9 @@ struct SafeDriverNoteApp: App {
                 .environmentObject(AppDI.shared)
                 .environmentObject(notificationDelegate)
                 .environmentObject(themeManager)
+                .environmentObject(quickActionManager)
                 .onAppear {
+                    appDelegate.registerQuickActionManager(quickActionManager)
                     // 设置通知代理
                     UNUserNotificationCenter.current().delegate = notificationDelegate
 
@@ -146,64 +153,82 @@ struct SafeDriverNoteApp: App {
 struct RootTabView: View {
     @EnvironmentObject private var notificationDelegate: NotificationDelegate
     @EnvironmentObject private var themeManager: ThemeManager
+    @EnvironmentObject private var quickActionManager: QuickActionManager
     @State private var showLaunchScreen = true
+    @State private var selectedTab: RootTab = .home
 
     var body: some View {
         ZStack {
-            TabView {
-            NavigationStack {
-                HomeView()
-            }
-            .tabItem { Label("首页", systemImage: "house") }
+            TabView(selection: $selectedTab) {
+                NavigationStack {
+                    HomeView()
+                }
+                .tabItem { Label("首页", systemImage: "house") }
+                .tag(RootTab.home)
 
-            NavigationStack {
-                LogListView()
-            }
-            .tabItem { Label("日志", systemImage: "list.bullet") }
+                NavigationStack {
+                    LogListView()
+                }
+                .tabItem { Label("日志", systemImage: "list.bullet") }
+                .tag(RootTab.logs)
 
-            NavigationStack {
-                ChecklistView()
-            }
-            .tabItem { Label("清单", systemImage: "checklist") }
+                NavigationStack {
+                    ChecklistView()
+                }
+                .tabItem { Label("清单", systemImage: "checklist") }
+                .tag(RootTab.checklist)
 
-            NavigationStack {
-                KnowledgeTodayView()
-            }
-            .tabItem { Label("知识", systemImage: "book") }
+                NavigationStack {
+                    KnowledgeTodayView()
+                }
+                .tabItem { Label("知识", systemImage: "book") }
+                .tag(RootTab.knowledge)
 
-            NavigationStack {
-                SettingsView()
-            }
-            .tabItem { Label("设置", systemImage: "gearshape") }
+                NavigationStack {
+                    SettingsView()
+                }
+                .tabItem { Label("设置", systemImage: "gearshape") }
+                .tag(RootTab.settings)
 
-            // 测试页 (暂时隐藏)
-            /*
-            #if DEBUG
-            NavigationStack {
-                WeakNetworkTestView()
+                // 测试页 (暂时隐藏)
+                /*
+                #if DEBUG
+                NavigationStack {
+                    WeakNetworkTestView()
+                }
+                .tabItem { Label("测试", systemImage: "testtube.2") }
+                .tag(RootTab.test)
+                #endif
+                */
             }
-            .tabItem { Label("测试", systemImage: "testtube.2") }
-            #endif
-            */
-        }
-        .alert(notificationDelegate.notificationDetailTitle, isPresented: $notificationDelegate.showNotificationDetail) {
-            Button("知道了") {
-                notificationDelegate.showNotificationDetail = false
+            .alert(notificationDelegate.notificationDetailTitle, isPresented: $notificationDelegate.showNotificationDetail) {
+                Button("知道了") {
+                    notificationDelegate.showNotificationDetail = false
+                }
+            } message: {
+                Text(notificationDelegate.notificationDetailContent)
             }
-        } message: {
-            Text(notificationDelegate.notificationDetailContent)
-        }
-        .sheet(isPresented: $notificationDelegate.showDelayedAlert) {
-            SafetyReminderView {
-                notificationDelegate.showDelayedAlert = false
-                notificationDelegate.markReminderShown()
+            .sheet(isPresented: $notificationDelegate.showDelayedAlert) {
+                SafetyReminderView {
+                    notificationDelegate.showDelayedAlert = false
+                    notificationDelegate.markReminderShown()
+                }
+                .presentationDetents([.height(240)])
+                .presentationDragIndicator(.visible)
             }
-            .presentationDetents([.height(240)])
-            .presentationDragIndicator(.visible)
-        }
-        .preferredColorScheme(themeManager.colorScheme)
+            .preferredColorScheme(themeManager.colorScheme)
+            .onChange(of: quickActionManager.requestedAction) { action in
+                guard let action else { return }
+                routeToTab(for: action)
+                quickActionManager.clear()
+            }
+            .onAppear {
+                if let action = quickActionManager.requestedAction {
+                    routeToTab(for: action)
+                    quickActionManager.clear()
+                }
+            }
 
-            // 启动动画层
             if showLaunchScreen {
                 LaunchScreenView(onSkip: {
                     withAnimation(.easeOut(duration: 0.5)) {
@@ -215,6 +240,28 @@ struct RootTabView: View {
             }
         }
     }
+
+    private func routeToTab(for action: QuickActionType) {
+        switch action {
+        case .startDriving:
+            selectedTab = .home
+        case .quickChecklist:
+            selectedTab = .checklist
+        case .drivingRules:
+            selectedTab = .knowledge
+        }
+    }
+}
+
+private enum RootTab: Hashable {
+    case home
+    case logs
+    case checklist
+    case knowledge
+    case settings
+#if DEBUG
+    case test
+#endif
 }
 
 // MARK: - Notification Delegate
