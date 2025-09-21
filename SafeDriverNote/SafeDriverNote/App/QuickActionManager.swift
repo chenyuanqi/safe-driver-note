@@ -88,7 +88,6 @@ final class QuickActionManager: ObservableObject {
     @Published var requestedAction: QuickActionType?
 
     func trigger(_ action: QuickActionType) {
-        print("[QuickAction] manager trigger -> \(action.rawValue)")
         DispatchQueue.main.async {
             self.requestedAction = action
         }
@@ -96,7 +95,6 @@ final class QuickActionManager: ObservableObject {
 
     func clear(_ action: QuickActionType) {
         guard requestedAction == action else { return }
-        print("[QuickAction] manager clear -> \(action.rawValue)")
         requestedAction = nil
     }
 }
@@ -123,34 +121,20 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         // 延迟配置一次，确保系统有时间处理
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
             Task { @MainActor in
-                print("🔄 Reconfiguring shortcut items after delay")
                 self.configureShortcutItems()
             }
         }
 
         if let shortcut = launchOptions?[.shortcutItem] as? UIApplicationShortcutItem {
-            print("📱 App launched via shortcut: \(shortcut.type)")
             pendingShortcutItem = shortcut
             return false
         }
-        print("📱 App launched normally")
         return true
     }
 
     func applicationDidBecomeActive(_ application: UIApplication) {
-        print("📱 App became active")
-        print("📱 Current shortcut items count: \(UIApplication.shared.shortcutItems?.count ?? 0)")
-
         // 检查是否有等待处理的快速操作
         deliverPendingShortcutIfNeeded()
-
-        // 这里添加一个重要的检查：如果应用是通过快速操作激活的，但没有被处理
-        if let shortcutItems = UIApplication.shared.shortcutItems {
-            print("📱 Available shortcut items:")
-            for item in shortcutItems {
-                print("   - \(item.localizedTitle): \(item.type)")
-            }
-        }
 
         // 确保快速操作在应用激活时也被配置
         Task { @MainActor in
@@ -159,10 +143,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
     }
 
     func application(_ application: UIApplication, performActionFor shortcutItem: UIApplicationShortcutItem, completionHandler: @escaping (Bool) -> Void) {
-        print("🎯 performActionFor shortcutItem called with: \(shortcutItem.type)")
-        print("🎯 shortcutItem details: title=\(shortcutItem.localizedTitle), subtitle=\(shortcutItem.localizedSubtitle ?? "nil")")
         let handled = handleShortcut(shortcutItem)
-        print("🎯 Shortcut handled: \(handled)")
         completionHandler(handled)
     }
 
@@ -173,16 +154,12 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
     }
 
     private func handleShortcut(_ shortcutItem: UIApplicationShortcutItem) -> Bool {
-        print("🎯 AppDelegate.handleShortcut called with: \(shortcutItem.type)")
         guard let actionType = QuickActionType(rawValue: shortcutItem.type) else {
-            print("❌ Failed to parse action type from: \(shortcutItem.type)")
             return false
         }
         if let manager = quickActionManager {
-            print("✅ Found quickActionManager, triggering action")
             manager.trigger(actionType)
         } else {
-            print("⏳ quickActionManager not ready, storing as pending")
             pendingShortcutItem = shortcutItem
         }
         return true
@@ -190,13 +167,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
 
     @MainActor
     private func configureShortcutItems() {
-        let items = QuickActionType.allCases.map { $0.dynamicShortcutItem() }
-        print("🔧 Configuring \(items.count) shortcut items:")
-        for item in items {
-            print("   - \(item.localizedTitle): \(item.type)")
-        }
-        UIApplication.shared.shortcutItems = items
-        print("✅ Shortcut items configured")
+        UIApplication.shared.shortcutItems = QuickActionType.allCases.map { $0.dynamicShortcutItem() }
     }
 
     @MainActor
@@ -223,18 +194,12 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
     }
 
     private func deliverPendingShortcutIfNeeded() {
-        print("📋 Checking for pending shortcuts...")
         guard let shortcut = pendingShortcutItem else {
-            print("📋 No pending shortcuts found")
             return
         }
-        print("📋 Found pending shortcut: \(shortcut.type)")
         if let actionType = QuickActionType(rawValue: shortcut.type) {
-            print("📋 Triggering pending shortcut action: \(actionType)")
             quickActionManager?.trigger(actionType)
             pendingShortcutItem = nil
-        } else {
-            print("📋 Failed to parse pending shortcut type")
         }
     }
 }
@@ -255,12 +220,8 @@ final class SceneDelegate: NSObject, UIWindowSceneDelegate {
 
     @discardableResult
     private func handleShortcut(_ shortcutItem: UIApplicationShortcutItem) -> Bool {
-        print("🎯 SceneDelegate.handleShortcut -> \(shortcutItem.type)")
         guard let actionType = QuickActionType(rawValue: shortcutItem.type) else { return false }
-        guard let manager = Self.quickActionManager else {
-            print("❌ SceneDelegate missing quickActionManager")
-            return false
-        }
+        guard let manager = Self.quickActionManager else { return false }
         manager.trigger(actionType)
         return true
     }

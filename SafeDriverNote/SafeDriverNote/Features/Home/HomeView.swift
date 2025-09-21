@@ -59,6 +59,7 @@ struct HomeView: View {
     @State private var quickChecklistAutoPrompt = false
     @State private var quickChecklistMode: ChecklistViewModel.Mode = .pre
     @State private var knowledgeShouldShowDrivingRules = false
+    @State private var showEndConfirmation = false
 
     var body: some View {
         NavigationStack {
@@ -97,7 +98,6 @@ struct HomeView: View {
         } // 关闭NavigationStack
         .onAppear { 
             vm.reload() 
-            print("[QuickAction] HomeView onAppear, current action: \(String(describing: quickActionManager.requestedAction))")
             presentPermissionOnboardingIfNeeded()
             if let action = quickActionManager.requestedAction {
                 handleQuickAction(action)
@@ -119,7 +119,6 @@ struct HomeView: View {
         }
         .onChange(of: quickActionManager.requestedAction) { action in
             guard let action else { return }
-            print("[QuickAction] HomeView observed action change -> \(action.rawValue)")
             handleQuickAction(action)
         }
         .sheet(isPresented: $showingPermissionOnboarding) {
@@ -280,6 +279,15 @@ struct HomeView: View {
                 knowledgeShouldShowDrivingRules = false
             }
         }
+        .confirmationDialog("结束驾驶", isPresented: $showEndConfirmation, titleVisibility: .visible) {
+            Button("结束当前驾驶", role: .destructive) {
+                showEndConfirmation = false
+                endCurrentDrive()
+            }
+            Button("取消", role: .cancel) { }
+        } message: {
+            Text("确定要结束当前驾驶记录吗？")
+        }
     }
 
     // 添加通知监听
@@ -317,7 +325,6 @@ struct HomeView: View {
     }
 
     private func handleQuickAction(_ action: QuickActionType) {
-        print("[QuickAction] HomeView handleQuickAction -> \(action.rawValue)")
         switch action {
         case .startDriving:
             handleQuickActionStartDriving()
@@ -333,18 +340,8 @@ struct HomeView: View {
 
     // 处理快速操作开始驾驶
     private func handleQuickActionStartDriving() {
-        print("[QuickAction] handleQuickActionStartDriving")
         if driveService.isDriving {
-            print("[QuickAction] current trip in progress, ending via quick action")
-            Task {
-                await driveService.endDriving()
-                await vm.loadRecentRoutes()
-                await MainActor.run {
-                    driveAlertTitle = "驾驶记录已结束"
-                    driveErrorMessage = "驾驶记录已结束，辛苦了！"
-                    showingDriveError = true
-                }
-            }
+            showEndConfirmation = true
         } else {
             // 如果没有在驾驶，则直接开始驾驶
             Task {
@@ -406,7 +403,6 @@ struct HomeView: View {
 
     // 处理快速操作行前检查
     private func handleQuickActionQuickChecklist(mode: ChecklistViewModel.Mode) {
-        print("[QuickAction] handleQuickActionQuickChecklist -> \(mode == .pre ? "pre" : "post")")
         quickChecklistMode = mode
         if showingQuickChecklist {
             NotificationCenter.default.post(name: .beginChecklistAutoPrompt, object: mode)
@@ -418,7 +414,6 @@ struct HomeView: View {
 
     // 处理快速操作开车守则
     private func handleQuickActionDrivingRules() {
-        print("[QuickAction] handleQuickActionDrivingRules")
         if showingKnowledgeView {
             NotificationCenter.default.post(name: .openDrivingRules, object: nil)
         } else {
@@ -458,6 +453,13 @@ struct HomeView: View {
             }
             manualAddress = ""
             showingManualLocationSheet = false
+        }
+    }
+
+    private func endCurrentDrive() {
+        Task {
+            await driveService.endDriving()
+            await vm.loadRecentRoutes()
         }
     }
 
@@ -1125,18 +1127,13 @@ private struct QuickChecklistContainerView: View {
     @Binding var isPresented: Bool
     let autoPrompt: Bool
     let mode: ChecklistViewModel.Mode
-    @State private var autoPromptFlag: Bool = false
 
     var body: some View {
         ChecklistView(initialMode: mode)
             .onAppear {
-                autoPromptFlag = autoPrompt
-                if autoPromptFlag {
+                if autoPrompt {
                     NotificationCenter.default.post(name: .beginChecklistAutoPrompt, object: mode)
                 }
-            }
-            .onDisappear {
-                autoPromptFlag = false
             }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

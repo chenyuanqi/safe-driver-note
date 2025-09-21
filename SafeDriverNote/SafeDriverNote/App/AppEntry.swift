@@ -189,7 +189,6 @@ struct RootTabView: View {
     @EnvironmentObject private var quickActionManager: QuickActionManager
     @State private var showLaunchScreen = true
     @State private var selectedTab: RootTab = .home
-    @State private var quickActionDebugMessage: String?
 
     var body: some View {
         ZStack {
@@ -253,12 +252,10 @@ struct RootTabView: View {
             .preferredColorScheme(themeManager.colorScheme)
             .onChange(of: quickActionManager.requestedAction) { action in
                 guard let action else { return }
-                print("[QuickAction] RootTabView observed change -> \(action.rawValue)")
                 routeToTab(for: action, source: "onChange")
             }
             .onAppear {
                 if let action = quickActionManager.requestedAction {
-                    print("[QuickAction] RootTabView onAppear pending action -> \(action.rawValue)")
                     routeToTab(for: action, source: "onAppear")
                 }
             }
@@ -272,38 +269,13 @@ struct RootTabView: View {
                 .transition(.opacity)
                 .zIndex(1)
             }
-
-            if let debugMessage = quickActionDebugMessage {
-                VStack {
-                    QuickActionDebugBanner(message: debugMessage)
-                    Spacer()
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .transition(.move(edge: .top).combined(with: .opacity))
-                .zIndex(2)
-                .allowsHitTesting(false)
-            }
         }
     }
 
     private func routeToTab(for action: QuickActionType, source: String) {
-        print("[QuickAction] routeToTab source=\(source) action=\(action.rawValue)")
         withAnimation(.easeInOut) {
             // 快捷操作统一回到首页，由 HomeView 处理后续流程
             selectedTab = .home
-        }
-
-        showDebugBanner("触发: \(action.displayName) • 来源: \(source)")
-    }
-
-    private func showDebugBanner(_ message: String) {
-        print("[QuickAction] debug banner -> \(message)")
-        quickActionDebugMessage = message
-        Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 2_000_000_000)
-            withAnimation(.easeOut) {
-                quickActionDebugMessage = nil
-            }
         }
     }
 }
@@ -371,23 +343,6 @@ final class NotificationDelegate: NSObject, UNUserNotificationCenterDelegate, Ob
         showNotificationDetail = true
     }
 }
-
-#if DEBUG
-private struct QuickActionDebugBanner: View {
-    let message: String
-
-    var body: some View {
-        Text(message)
-            .font(.caption2)
-            .foregroundColor(.white)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(Color.black.opacity(0.8))
-            .clipShape(Capsule())
-            .padding(.top, 48)
-    }
-}
-#endif
 
 extension Notification.Name {
     static let openDrivingRules = Notification.Name("OpenDrivingRules")
