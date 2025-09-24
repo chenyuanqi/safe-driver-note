@@ -77,7 +77,10 @@ struct SafeDriverNoteApp: App {
                         Task { await setupNotifications() }
                         Task { await clearNotificationBadges() }
 
-                        checkForDelayedAlert()
+                        // 只有在启动动画完成后才检查延迟弹框
+                        if !showLaunchScreen {
+                            checkForDelayedAlert()
+                        }
                     }
                     .onChange(of: scenePhase) { oldPhase, newPhase in
                         handleScenePhaseChange(from: oldPhase, to: newPhase)
@@ -99,6 +102,10 @@ struct SafeDriverNoteApp: App {
                     LaunchScreenView(onSkip: {
                         withAnimation(.easeOut(duration: 0.4)) {
                             showLaunchScreen = false
+                        }
+                        // 启动动画完成后，检查是否需要显示延迟弹框
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                            checkForDelayedAlert()
                         }
                     })
                     .transition(.opacity)
