@@ -57,6 +57,7 @@ struct HomeView: View {
     @State private var quickChecklistMode: ChecklistViewModel.Mode = .pre
     @State private var knowledgeShouldShowDrivingRules = false
     @State private var showEndConfirmation = false
+    @State private var showingWeatherDetail = false
 
     var body: some View {
         NavigationStack {
@@ -103,6 +104,8 @@ struct HomeView: View {
                 await vm.loadRecentRoutes()
                 // 获取当前位置（一次性，不并发重复调用）
                 await updateCurrentLocation()
+                // 加载天气数据
+                vm.loadWeatherData()
             }
             
             // 添加通知监听
@@ -470,6 +473,97 @@ struct HomeView: View {
 					.foregroundColor(.brandSecondary900)
 			}
 			
+			// Weather and Location Card
+            if let weather = vm.currentWeather {
+                Card(shadow: true) {
+                    HStack {
+                        // 天气信息
+                        VStack(alignment: .leading, spacing: Spacing.xs) {
+                            HStack {
+                                Image(systemName: weather.systemIcon)
+                                    .font(.title2)
+                                    .foregroundColor(.brandPrimary500)
+
+                                VStack(alignment: .leading) {
+                                    Text("\(weather.temperature)°C")
+                                        .font(.title2)
+                                        .fontWeight(.bold)
+                                        .foregroundColor(.brandSecondary900)
+
+                                    Text(weather.shortDescription)
+                                        .font(.bodySmall)
+                                        .foregroundColor(.brandSecondary500)
+                                }
+                            }
+
+                            Text(weather.city)
+                                .font(.bodySmall)
+                                .foregroundColor(.brandSecondary700)
+                        }
+
+                        Spacer()
+
+                        // 湿度和风速信息
+                        VStack(alignment: .trailing, spacing: Spacing.xs) {
+                            HStack(spacing: Spacing.xs) {
+                                Image(systemName: "humidity")
+                                    .font(.caption)
+                                    .foregroundColor(.brandInfo500)
+                                Text("\(weather.humidity)%")
+                                    .font(.bodySmall)
+                                    .foregroundColor(.brandSecondary700)
+                            }
+
+                            HStack(spacing: Spacing.xs) {
+                                Image(systemName: "wind")
+                                    .font(.caption)
+                                    .foregroundColor(.brandInfo500)
+                                Text("\(Int(weather.windSpeed))km/h")
+                                    .font(.bodySmall)
+                                    .foregroundColor(.brandSecondary700)
+                            }
+                        }
+
+                        // 点击指示器
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundColor(.brandSecondary400)
+                    }
+                    .padding(.horizontal, Spacing.lg)
+                    .padding(.vertical, Spacing.md)
+                }
+                .onTapGesture {
+                    showingWeatherDetail = true
+                }
+            } else if vm.isWeatherLoading {
+                Card(shadow: true) {
+                    HStack {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: .brandPrimary500))
+                        Text("获取天气信息中...")
+                            .font(.body)
+                            .foregroundColor(.brandSecondary500)
+                        Spacer()
+                    }
+                    .padding(.horizontal, Spacing.lg)
+                    .padding(.vertical, Spacing.md)
+                }
+            } else if let errorMessage = vm.weatherErrorMessage {
+                Card(backgroundColor: .brandDanger100, shadow: true) {
+                    HStack {
+                        Image(systemName: "exclamationmark.triangle")
+                            .font(.body)
+                            .foregroundColor(.brandDanger500)
+                        Text(errorMessage)
+                            .font(.bodySmall)
+                            .foregroundColor(.brandDanger600)
+                        Spacer()
+                    }
+                    .padding(.horizontal, Spacing.lg)
+                    .padding(.vertical, Spacing.md)
+                }
+            }
+			
 			// Status Cards
 			HStack(spacing: Spacing.lg) {
 				StatusCard(
@@ -534,6 +628,9 @@ struct HomeView: View {
 			}
 			.presentationDetents([.medium])
 		}
+        .sheet(isPresented: $showingWeatherDetail) {
+            WeatherDetailView()
+        }
 	}
 	
 	// MARK: - Quick Actions Section
@@ -1061,6 +1158,9 @@ struct HomeView: View {
 
         // 更新当前位置
         await updateCurrentLocation()
+        
+        // 更新天气数据
+        await vm.refreshWeatherData()
 
         // 添加轻微延迟以提供更好的用户体验
         try? await Task.sleep(nanoseconds: 500_000_000) // 0.5秒
@@ -1237,8 +1337,15 @@ final class HomeViewModel: ObservableObject {
     @Published private(set) var todayKnowledgeCompleted: Bool = false
     @Published private(set) var todayLearnedCount: Int = 0  // 今天已学习的卡片数量
     @Published private(set) var userStats: UserStats? = nil
+    
+    // 添加天气服务相关属性
+    @Published private(set) var currentWeather: WeatherData?
+    @Published private(set) var isWeatherLoading = false
+    @Published private(set) var weatherErrorMessage: String?
         
-    init() { reload() }
+    init() { 
+        reload() 
+    }
     
     func reload() {
         if let list = try? AppDI.shared.logRepository.fetchAll() {
@@ -1262,6 +1369,55 @@ final class HomeViewModel: ObservableObject {
 
         if let stats = try? AppDI.shared.userProfileRepository.calculateUserStats() {
             self.userStats = stats
+        }
+        
+        // Load weather data
+        loadWeatherData()
+    }
+    
+    // 添加加载天气数据的方法
+    func loadWeatherData() {
+        Task {
+            let locationService = LocationService.shared
+            await WeatherService.shared.fetchCurrentWeather(
+                hasLocationPermission: locationService.hasLocationPermission,
+                getCurrentLocation: { timeout in
+                    try await locationService.getCurrentLocation(timeout: timeout)
+                },
+                getLocationDescription: { location in
+                    await locationService.getLocationDescription(from: location)
+                }
+            )
+            await MainActor.run {
+                self.currentWeather = WeatherService.shared.currentWeather
+                self.isWeatherLoading = WeatherService.shared.isLoading
+                self.weatherErrorMessage = WeatherService.shared.errorMessage
+            }
+        }
+    }
+    
+    // 添加刷新天气数据的方法
+    func refreshWeatherData() async {
+        // 清除之前的错误信息
+        await MainActor.run {
+            self.weatherErrorMessage = nil
+        }
+        
+        // 重新获取天气数据
+        let locationService = LocationService.shared
+        await WeatherService.shared.fetchCurrentWeather(
+            hasLocationPermission: locationService.hasLocationPermission,
+            getCurrentLocation: { timeout in
+                try await locationService.getCurrentLocation(timeout: timeout)
+            },
+            getLocationDescription: { location in
+                await locationService.getLocationDescription(from: location)
+            }
+        )
+        await MainActor.run {
+            self.currentWeather = WeatherService.shared.currentWeather
+            self.isWeatherLoading = WeatherService.shared.isLoading
+            self.weatherErrorMessage = WeatherService.shared.errorMessage
         }
     }
     
@@ -1489,12 +1645,12 @@ final class HomeViewModel: ObservableObject {
 	}
 	
 	func formatDate(_ date: Date) -> String {
-		let f = DateFormatter()
-		f.locale = Locale(identifier: "zh_CN")
-		f.calendar = Calendar(identifier: .gregorian)
-		f.dateFormat = "M月d日 HH:mm"
-		return f.string(from: date)
-	}
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "zh_CN")
+        f.calendar = Calendar(identifier: .gregorian)
+        f.dateFormat = "M月d日 HH:mm"
+        return f.string(from: date)
+    }
 }
 
 #Preview {

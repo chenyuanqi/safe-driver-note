@@ -29,9 +29,22 @@
 		040B64342E52D5BC005307E1 /* SafeDriverNoteUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SafeDriverNoteUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		0DE2E43F2E85219500F6303B /* Exceptions for "SafeDriverNote" folder in "SafeDriverNote" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 040B641A2E52D5B3005307E1 /* SafeDriverNote */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		040B641D2E52D5B3005307E1 /* SafeDriverNote */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				0DE2E43F2E85219500F6303B /* Exceptions for "SafeDriverNote" folder in "SafeDriverNote" target */,
+			);
 			path = SafeDriverNote;
 			sourceTree = "<group>";
 		};
@@ -394,17 +407,17 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
+				CODE_SIGN_ENTITLEMENTS = SafeDriverNote/SafeDriverNote.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = L2S3Q4VNNN;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "安全驾驶日志";
-				INFOPLIST_KEY_NSCameraUsageDescription = "更换头像时需要使用摄像头拍照。";
+				INFOPLIST_FILE = SafeDriverNote/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "安全驾驶日记";
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "为保证行程记录的完整性，我们会在后台持续记录行驶路线位置。";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "我们需要位置权限来为您的驾驶日志和打卡记录自动标记地点，帮助您更好地记录驾驶经历。";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "用于语音记录与语音识别，帮助您快速添加日志。";
-				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "用于选择或更新您的头像照片。";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "用于将您的语音转换为文本，便于AI整理日志内容。";
 				INFOPLIST_KEY_UIBackgroundModes = location;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -429,17 +442,17 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
+				CODE_SIGN_ENTITLEMENTS = SafeDriverNote/SafeDriverNote.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = L2S3Q4VNNN;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = "安全驾驶日志";
-				INFOPLIST_KEY_NSCameraUsageDescription = "更换头像时需要使用摄像头拍照。";
+				INFOPLIST_FILE = SafeDriverNote/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "安全驾驶日记";
 				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "为保证行程记录的完整性，我们会在后台持续记录行驶路线位置。";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "我们需要位置权限来为您的驾驶日志和打卡记录自动标记地点，帮助您更好地记录驾驶经历。";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "用于语音记录与语音识别，帮助您快速添加日志。";
-				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "用于选择或更新您的头像照片。";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "用于将您的语音转换为文本，便于AI整理日志内容。";
 				INFOPLIST_KEY_UIBackgroundModes = location;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

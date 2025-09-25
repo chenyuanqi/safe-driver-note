@@ -1,7 +1,9 @@
 import Foundation
 import CoreLocation
 import Combine
+#if canImport(UIKit)
 import UIKit
+#endif
 
 @MainActor
 class LocationService: NSObject, ObservableObject {
@@ -89,6 +91,7 @@ class LocationService: NSObject, ObservableObject {
         locationManager.startUpdatingLocation()
 
         // 安全地设置后台定位（只在有权限且已经开始定位后设置）
+        #if os(iOS)
         if authorizationStatus == .authorizedAlways || authorizationStatus == .authorizedWhenInUse {
             // 检查是否配置了后台模式
             let backgroundModes = Bundle.main.object(forInfoDictionaryKey: "UIBackgroundModes") as? [String] ?? []
@@ -106,12 +109,15 @@ class LocationService: NSObject, ObservableObject {
                 }
 
                 // 后台模式下调整精度以节省电量
+                #if canImport(UIKit)
                 if UIApplication.shared.applicationState == .background {
                     locationManager.desiredAccuracy = kCLLocationAccuracyNearestTenMeters
                     locationManager.distanceFilter = 10.0
                 }
+                #endif
             }
         }
+        #endif
 
         // 同时启用显著位置变化监听作为备份（这个在后台也能工作）
         locationManager.startMonitoringSignificantLocationChanges()
@@ -127,9 +133,11 @@ class LocationService: NSObject, ObservableObject {
 
         // 安全地关闭后台定位
         DispatchQueue.main.async { [weak self] in
+            #if os(iOS)
             if #available(iOS 11.0, *) {
                 self?.locationManager.showsBackgroundLocationIndicator = false
             }
+            #endif
             // 恢复为默认（前台）模式
             self?.locationManager.allowsBackgroundLocationUpdates = false
             self?.locationManager.pausesLocationUpdatesAutomatically = true
@@ -140,19 +148,23 @@ class LocationService: NSObject, ObservableObject {
     
     /// 在已授权“使用期间”后，尝试申请“始终允许”权限
     func requestAlwaysAuthorizationIfEligible() {
+        #if os(iOS)
         if authorizationStatus == .authorizedWhenInUse {
             print("请求始终允许权限")
             locationManager.requestAlwaysAuthorization()
         }
+        #endif
     }
     
     /// 获取当前位置（一次性，尽快返回）：
     /// - 优先返回系统缓存的最近位置（若在 staleThreshold 内）
     /// - 否则短暂开启 startUpdatingLocation，加速首次定位
     func getCurrentLocation(timeout: TimeInterval = 15.0, staleThreshold: TimeInterval = 300.0) async throws -> CLLocation? {
+        #if os(iOS)
         guard authorizationStatus == .authorizedWhenInUse || authorizationStatus == .authorizedAlways else {
             throw LocationError.permissionDenied
         }
+        #endif
         
         // 取消之前的超时任务
         locationTimeoutTask?.cancel()
@@ -335,7 +347,11 @@ class LocationService: NSObject, ObservableObject {
     
     /// 检查是否有位置权限
     var hasLocationPermission: Bool {
+        #if os(iOS)
         return authorizationStatus == .authorizedWhenInUse || authorizationStatus == .authorizedAlways
+        #else
+        return false
+        #endif
     }
 }
 
