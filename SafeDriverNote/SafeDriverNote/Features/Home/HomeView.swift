@@ -12,6 +12,7 @@ private let permissionOnboardingShownKey = "PermissionOnboardingShownKey"
 struct HomeView: View {
     @StateObject private var vm = HomeViewModel()
     @StateObject private var driveService = AppDI.shared.driveService
+    @StateObject private var todayLearningService = TodayLearningService.shared
     @ObservedObject private var locationService = LocationService.shared
     @EnvironmentObject private var quickActionManager: QuickActionManager
     @State private var selectedKnowledgeIndex = 0
@@ -117,7 +118,7 @@ struct HomeView: View {
             }
 
         }
-        .onChange(of: quickActionManager.requestedAction) { action in
+        .onChange(of: quickActionManager.requestedAction) { _, action in
             guard let action else { return }
             handleQuickAction(action)
         }
@@ -261,12 +262,12 @@ struct HomeView: View {
             .presentationDetents([.large])
             .presentationDragIndicator(.visible)
         }
-        .onChange(of: showingQuickChecklist) { isPresented in
+        .onChange(of: showingQuickChecklist) { _, isPresented in
             if !isPresented {
                 quickChecklistAutoPrompt = false
             }
         }
-        .onChange(of: showingKnowledgeView) { isPresented in
+        .onChange(of: showingKnowledgeView) { _, isPresented in
             if !isPresented {
                 knowledgeShouldShowDrivingRules = false
             }
@@ -298,16 +299,7 @@ struct HomeView: View {
         }
         
         // 监听知识卡片标记通知
-        NotificationCenter.default.addObserver(
-            forName: .knowledgeCardMarked,
-            object: nil,
-            queue: .main
-        ) { _ in
-            // 重新加载今日学习卡片
-            Task { @MainActor in
-                vm.loadTodayKnowledgeCards()
-            }
-        }
+        // 不再需要监听通知，TodayLearningService 会自动处理更新
 
     }
     
@@ -741,17 +733,11 @@ struct HomeView: View {
 		// 更新位置显示为加载状态
 		currentLocationDescription = "获取位置中..."
 		
-		do {
-			// 获取位置服务实例
-			let locationService = LocationService.shared
-			let locationDescription = await locationService.getCurrentLocationDescription()
-			await MainActor.run {
-				self.currentLocationDescription = locationDescription
-			}
-		} catch {
-			await MainActor.run {
-				self.currentLocationDescription = "未知位置"
-			}
+		// 获取位置服务实例
+		let locationService = LocationService.shared
+		let locationDescription = await locationService.getCurrentLocationDescription()
+		await MainActor.run {
+			self.currentLocationDescription = locationDescription.isEmpty ? "未知位置" : locationDescription
 		}
 	}
 	
@@ -766,15 +752,15 @@ struct HomeView: View {
 	            
 	            Spacer()
 	            
-	            Text("\(vm.todayLearnedCount)/3")
+	            Text("\(todayLearningService.learnedCount)/3")
 	                .font(.bodySmall)
 	                .foregroundColor(.brandSecondary500)
 	        }
 	        
 	        // 使用ZStack和手动控制页面切换，避免手势冲突
 	        ZStack {
-	            ForEach(0..<vm.todayKnowledgeCards.count, id: \.self) { index in
-	                let card = vm.todayKnowledgeCards[index]
+	            ForEach(0..<todayLearningService.todayCards.count, id: \.self) { index in
+	                let card = todayLearningService.todayCards[index]
 	                knowledgeCardView(card, index: index)
 	                    .opacity(index == selectedKnowledgeIndex ? 1.0 : 0.0)
 	                    .zIndex(index == selectedKnowledgeIndex ? 1.0 : 0.0)
@@ -793,7 +779,7 @@ struct HomeView: View {
 	        
 	        // 手动添加页面指示器并居中显示
 	        HStack(spacing: 8) {
-	            ForEach(0..<vm.todayKnowledgeCards.count, id: \.self) { index in
+	            ForEach(0..<todayLearningService.todayCards.count, id: \.self) { index in
 	                Circle()
 	                    .fill(index == selectedKnowledgeIndex ? Color.brandPrimary500 : Color.brandSecondary300)
 	                    .frame(width: 8, height: 8)
@@ -812,8 +798,9 @@ struct HomeView: View {
 	}
 
 	// MARK: - Knowledge Card View
-	private func knowledgeCardView(_ card: KnowledgeCardData, index: Int) -> some View {
-	    Card(shadow: true) {
+	private func knowledgeCardView(_ card: KnowledgeCard, index: Int) -> some View {
+	    NavigationLink(destination: KnowledgeTodayView(initialCardTitle: card.title)) {
+	        Card(shadow: true) {
 	        VStack(alignment: .leading, spacing: Spacing.lg) {
 	            Text(card.title)
 	                .font(.bodyLarge)
@@ -821,7 +808,7 @@ struct HomeView: View {
 	                .foregroundColor(.brandSecondary900)
 	                .multilineTextAlignment(.leading)
 
-	            Text(card.content)
+	            Text(card.what)
 	                .font(.body)
 	                .foregroundColor(.brandSecondary700)
 	                .lineLimit(3)
@@ -832,7 +819,7 @@ struct HomeView: View {
 	            HStack {
 	                Spacer()
 
-	                if card.isLearned {
+	                if todayLearningService.isCardLearned(card) {
 	                    Text("已学习")
 	                        .tagStyle(.success)
 	                } else {
@@ -848,6 +835,7 @@ struct HomeView: View {
 	            }
 	        }
 	    }
+	    }
 	    .gesture(
 	        DragGesture(minimumDistance: 50)
 	            .onEnded { value in
@@ -861,7 +849,7 @@ struct HomeView: View {
 	                } else if value.translation.width < -50 {
 	                    // 左滑，切换到下一张卡片
 	                    withAnimation {
-	                        selectedKnowledgeIndex = min(vm.todayKnowledgeCards.count - 1, selectedKnowledgeIndex + 1)
+	                        selectedKnowledgeIndex = min(todayLearningService.todayCards.count - 1, selectedKnowledgeIndex + 1)
 	                        // 用户手动切换时重置定时器
 	                        resetAutoCarousel()
 	                    }
@@ -993,7 +981,7 @@ struct HomeView: View {
 	
 	private func recentActivityItem(_ activity: RecentActivity) -> some View {
 		Group {
-			if activity.activityType == .logEntry, let logId = activity.relatedId {
+			if activity.activityType == .logEntry, let _ = activity.relatedId {
 				// 日志记录点击跳转到日志列表
 				NavigationLink(destination: LogListView()) {
 					activityItemContent(activity)
@@ -1054,7 +1042,7 @@ struct HomeView: View {
         carouselTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { _ in
             DispatchQueue.main.async {
                 withAnimation {
-                    selectedKnowledgeIndex = (selectedKnowledgeIndex + 1) % vm.todayKnowledgeCards.count
+                    selectedKnowledgeIndex = (selectedKnowledgeIndex + 1) % todayLearningService.todayCards.count
                 }
             }
         }
@@ -1287,24 +1275,6 @@ private struct PermissionRow: View {
     }
 }
 
-// MARK: - Knowledge Card Data
-struct KnowledgeCardData: Identifiable {
-    let id = UUID()
-    let title: String
-    let content: String
-    let isLearned: Bool
-}
-
-// 修改为使用KnowledgeCard模型
-extension KnowledgeCardData {
-    init(from knowledgeCard: KnowledgeCard) {
-        self.init(
-            title: knowledgeCard.title,
-            content: knowledgeCard.what,
-            isLearned: false
-        )
-    }
-}
 
 // MARK: - Recent Activity Data
 struct RecentActivity: Identifiable {
@@ -1333,9 +1303,6 @@ final class HomeViewModel: ObservableObject {
     @Published private(set) var recentActivities: [RecentActivity] = []
     @Published private(set) var todayPreCount: Int = 0
     @Published private(set) var todayPostCount: Int = 0
-    @Published private(set) var todayKnowledgeCards: [KnowledgeCardData] = []
-    @Published private(set) var todayKnowledgeCompleted: Bool = false
-    @Published private(set) var todayLearnedCount: Int = 0  // 今天已学习的卡片数量
     @Published private(set) var userStats: UserStats? = nil
     
     // 添加天气服务相关属性
@@ -1361,8 +1328,7 @@ final class HomeViewModel: ObservableObject {
         self.todayPreCount = pre.count
         self.todayPostCount = post.count
         
-        // Load today's knowledge cards
-        loadTodayKnowledgeCards()
+        // 今日学习卡片由 TodayLearningService 自动管理
         
         // Load recent activities (combine logs and routes)
         updateRecentActivities()
@@ -1447,7 +1413,7 @@ final class HomeViewModel: ObservableObject {
             let distance = AppDI.shared.driveService.formatDistance(route.distance)
             
             let subtitle: String
-            if let dur = route.duration, let dist = route.distance {
+            if route.duration != nil && route.distance != nil {
                 subtitle = "\(duration) · \(distance)"
             } else if route.duration != nil {
                 subtitle = duration
@@ -1502,68 +1468,6 @@ final class HomeViewModel: ObservableObject {
         }
     }
     
-    func loadTodayKnowledgeCards() {
-        // 从知识库获取今日学习卡片数据
-        let knowledgeRepo = AppDI.shared.knowledgeRepository
-        if let knowledgeCards = try? knowledgeRepo.todayCards(limit: 3) {
-            // 获取今日的学习进度
-            let ctx = try? GlobalModelContext.context
-            let progresses = (try? ctx?.fetch(FetchDescriptor<KnowledgeProgress>())) ?? []
-            
-            // 获取今天的日期（用于检查是否已学习）
-            let today = Calendar.current.startOfDay(for: Date())
-            
-            // 计算今天已标记学习的卡片数量
-            let todayLearnedCount = progresses.reduce(0) { count, progress in
-                let hasLearnedToday = progress.markedDates.contains { date in
-                    Calendar.current.isDate(date, inSameDayAs: today)
-                }
-                return count + (hasLearnedToday ? 1 : 0)
-            }
-
-            // 保存今天已学习的卡片数量
-            self.todayLearnedCount = todayLearnedCount
-
-            // 如果今天已经标记学习了3个或以上卡片，则认为今日知识学习已完成
-            self.todayKnowledgeCompleted = todayLearnedCount >= 3
-
-            self.todayKnowledgeCards = knowledgeCards.map { card in
-                // 检查该卡片今天是否已学习
-                let isLearned = progresses.contains { progress in
-                    progress.cardId == card.id &&
-                    progress.markedDates.contains { date in
-                        Calendar.current.isDate(date, inSameDayAs: today)
-                    }
-                }
-
-                return KnowledgeCardData(
-                    title: card.title,
-                    content: card.what,
-                    isLearned: isLearned
-                )
-            }
-        } else {
-            // 如果获取失败，使用模拟数据
-            self.todayKnowledgeCompleted = false
-            todayKnowledgeCards = [
-                KnowledgeCardData(
-                    title: "安全跟车距离",
-                    content: "保持3秒车距原则，在高速公路上应保持更长的跟车距离，确保有足够的反应时间。",
-                    isLearned: false
-                ),
-                KnowledgeCardData(
-                    title: "雨天驾驶技巧",
-                    content: "雨天路面湿滑，要降低车速，保持更大的跟车距离，避免急刹车和急转弯。",
-                    isLearned: false
-                ),
-                KnowledgeCardData(
-                    title: "停车技巧",
-                    content: "倒车入库时要多观察后视镜，利用参照物判断车位，耐心慢速操作。",
-                    isLearned: false
-                )
-            ]
-        }
-    }
 	
 	var monthLogs: [LogEntry] {
 		let cal = Calendar(identifier: .gregorian)
@@ -1618,7 +1522,8 @@ final class HomeViewModel: ObservableObject {
 	
 	var todayCompletionRate: String {
 		let totalTasks = 3 // Assume 3 daily tasks (checklist pre, post, learning)
-		let completed = min(1, todayPreCount) + min(1, todayPostCount) + (todayKnowledgeCompleted ? 1 : 0)
+		let knowledgeCompleted = TodayLearningService.shared.learnedCount >= 3 ? 1 : 0
+		let completed = min(1, todayPreCount) + min(1, todayPostCount) + knowledgeCompleted
 		let rate = totalTasks > 0 ? (Double(completed) / Double(totalTasks) * 100) : 0
 		return String(format: "%.0f%%", rate)
 	}

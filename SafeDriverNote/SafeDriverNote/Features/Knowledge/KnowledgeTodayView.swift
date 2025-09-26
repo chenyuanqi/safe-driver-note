@@ -6,7 +6,7 @@ enum SwipeDirection {
 }
 
 struct KnowledgeTodayView: View {
-    @StateObject private var vm = KnowledgeViewModel(repository: AppDI.shared.knowledgeRepository)
+    @StateObject private var todayLearningService = TodayLearningService.shared
     @State private var currentCardIndex: Int = 0  // 添加当前卡片索引
     @State private var dragOffset: CGFloat = 0
     @State private var cardRotation: Double = 0
@@ -47,8 +47,8 @@ struct KnowledgeTodayView: View {
                                     drivingRulesSection
 
                                     // 学习卡片区域
-                                    if currentCardIndex < vm.today.count {
-                                        let card = vm.today[currentCardIndex]
+                                    if currentCardIndex < todayLearningService.todayCards.count {
+                                        let card = todayLearningService.todayCards[currentCardIndex]
                                         GeometryReader { geo in
                                             let cardHeight = geo.size.height * 0.7
                                             VStack(spacing: Spacing.lg) {
@@ -72,18 +72,16 @@ struct KnowledgeTodayView: View {
                                                                     let dx = value.translation.width
                                                                     if dx > 120 { // 右滑：掌握
                                                                         dismissCard(direction: .right, action: {
-                                                                            vm.mark(card: card)
-                                                                            // 立即发送通知更新首页进度
-                                                                            NotificationCenter.default.post(name: .knowledgeCardMarked, object: nil)
+                                                                            todayLearningService.markCardAsLearned(card)
                                                                             // 移到下一张卡片
-                                                                            if currentCardIndex < vm.today.count - 1 {
+                                                                            if currentCardIndex < todayLearningService.todayCards.count - 1 {
                                                                                 currentCardIndex += 1
                                                                             }
                                                                         })
                                                                     } else if dx < -120 { // 左滑：稍后
                                                                         dismissCard(direction: .left, action: {
                                                                             // 稍后查看，移到下一张卡片
-                                                                            if currentCardIndex < vm.today.count - 1 {
+                                                                            if currentCardIndex < todayLearningService.todayCards.count - 1 {
                                                                                 currentCardIndex += 1
                                                                             } else {
                                                                                 // 如果是最后一张，回到第一张
@@ -134,7 +132,8 @@ struct KnowledgeTodayView: View {
                     showBackButton: false,
                     trailingButtons: [
                         StandardNavigationBar.NavBarButton(icon: "arrow.triangle.2.circlepath") {
-                            vm.loadToday()
+                            todayLearningService.refreshTodayCards()
+                            currentCardIndex = 0  // 重置到第一张卡片
                         }
                     ]
                 )
@@ -149,7 +148,7 @@ struct KnowledgeTodayView: View {
         .onAppear {
             // 如果有指定的初始卡片标题，设置对应的索引
             if let title = initialCardTitle {
-                if let index = vm.indexOfCard(withTitle: title) {
+                if let index = todayLearningService.indexOfCard(withTitle: title) {
                     currentCardIndex = index
                 }
             }
@@ -326,7 +325,8 @@ struct KnowledgeTodayView: View {
                 .foregroundColor(.brandSecondary500)
             
             Button("重新抽取") {
-                vm.loadToday()
+                todayLearningService.refreshTodayCards()
+                currentCardIndex = 0
             }
             .font(.bodyMedium)
             .fontWeight(.medium)
@@ -374,7 +374,8 @@ struct KnowledgeTodayView: View {
     // MARK: - Pull to Refresh
     private func refreshKnowledgeData() async {
         // 重新加载今日知识卡片
-        vm.loadToday()
+        todayLearningService.refreshTodayCards()
+        currentCardIndex = 0
 
         // 添加轻微延迟以提供更好的用户体验
         try? await Task.sleep(nanoseconds: 500_000_000) // 0.5秒
