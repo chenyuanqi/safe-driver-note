@@ -267,7 +267,7 @@ class LocationService: NSObject, ObservableObject {
 
         // 3. 设置超时（弱网环境下快速降级）
         let timeoutTask = Task {
-            try? await Task.sleep(nanoseconds: 3_000_000_000) // 3秒超时
+            try? await Task.sleep(nanoseconds: 5_000_000_000) // 增加到5秒超时，给地址解析更多时间
             geocodeTask.cancel()
         }
 
@@ -280,8 +280,8 @@ class LocationService: NSObject, ObservableObject {
 
         timeoutTask.cancel()
 
-        // 4. 降级：返回坐标字符串
-        let fallbackAddress = String(format: "%.6f, %.6f", location.coordinate.latitude, location.coordinate.longitude)
+        // 4. 降级：尝试生成有意义的地址描述而不是纯坐标
+        let fallbackAddress = generateMeaningfulAddress(from: location)
         // 也缓存降级地址，避免重复尝试
         cacheAddress(fallbackAddress, for: coordinateKey)
         return fallbackAddress
@@ -344,7 +344,45 @@ class LocationService: NSObject, ObservableObject {
         let result = components.prefix(3).joined(separator: " ")
         return result.isEmpty ? "未知位置" : result
     }
-    
+
+    /// 生成有意义的地址描述（当网络地理编码失败时使用）
+    private func generateMeaningfulAddress(from location: CLLocation) -> String {
+        let lat = location.coordinate.latitude
+        let lon = location.coordinate.longitude
+
+        // 根据坐标范围判断大致区域（中国范围）
+        if lat >= 18.0 && lat <= 54.0 && lon >= 73.0 && lon <= 135.0 {
+            // 在中国境内，尝试提供更有意义的描述
+            if lat >= 39.4 && lat <= 41.0 && lon >= 115.4 && lon <= 117.5 {
+                return "北京地区 (\(String(format: "%.4f, %.4f", lat, lon)))"
+            } else if lat >= 30.4 && lat <= 31.9 && lon >= 120.8 && lon <= 122.1 {
+                return "上海地区 (\(String(format: "%.4f, %.4f", lat, lon)))"
+            } else if lat >= 22.4 && lat <= 23.8 && lon >= 113.1 && lon <= 114.6 {
+                return "深圳地区 (\(String(format: "%.4f, %.4f", lat, lon)))"
+            } else if lat >= 23.0 && lat <= 23.6 && lon >= 113.0 && lon <= 113.6 {
+                return "广州地区 (\(String(format: "%.4f, %.4f", lat, lon)))"
+            } else if lat >= 30.4 && lat <= 31.4 && lon >= 120.0 && lon <= 121.0 {
+                return "杭州地区 (\(String(format: "%.4f, %.4f", lat, lon)))"
+            } else if lat >= 31.1 && lat <= 32.0 && lon >= 118.6 && lon <= 119.2 {
+                return "南京地区 (\(String(format: "%.4f, %.4f", lat, lon)))"
+            } else if lat >= 30.4 && lat <= 31.0 && lon >= 114.0 && lon <= 114.6 {
+                return "武汉地区 (\(String(format: "%.4f, %.4f", lat, lon)))"
+            } else if lat >= 29.4 && lat <= 30.0 && lon >= 106.3 && lon <= 106.8 {
+                return "重庆地区 (\(String(format: "%.4f, %.4f", lat, lon)))"
+            } else if lat >= 30.5 && lat <= 31.0 && lon >= 104.0 && lon <= 104.2 {
+                return "成都地区 (\(String(format: "%.4f, %.4f", lat, lon)))"
+            } else if lat >= 36.0 && lat <= 36.4 && lon >= 120.2 && lon <= 120.5 {
+                return "青岛地区 (\(String(format: "%.4f, %.4f", lat, lon)))"
+            } else {
+                // 其他中国城市区域
+                return "位置 (\(String(format: "%.4f, %.4f", lat, lon)))"
+            }
+        } else {
+            // 海外位置
+            return "位置 (\(String(format: "%.4f, %.4f", lat, lon)))"
+        }
+    }
+
     /// 检查是否有位置权限
     var hasLocationPermission: Bool {
         #if os(iOS)

@@ -65,18 +65,12 @@ class DriveService: ObservableObject {
         defer { isStartingDrive = false }
         
         do {
-            // 使用最近一次已知位置，避免并发一次性定位造成挂起
+            // 使用最近一次已知位置，等待地址解析完成
             var startLocation: RouteLocation? = nil
             if let loc = locationService.currentLocation {
-                // 异步获取地址，但不阻塞开始驾驶
-                Task.detached { [weak self] in
-                    let address = await self?.locationService.getLocationDescription(from: loc) ?? ""
-                    await MainActor.run {
-                        startLocation?.address = address
-                    }
-                }
-                // 立即使用坐标创建位置，地址后补
-                startLocation = RouteLocation(latitude: loc.coordinate.latitude, longitude: loc.coordinate.longitude, address: "")
+                // 同步等待地址获取完成，确保起点有完整的地址信息
+                let address = await locationService.getLocationDescription(from: loc)
+                startLocation = RouteLocation(latitude: loc.coordinate.latitude, longitude: loc.coordinate.longitude, address: address)
             }
             let route = try repository.startRoute(startLocation: startLocation)
             
@@ -354,20 +348,10 @@ class DriveService: ObservableObject {
                         }
                     }
 
-                    // 异步获取地址，不阻塞位置记录
-                    let waypoint = RouteLocation(latitude: location.coordinate.latitude, longitude: location.coordinate.longitude, address: "")
+                    // 同步获取地址，确保路径点有完整的地址信息
+                    let address = await self.locationService.getLocationDescription(from: location)
+                    let waypoint = RouteLocation(latitude: location.coordinate.latitude, longitude: location.coordinate.longitude, address: address)
 
-                    // 异步更新地址
-                    Task.detached { [weak self] in
-                        let address = await self?.locationService.getLocationDescription(from: location) ?? ""
-                        await MainActor.run {
-                            if let index = self?.currentWaypoints.firstIndex(where: {
-                                $0.latitude == waypoint.latitude && $0.longitude == waypoint.longitude
-                            }) {
-                                self?.currentWaypoints[index].address = address
-                            }
-                        }
-                    }
                     self.currentWaypoints.append(waypoint)
                     self.currentWaypointCount = self.currentWaypoints.count
                     print("移动触发路径点: \(waypoint.latitude), \(waypoint.longitude), 精度: \(location.horizontalAccuracy)米")
@@ -402,6 +386,7 @@ class DriveService: ObservableObject {
                 // 获取当前位置
                 guard let currentLocation = try await locationService.getCurrentLocation() else { return }
 
+                // 同步获取地址，确保路径点有完整的地址信息
                 let address = await locationService.getLocationDescription(from: currentLocation)
 
                 // 创建路径点
@@ -466,25 +451,13 @@ class DriveService: ObservableObject {
                     // 即使精度较差，也记录位置以保证轨迹完整性
                 }
 
-                // 先记录位置，地址异步获取
+                // 同步获取地址，确保位置有完整的地址信息
+                let address = await locationService.getLocationDescription(from: location)
                 let routeLocation = RouteLocation(
                     latitude: location.coordinate.latitude,
                     longitude: location.coordinate.longitude,
-                    address: ""
+                    address: address
                 )
-
-                // 异步获取地址
-                Task.detached { [weak self] in
-                    let address = await self?.locationService.getLocationDescription(from: location) ?? ""
-                    await MainActor.run {
-                        // 更新已记录位置的地址
-                        if let index = self?.currentWaypoints.firstIndex(where: {
-                            $0.latitude == routeLocation.latitude && $0.longitude == routeLocation.longitude
-                        }) {
-                            self?.currentWaypoints[index].address = address
-                        }
-                    }
-                }
 
                 // 添加到路径点集合
                 currentWaypoints.append(routeLocation)
