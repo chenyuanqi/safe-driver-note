@@ -1398,11 +1398,6 @@ final class HomeViewModel: ObservableObject {
     
     // 添加刷新天气数据的方法
     func refreshWeatherData() async {
-        // 清除之前的错误信息
-        await MainActor.run {
-            self.weatherErrorMessage = nil
-        }
-        
         // 重新获取天气数据
         let locationService = LocationService.shared
         await WeatherService.shared.fetchCurrentWeather(

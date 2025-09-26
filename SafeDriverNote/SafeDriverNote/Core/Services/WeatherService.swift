@@ -144,8 +144,8 @@ final class WeatherService: ObservableObject {
     // 获取当前位置的天气信息
     func fetchCurrentWeather(
         hasLocationPermission: Bool,
-        getCurrentLocation: (TimeInterval) async throws -> CLLocation?,
-        getLocationDescription: (CLLocation) async -> String
+        getCurrentLocation: @escaping (TimeInterval) async throws -> CLLocation?,
+        getLocationDescription: @escaping (CLLocation) async -> String
     ) async {
         guard hasLocationPermission else {
             await MainActor.run {
@@ -156,7 +156,6 @@ final class WeatherService: ObservableObject {
         
         await MainActor.run {
             self.isLoading = true
-            self.errorMessage = nil
         }
         
         do {
@@ -169,16 +168,43 @@ final class WeatherService: ObservableObject {
                 return
             }
             
-            // 获取天气信息（模拟数据，实际项目中应调用真实天气API）
-            let weather = await getMockWeatherData(for: location, getLocationDescription: getLocationDescription)
-            let daily = await getMockDailyWeatherData()
-            let hourly = await getMockHourlyWeatherData()
+            do {
+                // 获取真实天气信息
+                let weather = try await WeatherAPIService.shared.fetchCurrentWeather(for: location, getLocationDescription: getLocationDescription)
+                let forecast = try await WeatherAPIService.shared.fetchWeatherForecast(for: location)
 
-            await MainActor.run {
-                self.currentWeather = weather
-                self.dailyWeather = daily
-                self.hourlyWeather = hourly
-                self.isLoading = false
+                await MainActor.run {
+                    self.currentWeather = weather
+                    self.dailyWeather = forecast.daily
+                    self.hourlyWeather = forecast.hourly
+                    self.isLoading = false
+                    self.errorMessage = nil
+                }
+            } catch {
+                // 如果API调用失败，保留上一次的数据，或在没有数据时使用模拟数据
+                print("天气API调用失败: \(error)")
+
+                await MainActor.run {
+                    self.isLoading = false
+                    if self.currentWeather == nil {
+                        // 如果没有之前的数据，则使用模拟数据
+                        Task {
+                            let weather = await self.getMockWeatherData(for: location, getLocationDescription: getLocationDescription)
+                            let daily = await self.getMockDailyWeatherData()
+                            let hourly = await self.getMockHourlyWeatherData()
+
+                            await MainActor.run {
+                                self.currentWeather = weather
+                                self.dailyWeather = daily
+                                self.hourlyWeather = hourly
+                                self.errorMessage = "使用离线天气数据"
+                            }
+                        }
+                    } else {
+                        // 如果有之前的数据，保留数据但显示错误信息
+                        self.errorMessage = "天气更新失败，显示上次数据"
+                    }
+                }
             }
         } catch {
             await MainActor.run {
@@ -189,7 +215,7 @@ final class WeatherService: ObservableObject {
     }
     
     // 模拟天气数据（实际项目中应调用真实天气API）
-    private func getMockWeatherData(for location: CLLocation, getLocationDescription: (CLLocation) async -> String) async -> WeatherData {
+    private func getMockWeatherData(for location: CLLocation, getLocationDescription: @escaping (CLLocation) async -> String) async -> WeatherData {
         // 获取城市名称
         let city = await getLocationDescription(location)
         
