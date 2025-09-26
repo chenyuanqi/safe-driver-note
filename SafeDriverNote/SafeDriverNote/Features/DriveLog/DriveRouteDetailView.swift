@@ -5,6 +5,15 @@ struct DriveRouteDetailView: View {
     let route: DriveRoute
     @EnvironmentObject private var di: AppDI
     @State private var showFullScreenMap = false
+    @State private var startAddress: String = ""
+    @State private var endAddress: String = ""
+    @State private var isUpdatingAddresses = false
+
+    init(route: DriveRoute) {
+        self.route = route
+        self._startAddress = State(initialValue: route.startLocation?.address ?? "")
+        self._endAddress = State(initialValue: route.endLocation?.address ?? "")
+    }
 
     var body: some View {
         ScrollView {
@@ -16,10 +25,10 @@ struct DriveRouteDetailView: View {
                 if route.startLocation != nil || route.endLocation != nil {
                     routeMapCard
                 }
-                
+
                 // 时间信息卡片
                 timeInfoCard
-                
+
                 // 位置信息卡片
                 if route.startLocation != nil || route.endLocation != nil {
                     locationInfoCard
@@ -34,6 +43,11 @@ struct DriveRouteDetailView: View {
         .background(Color.brandSecondary50)
         .navigationTitle("驾驶记录详情")
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            Task {
+                await fixMissingAddresses()
+            }
+        }
     }
     
     // MARK: - Route Overview Card
@@ -115,7 +129,7 @@ struct DriveRouteDetailView: View {
                         value: formatDateTime(route.startTime),
                         color: Color.brandPrimary500
                     )
-                    
+
                     if let endTime = route.endTime {
                         timeInfoRow(
                             icon: "stop.circle",
@@ -137,13 +151,35 @@ struct DriveRouteDetailView: View {
                     Image(systemName: "location")
                         .font(.title3)
                         .foregroundColor(Color.brandWarning500)
-                    
+
                     Text("位置信息")
                         .font(.headline)
                         .fontWeight(.semibold)
                         .foregroundColor(Color.brandSecondary900)
-                    
+
                     Spacer()
+
+                    // 刷新按钮
+                    Button(action: {
+                        Task {
+                            await refreshAddresses()
+                        }
+                    }) {
+                        HStack(spacing: 4) {
+                            if isUpdatingAddresses {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: Color.brandWarning500))
+                                    .scaleEffect(0.8)
+                            } else {
+                                Image(systemName: "arrow.clockwise")
+                                    .font(.caption)
+                            }
+                            Text(isUpdatingAddresses ? "加载中" : "刷新")
+                                .font(.caption)
+                        }
+                        .foregroundColor(Color.brandWarning500)
+                    }
+                    .disabled(isUpdatingAddresses)
                 }
                 
                 VStack(spacing: Spacing.md) {
@@ -151,19 +187,31 @@ struct DriveRouteDetailView: View {
                         locationInfoRow(
                             icon: "location.circle",
                             title: "出发地点",
-                            address: startLocation.address,
+                            address: startAddress,
                             coordinates: "(\(String(format: "%.6f", startLocation.latitude)), \(String(format: "%.6f", startLocation.longitude)))",
-                            color: Color.brandPrimary500
+                            color: Color.brandPrimary500,
+                            isUpdating: isUpdatingAddresses,
+                            onRefresh: {
+                                Task {
+                                    await refreshStartAddress()
+                                }
+                            }
                         )
                     }
-                    
+
                     if let endLocation = route.endLocation {
                         locationInfoRow(
                             icon: "location.circle.fill",
                             title: "到达地点",
-                            address: endLocation.address,
+                            address: endAddress,
                             coordinates: "(\(String(format: "%.6f", endLocation.latitude)), \(String(format: "%.6f", endLocation.longitude)))",
-                            color: Color.brandDanger500
+                            color: Color.brandDanger500,
+                            isUpdating: isUpdatingAddresses,
+                            onRefresh: {
+                                Task {
+                                    await refreshEndAddress()
+                                }
+                            }
                         )
                     }
                 }
@@ -257,7 +305,7 @@ struct DriveRouteDetailView: View {
                     Text(route.status.displayName)
                         .tagStyle(statusTagType)
                 }
-                
+
                 if let notes = route.notes, !notes.isEmpty {
                     VStack(alignment: .leading, spacing: Spacing.xs) {
                         Text("备注")
@@ -296,7 +344,7 @@ struct DriveRouteDetailView: View {
         }
     }
     
-    private func locationInfoRow(icon: String, title: String, address: String, coordinates: String, color: Color) -> some View {
+    private func locationInfoRow(icon: String, title: String, address: String, coordinates: String, color: Color, isUpdating: Bool = false, onRefresh: (() -> Void)? = nil) -> some View {
         HStack(spacing: Spacing.md) {
             Image(systemName: icon)
                 .font(.body)
@@ -307,33 +355,62 @@ struct DriveRouteDetailView: View {
                 Text(title)
                     .font(.caption)
                     .foregroundColor(Color.brandSecondary500)
-                
-                Text(address)
-                    .font(.body)
-                    .foregroundColor(Color.brandSecondary900)
+
+                HStack {
+                    let trimmedAddress = address.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if isUpdating && trimmedAddress.isEmpty {
+                        ProgressView()
+                            .progressViewStyle(CircularProgressViewStyle(tint: color))
+                            .scaleEffect(0.8)
+                        Text("获取位置信息...")
+                            .font(.body)
+                            .foregroundColor(Color.brandSecondary500)
+                    } else {
+                        Text(trimmedAddress.isEmpty ? "位置信息缺失" : address)
+                            .font(.body)
+                            .foregroundColor(trimmedAddress.isEmpty ? Color.brandSecondary500 : Color.brandSecondary900)
+                    }
+                }
                 
                 Text(coordinates)
                     .font(.caption)
                     .foregroundColor(Color.brandSecondary400)
             }
-            
+
             Spacer()
+
+            // 单独的刷新按钮
+            if let onRefresh = onRefresh {
+                Button(action: onRefresh) {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.caption2)
+                        .foregroundColor(color.opacity(0.7))
+                        .padding(4)
+                        .background(Circle().fill(color.opacity(0.1)))
+                }
+                .disabled(isUpdating)
+            }
         }
     }
     
     // MARK: - Computed Properties
     private var routeTitle: String {
-        if let start = route.startLocation?.address, let end = route.endLocation?.address {
-            return "\(start) → \(end)"
-        } else if let start = route.startLocation?.address {
-            return "从 \(start) 出发"
-        } else if let end = route.endLocation?.address {
-            return "抵达 \(end)"
+        let displayStartAddress = startAddress.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?
+            (route.startLocation?.address.trimmingCharacters(in: .whitespacesAndNewlines) ?? "") : startAddress
+        let displayEndAddress = endAddress.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?
+            (route.endLocation?.address.trimmingCharacters(in: .whitespacesAndNewlines) ?? "") : endAddress
+
+        if !displayStartAddress.isEmpty && !displayEndAddress.isEmpty {
+            return "\(displayStartAddress) → \(displayEndAddress)"
+        } else if !displayStartAddress.isEmpty {
+            return "从 \(displayStartAddress) 出发"
+        } else if !displayEndAddress.isEmpty {
+            return "抵达 \(displayEndAddress)"
         } else {
             return "驾驶记录"
         }
     }
-    
+
     private var statusTagType: TagStyle.TagType {
         switch route.status {
         case .active:
@@ -344,7 +421,184 @@ struct DriveRouteDetailView: View {
             return .error
         }
     }
-    
+
+    // MARK: - Address Fixing
+    private func fixMissingAddresses() async {
+        await MainActor.run {
+            isUpdatingAddresses = true
+        }
+
+        // 检查并修复起始位置地址
+        if let startLocation = route.startLocation {
+            print("起始位置地址: '\(startLocation.address)' (isEmpty: \(startLocation.address.isEmpty))")
+            if startLocation.address.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                print("正在获取起始位置地址...")
+                let newAddress = await LocationService.shared.getLocationDescription(
+                    from: CLLocation(latitude: startLocation.latitude, longitude: startLocation.longitude)
+                )
+                print("获取到的起始位置地址: '\(newAddress)'")
+                await MainActor.run {
+                    // 更新状态变量用于显示
+                    self.startAddress = newAddress
+
+                    // 创建新的 RouteLocation 并保存到数据库
+                    let updatedLocation = RouteLocation(
+                        latitude: startLocation.latitude,
+                        longitude: startLocation.longitude,
+                        address: newAddress,
+                        timestamp: startLocation.timestamp
+                    )
+                    self.route.startLocation = updatedLocation
+                }
+            }
+        }
+
+        // 检查并修复结束位置地址
+        if let endLocation = route.endLocation {
+            print("结束位置地址: '\(endLocation.address)' (isEmpty: \(endLocation.address.isEmpty))")
+            if endLocation.address.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                print("正在获取结束位置地址...")
+                let newAddress = await LocationService.shared.getLocationDescription(
+                    from: CLLocation(latitude: endLocation.latitude, longitude: endLocation.longitude)
+                )
+                print("获取到的结束位置地址: '\(newAddress)'")
+                await MainActor.run {
+                    // 更新状态变量用于显示
+                    self.endAddress = newAddress
+
+                    // 创建新的 RouteLocation 并保存到数据库
+                    let updatedLocation = RouteLocation(
+                        latitude: endLocation.latitude,
+                        longitude: endLocation.longitude,
+                        address: newAddress,
+                        timestamp: endLocation.timestamp
+                    )
+                    self.route.endLocation = updatedLocation
+                }
+            }
+        }
+
+        await MainActor.run {
+            self.isUpdatingAddresses = false
+        }
+    }
+
+    // MARK: - Manual Address Refresh
+    private func refreshAddresses() async {
+        await MainActor.run {
+            isUpdatingAddresses = true
+        }
+
+        // 强制刷新起始位置地址
+        if let startLocation = route.startLocation {
+            print("正在强制刷新起始位置地址...")
+            let newAddress = await LocationService.shared.getLocationDescription(
+                from: CLLocation(latitude: startLocation.latitude, longitude: startLocation.longitude)
+            )
+            print("获取到的起始位置地址: '\(newAddress)'")
+            await MainActor.run {
+                // 更新状态变量用于显示
+                self.startAddress = newAddress
+
+                // 创建新的 RouteLocation 并保存到数据库
+                let updatedLocation = RouteLocation(
+                    latitude: startLocation.latitude,
+                    longitude: startLocation.longitude,
+                    address: newAddress,
+                    timestamp: startLocation.timestamp
+                )
+                self.route.startLocation = updatedLocation
+            }
+        }
+
+        // 强制刷新结束位置地址
+        if let endLocation = route.endLocation {
+            print("正在强制刷新结束位置地址...")
+            let newAddress = await LocationService.shared.getLocationDescription(
+                from: CLLocation(latitude: endLocation.latitude, longitude: endLocation.longitude)
+            )
+            print("获取到的结束位置地址: '\(newAddress)'")
+            await MainActor.run {
+                // 更新状态变量用于显示
+                self.endAddress = newAddress
+
+                // 创建新的 RouteLocation 并保存到数据库
+                let updatedLocation = RouteLocation(
+                    latitude: endLocation.latitude,
+                    longitude: endLocation.longitude,
+                    address: newAddress,
+                    timestamp: endLocation.timestamp
+                )
+                self.route.endLocation = updatedLocation
+            }
+        }
+
+        await MainActor.run {
+            self.isUpdatingAddresses = false
+        }
+    }
+
+    // MARK: - Individual Address Refresh
+    private func refreshStartAddress() async {
+        guard let startLocation = route.startLocation else { return }
+
+        await MainActor.run {
+            isUpdatingAddresses = true
+        }
+
+        print("正在刷新起始位置地址...")
+        let newAddress = await LocationService.shared.getLocationDescription(
+            from: CLLocation(latitude: startLocation.latitude, longitude: startLocation.longitude)
+        )
+        print("获取到的起始位置地址: '\(newAddress)'")
+
+        await MainActor.run {
+            // 更新状态变量用于显示
+            self.startAddress = newAddress
+
+            // 创建新的 RouteLocation 并保存到数据库
+            let updatedLocation = RouteLocation(
+                latitude: startLocation.latitude,
+                longitude: startLocation.longitude,
+                address: newAddress,
+                timestamp: startLocation.timestamp
+            )
+            self.route.startLocation = updatedLocation
+
+            self.isUpdatingAddresses = false
+        }
+    }
+
+    private func refreshEndAddress() async {
+        guard let endLocation = route.endLocation else { return }
+
+        await MainActor.run {
+            isUpdatingAddresses = true
+        }
+
+        print("正在刷新结束位置地址...")
+        let newAddress = await LocationService.shared.getLocationDescription(
+            from: CLLocation(latitude: endLocation.latitude, longitude: endLocation.longitude)
+        )
+        print("获取到的结束位置地址: '\(newAddress)'")
+
+        await MainActor.run {
+            // 更新状态变量用于显示
+            self.endAddress = newAddress
+
+            // 创建新的 RouteLocation 并保存到数据库
+            let updatedLocation = RouteLocation(
+                latitude: endLocation.latitude,
+                longitude: endLocation.longitude,
+                address: newAddress,
+                timestamp: endLocation.timestamp
+            )
+            self.route.endLocation = updatedLocation
+
+            self.isUpdatingAddresses = false
+        }
+    }
+
     // MARK: - Helper Methods
     private func formatDuration(_ duration: TimeInterval) -> String {
         let hours = Int(duration) / 3600
