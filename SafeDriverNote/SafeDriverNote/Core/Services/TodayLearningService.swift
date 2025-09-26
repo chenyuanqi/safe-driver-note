@@ -9,6 +9,7 @@ class TodayLearningService: ObservableObject {
 
     @Published private(set) var todayCards: [KnowledgeCard] = []
     @Published private(set) var learnedCount: Int = 0
+    @Published private(set) var laterViewedCardIds: Set<String> = [] // 追踪"稍后看"的卡片
 
     private let knowledgeRepository = AppDI.shared.knowledgeRepository
     private var lastRefreshDate: Date?
@@ -42,8 +43,24 @@ class TodayLearningService: ObservableObject {
 
     /// 强制重新抽取今日卡片（重置当天的学习内容）
     func refreshTodayCards() {
+        print("===== 开始重新抽取卡片 =====")
+        print("清理前的状态:")
+        print("- 当前卡片数: \(todayCards.count)")
+        print("- 稍后看的卡片数: \(laterViewedCardIds.count)")
+
+        // 清理今日的显示记录，允许重新抽取
+        clearTodayShownRecords()
+
+        // 清理"稍后看"的记录
+        laterViewedCardIds.removeAll()
+
         lastRefreshDate = nil
         loadTodayCards()
+
+        print("清理后的状态:")
+        print("- 新卡片数: \(todayCards.count)")
+        print("- 稍后看的卡片数: \(laterViewedCardIds.count)")
+        print("=============================")
 
         // 通知其他地方更新
         NotificationCenter.default.post(name: .todayLearningRefreshed, object: nil)
@@ -86,6 +103,13 @@ class TodayLearningService: ObservableObject {
         NotificationCenter.default.post(name: .knowledgeCardMarked, object: nil)
     }
 
+    /// 标记卡片为稍后查看
+    func markCardAsLaterViewed(_ card: KnowledgeCard) {
+        laterViewedCardIds.insert(card.id)
+        // 发送通知
+        NotificationCenter.default.post(name: .knowledgeCardMarked, object: nil)
+    }
+
     /// 检查卡片是否已学习
     func isCardLearned(_ card: KnowledgeCard) -> Bool {
         guard let context = GlobalModelContext.context else { return false }
@@ -116,12 +140,50 @@ class TodayLearningService: ObservableObject {
         return todayCards.firstIndex { $0.title == title }
     }
 
+    /// 检查是否所有卡片都已掌握或处理过（包括"稍后看"）
+    var isAllCardsLearned: Bool {
+        guard !todayCards.isEmpty else { return false }
+
+        // 计算已处理的卡片数（掌握 + 稍后看）
+        let processedCount = todayCards.reduce(0) { count, card in
+            let isLearned = isCardLearned(card)
+            let isLaterViewed = laterViewedCardIds.contains(card.id)
+            return count + (isLearned || isLaterViewed ? 1 : 0)
+        }
+
+        return processedCount >= todayCards.count
+    }
+
     // MARK: - Private Methods
 
     /// 更新已学习计数
     private func updateLearnedCount() {
         learnedCount = todayCards.reduce(0) { count, card in
             return count + (isCardLearned(card) ? 1 : 0)
+        }
+    }
+
+    /// 清理今日的显示记录，允许重新抽取
+    private func clearTodayShownRecords() {
+        guard let context = GlobalModelContext.context else { return }
+
+        let today = Calendar.current.startOfDay(for: Date())
+
+        // 获取今日的显示记录
+        let descriptor = FetchDescriptor<KnowledgeRecentlyShown>()
+        if let allShownRecords = try? context.fetch(descriptor) {
+            let todayRecords = allShownRecords.filter { record in
+                Calendar.current.isDate(record.shownDate, inSameDayAs: today)
+            }
+
+            // 删除今日的显示记录
+            for record in todayRecords {
+                context.delete(record)
+            }
+
+            // 保存更改
+            try? context.save()
+            print("已清理今日显示记录 \(todayRecords.count) 条，准备重新抽取")
         }
     }
 
@@ -168,4 +230,5 @@ class TodayLearningService: ObservableObject {
 // MARK: - Notifications
 extension Notification.Name {
     static let todayLearningRefreshed = Notification.Name("todayLearningRefreshed")
+    static let todayLearningAllCompleted = Notification.Name("todayLearningAllCompleted")
 }

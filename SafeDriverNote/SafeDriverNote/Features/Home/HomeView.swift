@@ -60,6 +60,7 @@ struct HomeView: View {
     @State private var showEndConfirmation = false
     @State private var showingWeatherDetail = false
 
+
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
@@ -298,8 +299,6 @@ struct HomeView: View {
             }
         }
         
-        // 监听知识卡片标记通知
-        // 不再需要监听通知，TodayLearningService 会自动处理更新
 
     }
     
@@ -757,6 +756,20 @@ struct HomeView: View {
 	                .foregroundColor(.brandSecondary500)
 	        }
 	        
+	        // 根据学习状态显示不同内容
+	        if todayLearningService.isAllCardsLearned {
+	            // 全部完成状态：显示恭喜信息和重新抽取按钮
+	            completedLearningView
+	        } else {
+	            // 学习中状态：显示卡片轮播
+	            learningCardsView
+	        }
+	    }
+	}
+
+	// MARK: - Learning Cards View (学习中状态)
+	private var learningCardsView: some View {
+	    VStack(spacing: Spacing.md) {
 	        // 使用ZStack和手动控制页面切换，避免手势冲突
 	        ZStack {
 	            ForEach(0..<todayLearningService.todayCards.count, id: \.self) { index in
@@ -776,7 +789,7 @@ struct HomeView: View {
 	            // 视图消失时停止定时器
 	            stopAutoCarousel()
 	        }
-	        
+
 	        // 手动添加页面指示器并居中显示
 	        HStack(spacing: 8) {
 	            ForEach(0..<todayLearningService.todayCards.count, id: \.self) { index in
@@ -793,8 +806,53 @@ struct HomeView: View {
 	            }
 	        }
 	        .frame(maxWidth: .infinity)
-	        .padding(.top, Spacing.md)
 	    }
+	}
+
+	// MARK: - Completed Learning View (完成状态)
+	private var completedLearningView: some View {
+	    Card(backgroundColor: .brandPrimary100, shadow: true) {
+	        VStack(spacing: Spacing.lg) {
+	            // 恭喜图标和文字
+	            VStack(spacing: Spacing.md) {
+	                Image(systemName: "checkmark.circle.fill")
+	                    .font(.system(size: 40))
+	                    .foregroundColor(.brandPrimary500)
+
+	                Text("恭喜完成今日学习！")
+	                    .font(.bodyLarge)
+	                    .fontWeight(.semibold)
+	                    .foregroundColor(.brandSecondary900)
+
+	                Text("已掌握 3/3 个知识点")
+	                    .font(.bodySmall)
+	                    .foregroundColor(.brandSecondary600)
+	            }
+
+	            // 重新抽取按钮
+	            Button(action: {
+	                withAnimation {
+	                    todayLearningService.refreshTodayCards()
+	                    selectedKnowledgeIndex = 0 // 重置到第一张卡片
+	                }
+	            }) {
+	                HStack(spacing: Spacing.sm) {
+	                    Image(systemName: "arrow.clockwise")
+	                        .font(.bodySmall)
+	                    Text("学习新卡片")
+	                        .font(.bodySmall)
+	                        .fontWeight(.medium)
+	                }
+	                .foregroundColor(.brandPrimary500)
+	                .padding(.horizontal, Spacing.lg)
+	                .padding(.vertical, Spacing.sm)
+	                .background(Color.white)
+	                .cornerRadius(CornerRadius.lg)
+	            }
+	        }
+	        .padding(.vertical, Spacing.xl)
+	    }
+	    .frame(height: 200)
 	}
 
 	// MARK: - Knowledge Card View

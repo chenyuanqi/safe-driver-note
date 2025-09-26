@@ -80,7 +80,9 @@ struct KnowledgeTodayView: View {
                                                                         })
                                                                     } else if dx < -120 { // 左滑：稍后
                                                                         dismissCard(direction: .left, action: {
-                                                                            // 稍后查看，移到下一张卡片
+                                                                            // 标记为稍后查看
+                                                                            todayLearningService.markCardAsLaterViewed(card)
+                                                                            // 移到下一张卡片
                                                                             if currentCardIndex < todayLearningService.todayCards.count - 1 {
                                                                                 currentCardIndex += 1
                                                                             } else {

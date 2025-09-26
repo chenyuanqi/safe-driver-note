@@ -155,20 +155,49 @@ struct KnowledgeRepositorySwiftData: KnowledgeRepository {
 
         // 如果今天还没有显示记录，生成今日的固定卡片列表
 
-        // 获取最近7天内显示过的卡片（避免短期重复）
-        let sevenDaysAgo = Calendar.current.date(byAdding: .day, value: -7, to: today) ?? today
+        // 获取最近3天内显示过的卡片（减少排除天数，确保有足够卡片可选）
+        let threeDaysAgo = Calendar.current.date(byAdding: .day, value: -3, to: today) ?? today
         let recentlyShown = try ctx.fetch(FetchDescriptor<KnowledgeRecentlyShown>())
-            .filter { $0.shownDate >= sevenDaysAgo && !Calendar.current.isDate($0.shownDate, inSameDayAs: today) }
+            .filter { $0.shownDate >= threeDaysAgo && !Calendar.current.isDate($0.shownDate, inSameDayAs: today) }
         let recentlyShownCardIds = Set(recentlyShown.map { $0.cardId })
 
-        // 筛选候选卡片：排除今日已标记和最近显示过的
-        let availableCards = allCards.filter { card in
+        // 首先尝试筛选：排除今日已标记和最近显示过的
+        var availableCards = allCards.filter { card in
             !todayMarkedCardIds.contains(card.id) && !recentlyShownCardIds.contains(card.id)
         }
 
-        // 基于日期生成固定的随机种子，确保同一天多次调用返回相同的卡片
+        // 如果可用卡片太少（少于需要数量），放宽条件：只排除今日已标记的
+        if availableCards.count < limit {
+            availableCards = allCards.filter { card in
+                !todayMarkedCardIds.contains(card.id)
+            }
+        }
+
+        // 如果还是不够，使用所有卡片（这种情况下用户可能只有很少的卡片）
+        if availableCards.count < limit {
+            availableCards = allCards
+        }
+
+        // 调试信息
+        print("===== 卡片抽取调试信息 =====")
+        print("总卡片数: \(allCards.count)")
+        print("今日已标记卡片数: \(todayMarkedCardIds.count)")
+        print("最近显示过的卡片数: \(recentlyShownCardIds.count)")
+        print("可用卡片数: \(availableCards.count)")
+        print("需要抽取数量: \(limit)")
+
+        // 基于日期和抽取次数生成随机种子，支持同一天多次重新抽取
         let dateComponents = Calendar.current.dateComponents([.year, .month, .day], from: today)
-        let seed = (dateComponents.year ?? 0) * 10000 + (dateComponents.month ?? 0) * 100 + (dateComponents.day ?? 0)
+        let baseSeed = (dateComponents.year ?? 0) * 10000 + (dateComponents.month ?? 0) * 100 + (dateComponents.day ?? 0)
+
+        // 准备日期格式化器
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyyMMdd"
+        let dateString = dateFormatter.string(from: today)
+
+        // 计算今天已经抽取的次数（通过已清理的记录推算）
+        let refreshCount = UserDefaults.standard.integer(forKey: "TodayRefreshCount_\(dateString)")
+        let seed = baseSeed &+ refreshCount &* 1337 // 使用不同的乘数避免重复
 
         // 使用固定种子的随机打乱
         let shuffledAvailable = availableCards.sorted { $0.id < $1.id } // 先按ID排序以确保稳定性
@@ -198,10 +227,6 @@ struct KnowledgeRepositorySwiftData: KnowledgeRepository {
         }
 
         // 记录今日显示的卡片
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "yyyyMMdd"
-        let dateString = dateFormatter.string(from: today)
-
         for (index, card) in finalCards.enumerated() {
             let recentRecord = KnowledgeRecentlyShown(
                 cardId: card.id,
@@ -210,6 +235,16 @@ struct KnowledgeRepositorySwiftData: KnowledgeRepository {
             )
             ctx.insert(recentRecord)
         }
+
+        // 更新今日抽取次数
+        UserDefaults.standard.set(refreshCount + 1, forKey: "TodayRefreshCount_\(dateString)")
+
+        // 调试信息：最终结果
+        print("最终抽取到的卡片数: \(finalCards.count)")
+        if !finalCards.isEmpty {
+            print("抽取到的卡片标题: \(finalCards.map { $0.title })")
+        }
+        print("===========================")
 
         // 清理30天前的显示记录
         let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: today) ?? today
