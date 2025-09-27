@@ -154,8 +154,15 @@ struct LaunchScreenView: View {
 
                 // 副标语
                 Text("慢出稳，练出精，思出透")
-                    .font(.system(size: 20, weight: .medium))
-                    .foregroundColor(.white.opacity(0.8))
+                    .font(.system(size: 22, weight: .light, design: .serif))
+                    .foregroundStyle(
+                        LinearGradient(
+                            colors: [.cyan, .blue, .purple],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .shadow(color: .blue.opacity(0.3), radius: 3, x: 0, y: 1)
                     .opacity(textOpacity)
                     .animation(.easeOut(duration: 1).delay(0.8), value: textOpacity)
 
