@@ -24,6 +24,24 @@ final class SpeechRecognitionService: ObservableObject {
 	private let voiceThreshold: Float = 0.02 // 语音检测阈值
 	private let silenceThreshold: Float = 0.005 // 静音检测阈值
 
+	init() {
+		// 初始化时检查当前权限状态
+		checkCurrentPermissions()
+	}
+
+	/// 检查当前权限状态
+	private func checkCurrentPermissions() {
+		// 检查语音识别权限
+		recognitionAuthorized = (SFSpeechRecognizer.authorizationStatus() == .authorized)
+
+		// 检查麦克风权限
+		if #available(iOS 17.0, *) {
+			micAuthorized = (AVAudioApplication.shared.recordPermission == .granted)
+		} else {
+			micAuthorized = (AVAudioSession.sharedInstance().recordPermission == .granted)
+		}
+	}
+
 	func requestPermissions() async {
 		// 语音识别
 		let speechAuth = await withCheckedContinuation { (cont: CheckedContinuation<SFSpeechRecognizerAuthorizationStatus, Never>) in
@@ -42,6 +60,9 @@ final class SpeechRecognitionService: ObservableObject {
 			}
 			micAuthorized = granted
 		}
+
+		// 权限请求完成后，更新当前状态
+		checkCurrentPermissions()
 	}
 
 	func start() {
