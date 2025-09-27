@@ -10,6 +10,7 @@ class TodayLearningService: ObservableObject {
     @Published private(set) var todayCards: [KnowledgeCard] = []
     @Published private(set) var learnedCount: Int = 0
     @Published private(set) var laterViewedCardIds: Set<String> = [] // 追踪"稍后看"的卡片
+    @Published private(set) var todayTaskLearnedCardIds: Set<String> = [] // 追踪今日学习任务中已学习的卡片
 
     private let knowledgeRepository = AppDI.shared.knowledgeRepository
     private var lastRefreshDate: Date?
@@ -26,6 +27,8 @@ class TodayLearningService: ObservableObject {
         if let lastDate = lastRefreshDate,
            Calendar.current.isDate(lastDate, inSameDayAs: today),
            !todayCards.isEmpty {
+            // 重新加载今日任务的学习状态
+            loadTodayTaskLearnedState()
             updateLearnedCount()
             return
         }
@@ -34,6 +37,8 @@ class TodayLearningService: ObservableObject {
         if let cards = try? knowledgeRepository.todayCards(limit: 3) {
             todayCards = cards
             lastRefreshDate = today
+            // 初始化今日任务学习状态
+            loadTodayTaskLearnedState()
             updateLearnedCount()
         } else {
             // 如果获取失败，使用默认数据确保一致性
@@ -54,12 +59,16 @@ class TodayLearningService: ObservableObject {
         // 清理"稍后看"的记录
         laterViewedCardIds.removeAll()
 
+        // 重置今日任务的学习状态
+        todayTaskLearnedCardIds.removeAll()
+
         lastRefreshDate = nil
         loadTodayCards()
 
         print("清理后的状态:")
         print("- 新卡片数: \(todayCards.count)")
         print("- 稍后看的卡片数: \(laterViewedCardIds.count)")
+        print("- 今日任务已学习卡片数: \(todayTaskLearnedCardIds.count)")
         print("=============================")
 
         // 通知其他地方更新
@@ -95,6 +104,12 @@ class TodayLearningService: ObservableObject {
 
         // 保存上下文
         try? context.save()
+
+        // 标记为今日任务已学习
+        todayTaskLearnedCardIds.insert(cardId)
+
+        // 保存今日任务学习状态
+        saveTodayTaskLearnedState()
 
         // 更新学习计数
         updateLearnedCount()
@@ -146,7 +161,7 @@ class TodayLearningService: ObservableObject {
 
         // 计算已处理的卡片数（掌握 + 稍后看）
         let processedCount = todayCards.reduce(0) { count, card in
-            let isLearned = isCardLearned(card)
+            let isLearned = todayTaskLearnedCardIds.contains(card.id)
             let isLaterViewed = laterViewedCardIds.contains(card.id)
             return count + (isLearned || isLaterViewed ? 1 : 0)
         }
@@ -159,8 +174,32 @@ class TodayLearningService: ObservableObject {
     /// 更新已学习计数
     private func updateLearnedCount() {
         learnedCount = todayCards.reduce(0) { count, card in
-            return count + (isCardLearned(card) ? 1 : 0)
+            return count + (todayTaskLearnedCardIds.contains(card.id) ? 1 : 0)
         }
+    }
+
+    /// 加载今日任务的学习状态
+    private func loadTodayTaskLearnedState() {
+        // 从 UserDefaults 中加载今日任务的学习状态
+        let today = Calendar.current.startOfDay(for: Date())
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyyMMdd"
+        let dateString = dateFormatter.string(from: today)
+
+        let key = "TodayTaskLearned_\(dateString)"
+        let learnedIds = UserDefaults.standard.array(forKey: key) as? [String] ?? []
+        todayTaskLearnedCardIds = Set(learnedIds)
+    }
+
+    /// 保存今日任务的学习状态
+    private func saveTodayTaskLearnedState() {
+        let today = Calendar.current.startOfDay(for: Date())
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyyMMdd"
+        let dateString = dateFormatter.string(from: today)
+
+        let key = "TodayTaskLearned_\(dateString)"
+        UserDefaults.standard.set(Array(todayTaskLearnedCardIds), forKey: key)
     }
 
     /// 清理今日的显示记录，允许重新抽取

@@ -256,6 +256,120 @@ struct KnowledgeRepositorySwiftData: KnowledgeRepository {
         try ctx.save()
         return finalCards
     }
+
+    func knowledgePageCards(limit: Int) throws -> [KnowledgeCard] {
+        let ctx = try context()
+        let allCards = try allCards()
+
+        // 知识页的抽取逻辑与今日学习分离
+        // 使用不同的记录表来追踪知识页的显示记录
+        let knowledgePagePrefix = "knowledge_page_"
+        let sessionIdentifier = knowledgePagePrefix + UUID().uuidString
+
+        // 获取知识页已显示的卡片记录
+        let knowledgePageShown = try ctx.fetch(FetchDescriptor<KnowledgeRecentlyShown>())
+            .filter { $0.sessionId.hasPrefix(knowledgePagePrefix) }
+
+        // 检查是否有现有的知识页会话（最近的一次）
+        let latestKnowledgePageSession = knowledgePageShown
+            .sorted { $0.shownDate > $1.shownDate }
+            .first?.sessionId.replacingOccurrences(of: knowledgePagePrefix, with: "")
+
+        if let sessionId = latestKnowledgePageSession {
+            // 如果有现有会话，返回该会话的卡片
+            let currentSessionCards = knowledgePageShown
+                .filter { $0.sessionId == knowledgePagePrefix + sessionId }
+                .sorted { $0.shownDate < $1.shownDate } // 按显示时间排序
+
+            let sessionCardIds = currentSessionCards.map { $0.cardId }
+            let sessionCards = sessionCardIds.compactMap { cardId in
+                allCards.first { $0.id == cardId }
+            }
+
+            if sessionCards.count == limit {
+                return sessionCards
+            }
+        }
+
+        // 如果没有现有会话或会话不完整，创建新的会话
+        // 获取最近一周内在知识页显示过的卡片（避免短期内重复）
+        let oneWeekAgo = Calendar.current.date(byAdding: .day, value: -7, to: Date()) ?? Date()
+        let recentlyShownInKnowledgePage = knowledgePageShown
+            .filter { $0.shownDate >= oneWeekAgo }
+        let recentlyShownCardIds = Set(recentlyShownInKnowledgePage.map { $0.cardId })
+
+        // 筛选可用卡片（排除最近在知识页显示过的）
+        var availableCards = allCards.filter { card in
+            !recentlyShownCardIds.contains(card.id)
+        }
+
+        // 额外排除今日学习中显示的卡片，避免重复
+        let todayShownInTodayLearning = try ctx.fetch(FetchDescriptor<KnowledgeRecentlyShown>())
+            .filter { !$0.sessionId.hasPrefix(knowledgePagePrefix) &&
+                     Calendar.current.isDate($0.shownDate, inSameDayAs: Date()) }
+        let todayLearningCardIds = Set(todayShownInTodayLearning.map { $0.cardId })
+
+        availableCards = availableCards.filter { card in
+            !todayLearningCardIds.contains(card.id)
+        }
+
+        // 如果可用卡片不足，先尝试只排除知识页记录
+        if availableCards.count < limit {
+            availableCards = allCards.filter { card in
+                !recentlyShownCardIds.contains(card.id)
+            }
+        }
+
+        // 如果还是不足，使用所有卡片
+        if availableCards.count < limit {
+            availableCards = allCards
+        }
+
+        // 使用基于时间戳的种子进行随机选择，确保与今日学习的固定种子不同
+        let currentTimestamp = Date().timeIntervalSince1970
+        let knowledgePageSeed = Int(currentTimestamp) &* 2654435761 // 使用不同的乘数
+
+        // 使用固定种子的随机打乱，但基于时间戳而非日期
+        let shuffledAvailable = availableCards.sorted { $0.id < $1.id } // 先按ID排序以确保稳定性
+            .enumerated()
+            .map { (index: $0.offset, card: $0.element, randomValue: (knowledgePageSeed &+ $0.offset.hashValue) &* 1664525 &+ 1013904223) }
+            .sorted { $0.randomValue < $1.randomValue }
+            .map { $0.card }
+
+        let selectedCards = Array(shuffledAvailable.prefix(limit))
+
+        // 记录新的知识页显示记录
+        let newSessionId = knowledgePagePrefix + UUID().uuidString
+        for (index, card) in selectedCards.enumerated() {
+            let record = KnowledgeRecentlyShown(
+                cardId: card.id,
+                shownDate: Date(),
+                sessionId: newSessionId
+            )
+            ctx.insert(record)
+        }
+
+        // 清理旧的知识页记录（保留最近30天）
+        let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
+        let oldKnowledgePageRecords = knowledgePageShown.filter { $0.shownDate < thirtyDaysAgo }
+        for record in oldKnowledgePageRecords {
+            ctx.delete(record)
+        }
+
+        // 调试信息
+        print("===== 知识页卡片抽取调试信息 =====")
+        print("总卡片数: \(allCards.count)")
+        print("排除今日学习后的可用卡片数: \(availableCards.count)")
+        print("抽取到的卡片数: \(selectedCards.count)")
+        if !selectedCards.isEmpty {
+            print("抽取到的卡片标题: \(selectedCards.map { $0.title })")
+        }
+        print("===========================")
+
+        try ctx.save()
+        return selectedCards
+    }
+
     func mark(cardId: String) throws {
         let ctx = try context()
         // 查找是否已有进度

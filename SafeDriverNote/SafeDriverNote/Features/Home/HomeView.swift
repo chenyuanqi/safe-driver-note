@@ -40,6 +40,10 @@ struct HomeView: View {
     // 添加知识页导航相关属性
     @State private var showingKnowledgeView = false
     @State private var selectedKnowledgeCardTitle: String? = nil
+
+    // 添加今日学习弹框相关属性
+    @State private var showingTodayLearningModal = false
+    @State private var selectedTodayCardTitle: String? = nil
     
     // 添加自动轮播定时器
     @State private var carouselTimer: Timer?
@@ -252,6 +256,15 @@ struct HomeView: View {
             .presentationDragIndicator(.visible)
             .presentationCornerRadius(20)
         }
+        .sheet(isPresented: $showingTodayLearningModal) {
+            TodayLearningModalView(
+                isPresented: $showingTodayLearningModal,
+                initialCardTitle: selectedTodayCardTitle
+            )
+            .presentationDetents([.large, .fraction(0.9)])
+            .presentationDragIndicator(.visible)
+            .presentationCornerRadius(20)
+        }
         .sheet(isPresented: $showingQuickChecklist) {
             NavigationStack {
                 QuickChecklistContainerView(
@@ -271,6 +284,11 @@ struct HomeView: View {
         .onChange(of: showingKnowledgeView) { _, isPresented in
             if !isPresented {
                 knowledgeShouldShowDrivingRules = false
+            }
+        }
+        .onChange(of: showingTodayLearningModal) { _, isPresented in
+            if !isPresented {
+                selectedTodayCardTitle = nil
             }
         }
         .confirmationDialog("结束驾驶", isPresented: $showEndConfirmation, titleVisibility: .visible) {
@@ -589,7 +607,7 @@ struct HomeView: View {
 				) {
 					// 今日完成说明
 					statusExplanationTitle = "今日完成"
-					statusExplanationContent = "今日任务完成度，包括行前检查、行后检查和知识学习。完成所有三项任务可获得100%的完成度。每天坚持完成任务有助于提升驾驶技能。"
+					statusExplanationContent = "今日任务完成度，包括行前检查、行后检查和首页的今日学习。完成所有三项任务可获得100%的完成度。每天坚持完成任务有助于提升驾驶技能。"
 					showingStatusExplanation = true
 				}
 			}
@@ -756,14 +774,8 @@ struct HomeView: View {
 	                .foregroundColor(.brandSecondary500)
 	        }
 	        
-	        // 根据学习状态显示不同内容
-	        if todayLearningService.isAllCardsLearned {
-	            // 全部完成状态：显示恭喜信息和重新抽取按钮
-	            completedLearningView
-	        } else {
-	            // 学习中状态：显示卡片轮播
-	            learningCardsView
-	        }
+	        // 始终显示学习卡片，不显示完成状态
+	        learningCardsView
 	    }
 	}
 
@@ -809,55 +821,20 @@ struct HomeView: View {
 	    }
 	}
 
-	// MARK: - Completed Learning View (完成状态)
-	private var completedLearningView: some View {
-	    Card(backgroundColor: .brandPrimary100, shadow: true) {
-	        VStack(spacing: Spacing.lg) {
-	            // 恭喜图标和文字
-	            VStack(spacing: Spacing.md) {
-	                Image(systemName: "checkmark.circle.fill")
-	                    .font(.system(size: 40))
-	                    .foregroundColor(.brandPrimary500)
-
-	                Text("恭喜完成今日学习！")
-	                    .font(.bodyLarge)
-	                    .fontWeight(.semibold)
-	                    .foregroundColor(.brandSecondary900)
-
-	                Text("已掌握 3/3 个知识点")
-	                    .font(.bodySmall)
-	                    .foregroundColor(.brandSecondary600)
-	            }
-
-	            // 重新抽取按钮
-	            Button(action: {
-	                withAnimation {
-	                    todayLearningService.refreshTodayCards()
-	                    selectedKnowledgeIndex = 0 // 重置到第一张卡片
-	                }
-	            }) {
-	                HStack(spacing: Spacing.sm) {
-	                    Image(systemName: "arrow.clockwise")
-	                        .font(.bodySmall)
-	                    Text("学习新卡片")
-	                        .font(.bodySmall)
-	                        .fontWeight(.medium)
-	                }
-	                .foregroundColor(.brandPrimary500)
-	                .padding(.horizontal, Spacing.lg)
-	                .padding(.vertical, Spacing.sm)
-	                .background(Color.white)
-	                .cornerRadius(CornerRadius.lg)
-	            }
-	        }
-	        .padding(.vertical, Spacing.xl)
-	    }
-	    .frame(height: 200)
-	}
 
 	// MARK: - Knowledge Card View
 	private func knowledgeCardView(_ card: KnowledgeCard, index: Int) -> some View {
-	    NavigationLink(destination: KnowledgeTodayView(initialCardTitle: card.title)) {
+	    Button(action: {
+	        // 点击卡片时显示今日学习弹框，并传递当前卡片标题
+	        print("===== 今日学习卡片点击 =====")
+	        print("点击的卡片标题: \(card.title)")
+	        print("设置 showingTodayLearningModal = true")
+	        selectedTodayCardTitle = card.title
+	        showingTodayLearningModal = true
+	        print("当前状态: showingTodayLearningModal = \(showingTodayLearningModal)")
+	        print("当前状态: showingKnowledgeView = \(showingKnowledgeView)")
+	        print("===========================")
+	    }) {
 	        Card(shadow: true) {
 	        VStack(alignment: .leading, spacing: Spacing.lg) {
 	            Text(card.title)
@@ -914,11 +891,7 @@ struct HomeView: View {
 	                }
 	            }
 	    )
-	    .onTapGesture {
-	        // 点击卡片时跳转到知识页面，并传递当前卡片标题
-	        selectedKnowledgeCardTitle = card.title
-	        showingKnowledgeView = true
-	    }
+	    .buttonStyle(PlainButtonStyle())
 	}
 	
 	// MARK: - Smart Recommendations Section
