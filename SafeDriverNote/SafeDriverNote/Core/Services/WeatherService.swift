@@ -182,7 +182,7 @@ final class WeatherService: ObservableObject {
                 }
             } catch {
                 // 如果API调用失败，保留上一次的数据，或在没有数据时使用模拟数据
-                print("天气API调用失败: \(error)")
+                // print("天气API调用失败: \(error)")
 
                 await MainActor.run {
                     self.isLoading = false

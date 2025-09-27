@@ -143,11 +143,11 @@ class WeatherAPIService {
 
         // 检查HTTP状态码
         if let httpResponse = response as? HTTPURLResponse {
-            print("天气API状态码: \(httpResponse.statusCode)")
+            // print("天气API状态码: \(httpResponse.statusCode)")
 
             if httpResponse.statusCode != 200 {
                 if let jsonString = String(data: data, encoding: .utf8) {
-                    print("天气API错误响应: \(jsonString)")
+                    // print("天气API错误响应: \(jsonString)")
                 }
 
                 // 尝试解码错误响应
@@ -160,7 +160,7 @@ class WeatherAPIService {
         }
 
         if let jsonString = String(data: data, encoding: .utf8) {
-            print("天气API响应: \(jsonString)")
+            // print("天气API响应: \(jsonString)")
         }
 
         let apiResponse = try JSONDecoder().decode(OpenWeatherResponse.self, from: data)
@@ -198,11 +198,11 @@ class WeatherAPIService {
 
         // 检查HTTP状态码
         if let httpResponse = response as? HTTPURLResponse {
-            print("预报API状态码: \(httpResponse.statusCode)")
+            // print("预报API状态码: \(httpResponse.statusCode)")
 
             if httpResponse.statusCode != 200 {
                 if let jsonString = String(data: data, encoding: .utf8) {
-                    print("预报API错误响应: \(jsonString)")
+                    // print("预报API错误响应: \(jsonString)")
                 }
 
                 // 尝试解码错误响应
@@ -215,7 +215,7 @@ class WeatherAPIService {
         }
 
         if let jsonString = String(data: data, encoding: .utf8) {
-            print("预报API响应: \(jsonString.prefix(500))...") // 只打印前500字符避免过长
+            // print("预报API响应: \(jsonString.prefix(500))...") // 只打印前500字符避免过长
         }
 
         let forecastResponse = try JSONDecoder().decode(ForecastResponse.self, from: data)
