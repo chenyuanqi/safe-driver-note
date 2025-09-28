@@ -604,16 +604,39 @@ struct UserProfileRepositorySwiftData: UserProfileRepository {
 
         let sortedDays = punchesByDay.keys.sorted(by: >)
 
-        // 从今天开始往前计算连续天数
-        var streakCount = 0
-        var currentDay = today
+        // 检查今天和昨天是否有记录
+        let yesterday = calendar.date(byAdding: .day, value: -1, to: today)!
+        let hasRecordToday = sortedDays.contains(today)
+        let hasRecordYesterday = sortedDays.contains(yesterday)
 
-        while sortedDays.contains(currentDay) {
-            streakCount += 1
-            currentDay = calendar.date(byAdding: .day, value: -1, to: currentDay)!
+        // 如果今天有记录，从今天开始往前计算连续天数
+        if hasRecordToday {
+            var streakCount = 0
+            var currentDay = today
+
+            while sortedDays.contains(currentDay) {
+                streakCount += 1
+                currentDay = calendar.date(byAdding: .day, value: -1, to: currentDay)!
+            }
+
+            return streakCount
         }
+        // 如果今天没有记录但昨天有记录，保留昨天的连续天数
+        else if hasRecordYesterday {
+            var streakCount = 0
+            var currentDay = yesterday
 
-        return streakCount
+            while sortedDays.contains(currentDay) {
+                streakCount += 1
+                currentDay = calendar.date(byAdding: .day, value: -1, to: currentDay)!
+            }
+
+            return streakCount
+        }
+        // 如果今天和昨天都没有记录，重置为0
+        else {
+            return 0
+        }
     }
 
     private func calculateSafetyScore(logs: [LogEntry], punches: [ChecklistPunch], routes: [DriveRoute]) -> Int {

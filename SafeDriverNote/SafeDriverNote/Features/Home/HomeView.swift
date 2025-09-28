@@ -1527,27 +1527,50 @@ final class HomeViewModel: ObservableObject {
 		if let stats = userStats {
 			return stats.currentStreakDays
 		}
-		// Calculate consecutive days with records
+		// Calculate consecutive days with records (fallback logic)
 		let calendar = Calendar.current
-		let today = Date()
+		let today = calendar.startOfDay(for: Date())
+		let yesterday = calendar.date(byAdding: .day, value: -1, to: today)!
+
+		// 检查今天和昨天是否有记录
+		let hasRecordToday = allLogs.contains { log in
+			let logDay = calendar.startOfDay(for: log.createdAt)
+			return logDay == today
+		}
+
+		let hasRecordYesterday = allLogs.contains { log in
+			let logDay = calendar.startOfDay(for: log.createdAt)
+			return logDay == yesterday
+		}
+
+		// 确定开始计算的日期
+		let startDate: Date
+		if hasRecordToday {
+			startDate = today
+		} else if hasRecordYesterday {
+			startDate = yesterday
+		} else {
+			return 0 // 今天和昨天都没有记录，重置为0
+		}
+
+		// 从startDate开始往前计算连续天数
 		var days = 0
-		
 		for i in 0..<30 { // Check last 30 days
-			guard let checkDate = calendar.date(byAdding: .day, value: -i, to: today) else { break }
+			guard let checkDate = calendar.date(byAdding: .day, value: -i, to: startDate) else { break }
 			let dayStart = calendar.startOfDay(for: checkDate)
 			let dayEnd = calendar.date(byAdding: .day, value: 1, to: dayStart) ?? dayStart
-			
+
 			let hasRecord = allLogs.contains { log in
 				log.createdAt >= dayStart && log.createdAt < dayEnd
 			}
-			
+
 			if hasRecord {
 				days += 1
-			} else if i > 0 {
-				break // Stop counting if we find a day without records (except today)
+			} else {
+				break // Stop counting if we find a day without records
 			}
 		}
-		
+
 		return days
 	}
 	
