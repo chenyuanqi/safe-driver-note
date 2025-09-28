@@ -68,10 +68,9 @@ struct StartDrivingConfirmationView: View {
     }
 }
 
-#Preview {
+#Preview(traits: .sizeThatFitsLayout) {
     StartDrivingConfirmationView(
         onCancel: { print("Cancelled") },
         onConfirm: { print("Confirmed") }
     )
-    .previewLayout(.sizeThatFits)
 }

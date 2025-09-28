@@ -88,10 +88,7 @@ final class SpeechRecognitionService: ObservableObject {
 		}
 
 		// 优化识别参数以提高敏感度
-		if #available(iOS 13.0, *) {
-			// 设置更短的语音检测超时
-			request.interactionIdentifier = UUID().uuidString
-		}
+		// interactionIdentifier was deprecated in iOS 15.0
 		self.request = request
 		let audioSession = AVAudioSession.sharedInstance()
 		do {

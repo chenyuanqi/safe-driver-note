@@ -337,7 +337,7 @@ struct ChecklistManagementModal: View {
     private func deleteItem(_ item: ChecklistItem) {
         items.removeAll { $0.id == item.id }
         // 重新排序
-        for (index, item) in items.enumerated() {
+        for (index, _) in items.enumerated() {
             items[index].sortOrder = index
         }
         itemToDelete = nil
@@ -347,7 +347,7 @@ struct ChecklistManagementModal: View {
         items.move(fromOffsets: source, toOffset: destination)
         
         // 更新排序
-        for (index, item) in items.enumerated() {
+        for (index, _) in items.enumerated() {
             items[index].sortOrder = index
         }
     }

@@ -362,7 +362,7 @@ struct DataImportView: View {
 
         Task {
             do {
-                try await BackupImporter.importData(
+                try BackupImporter.importData(
                     backup,
                     options: importOptions
                 )

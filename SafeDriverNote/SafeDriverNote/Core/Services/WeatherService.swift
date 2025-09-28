@@ -11,6 +11,10 @@ struct HourlyWeatherData: Codable, Identifiable {
     let conditionIcon: String
     let precipitationChance: Int // 降水概率
 
+    enum CodingKeys: String, CodingKey {
+        case hour, temperature, condition, conditionIcon, precipitationChance
+    }
+
     var systemIcon: String {
         switch condition.lowercased() {
         case "晴天", "晴":
@@ -45,6 +49,10 @@ struct DailyWeatherData: Codable, Identifiable {
     let highTemperature: Int
     let lowTemperature: Int
     let precipitationChance: Int
+
+    enum CodingKeys: String, CodingKey {
+        case date, fullDate, condition, conditionIcon, highTemperature, lowTemperature, precipitationChance
+    }
 
     var systemIcon: String {
         switch condition.lowercased() {

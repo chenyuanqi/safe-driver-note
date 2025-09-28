@@ -27,7 +27,7 @@ enum AppTheme: String, CaseIterable {
 // MARK: - Theme Manager
 @MainActor
 final class ThemeManager: ObservableObject {
-    static let shared = ThemeManager()
+    nonisolated static let shared = ThemeManager()
 
     @Published private(set) var currentTheme: AppTheme = .system
     @Published private(set) var colorScheme: ColorScheme?
@@ -35,9 +35,11 @@ final class ThemeManager: ObservableObject {
     private let userDefaults = UserDefaults.standard
     private let themeKey = "app_theme"
 
-    private init() {
-        loadSavedTheme()
-        updateColorScheme()
+    nonisolated private init() {
+        Task { @MainActor in
+            loadSavedTheme()
+            updateColorScheme()
+        }
     }
 
     func setTheme(_ theme: AppTheme) {

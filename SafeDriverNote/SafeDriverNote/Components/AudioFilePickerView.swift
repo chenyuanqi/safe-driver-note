@@ -98,8 +98,14 @@ struct AudioFilePickerView: UIViewControllerRepresentable {
                             if destSize > 1024 {
                                 // 验证文件可播放性
                                 let asset = AVURLAsset(url: destinationURL)
-                                let playable = asset.isPlayable
-                                print("文件可播放: \(playable)")
+                                Task {
+                                    do {
+                                        let playable = try await asset.load(.isPlayable)
+                                        print("文件可播放: \(playable)")
+                                    } catch {
+                                        print("检查文件可播放性失败: \(error)")
+                                    }
+                                }
 
                                 DispatchQueue.main.async {
                                     self.parent.audioFileName = fileName

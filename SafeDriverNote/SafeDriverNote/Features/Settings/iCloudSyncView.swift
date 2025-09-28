@@ -105,20 +105,12 @@ struct iCloudSyncView: View {
         isInitializing = true
 
         Task {
-            do {
-                // 在后台线程初始化同步服务
-                let service = iCloudSyncService(modelContainer: sharedModelContainer)
+            // 在后台线程初始化同步服务
+            let service = iCloudSyncService(modelContainer: sharedModelContainer)
 
-                await MainActor.run {
-                    self.syncService = service
-                    self.isInitializing = false
-                }
-            } catch {
-                await MainActor.run {
-                    print("Failed to initialize sync service: \(error)")
-                    self.syncService = nil
-                    self.isInitializing = false
-                }
+            await MainActor.run {
+                self.syncService = service
+                self.isInitializing = false
             }
         }
     }

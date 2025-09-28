@@ -174,7 +174,7 @@ struct ChecklistView: View {
         } message: {
             Text("成功记录本次打卡，得分 \(lastPunchScore)分！")
         }
-        .onChange(of: showingManagement) { isPresented in
+        .onChange(of: showingManagement) { _, isPresented in
             if !isPresented {
                 itemPendingEdit = nil
             }

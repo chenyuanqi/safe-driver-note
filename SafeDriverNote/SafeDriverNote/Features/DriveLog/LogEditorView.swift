@@ -395,7 +395,7 @@ private enum QuickParser {
     static func parse(text: String) -> ParsedLog {
         let normalized = text.replacingOccurrences(of: "\r\n", with: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
         // 类型：包含顺利/顺溜/很顺/顺畅/开心 视为 success，否则默认 mistake；包含“失误/不好/不安/问题/险/差点/不对”强制 mistake
-        let lower = normalized.lowercased()
+        let _ = normalized.lowercased()
         let positiveHints = ["顺利","顺溜","顺畅","很顺","开心","成功"]
         let negativeHints = ["失误","不好","不安","问题","险","差点","不对","糟糕"]
         let isNegative = negativeHints.contains(where: { normalized.contains($0) })

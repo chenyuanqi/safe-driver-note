@@ -358,7 +358,7 @@ struct AboutView: View {
                 UIApplication.shared.open(emailURL)
             } else {
                 // 如果无法打开邮件应用，可以显示一个提示
-                if let url = UIPasteboard.general.url {
+                if let _ = UIPasteboard.general.url {
                     UIPasteboard.general.string = email
                 }
             }

@@ -239,7 +239,7 @@ extension Array where Element: Hashable {
 }
 
 #Preview {
-    @State var text = "倒车, 立柱, 后视镜"
+    @Previewable @State var text = "倒车, 立柱, 后视镜"
     return VStack {
         EnhancedTagInputView(text: $text)
         Spacer()

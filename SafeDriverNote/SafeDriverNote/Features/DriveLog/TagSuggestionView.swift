@@ -63,6 +63,6 @@ struct TagSuggestionView: View {
 }
 
 #Preview {
-    @State var input = ""
+    @Previewable @State var input = ""
     return VStack { TagSuggestionView(currentInput: $input); TextField("tags", text: $input) }.padding()
 }

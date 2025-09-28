@@ -395,50 +395,56 @@ class LocationService: NSObject, ObservableObject {
 
 // MARK: - CLLocationManagerDelegate
 extension LocationService: CLLocationManagerDelegate {
-    func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
-        isLocationUpdating = false
-        // 取消超时任务
-        locationTimeoutTask?.cancel()
-        locationTimeoutTask = nil
-        
-        guard let location = locations.first else {
-            locationContinuation?.resume(returning: nil)
+    nonisolated func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        Task { @MainActor in
+            isLocationUpdating = false
+            // 取消超时任务
+            locationTimeoutTask?.cancel()
+            locationTimeoutTask = nil
+
+            guard let location = locations.first else {
+                locationContinuation?.resume(returning: nil)
+                locationContinuation = nil
+                return
+            }
+
+            currentLocation = location
+
+            // 添加到位置缓存队列
+            locationCache.append(location)
+            if locationCache.count > maxCacheSize {
+                locationCache.removeFirst(locationCache.count - maxCacheSize)
+            }
+
+            print("位置更新: (\(location.coordinate.latitude), \(location.coordinate.longitude)), 精度: \(location.horizontalAccuracy)米, 时间: \(location.timestamp)")
+
+            // 发布连续定位的更新
+            locationUpdateSubject.send(location)
+            locationContinuation?.resume(returning: location)
             locationContinuation = nil
-            return
-        }
-        
-        currentLocation = location
-
-        // 添加到位置缓存队列
-        locationCache.append(location)
-        if locationCache.count > maxCacheSize {
-            locationCache.removeFirst(locationCache.count - maxCacheSize)
-        }
-
-        print("位置更新: (\(location.coordinate.latitude), \(location.coordinate.longitude)), 精度: \(location.horizontalAccuracy)米, 时间: \(location.timestamp)")
-
-        // 发布连续定位的更新
-        locationUpdateSubject.send(location)
-        locationContinuation?.resume(returning: location)
-        locationContinuation = nil
-        // 如果当前不是连续模式（一次性定位），拿到首个结果后立即停止
-        if !isContinuousMode {
-            manager.stopUpdatingLocation()
+            // 如果当前不是连续模式（一次性定位），拿到首个结果后立即停止
+            if !isContinuousMode {
+                manager.stopUpdatingLocation()
+            }
         }
     }
     
-    func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        isLocationUpdating = false
-        // 取消超时任务
-        locationTimeoutTask?.cancel()
-        locationTimeoutTask = nil
-        
-        locationContinuation?.resume(throwing: error)
-        locationContinuation = nil
+    nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
+        Task { @MainActor in
+            isLocationUpdating = false
+            // 取消超时任务
+            locationTimeoutTask?.cancel()
+            locationTimeoutTask = nil
+
+            locationContinuation?.resume(throwing: error)
+            locationContinuation = nil
+        }
     }
     
-    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
-        authorizationStatus = manager.authorizationStatus
+    nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        Task { @MainActor in
+            authorizationStatus = manager.authorizationStatus
+        }
     }
 }
 

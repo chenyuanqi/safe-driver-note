@@ -264,7 +264,7 @@ struct KnowledgeRepositorySwiftData: KnowledgeRepository {
         // 知识页的抽取逻辑与今日学习分离
         // 使用不同的记录表来追踪知识页的显示记录
         let knowledgePagePrefix = "knowledge_page_"
-        let sessionIdentifier = knowledgePagePrefix + UUID().uuidString
+        let _ = knowledgePagePrefix + UUID().uuidString
 
         // 获取知识页已显示的卡片记录
         let knowledgePageShown = try ctx.fetch(FetchDescriptor<KnowledgeRecentlyShown>())
@@ -340,7 +340,7 @@ struct KnowledgeRepositorySwiftData: KnowledgeRepository {
 
         // 记录新的知识页显示记录
         let newSessionId = knowledgePagePrefix + UUID().uuidString
-        for (index, card) in selectedCards.enumerated() {
+        for (_, card) in selectedCards.enumerated() {
             let record = KnowledgeRecentlyShown(
                 cardId: card.id,
                 shownDate: Date(),

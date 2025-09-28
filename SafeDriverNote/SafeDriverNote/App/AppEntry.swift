@@ -260,7 +260,7 @@ struct RootTabView: View {
                 .presentationDragIndicator(.visible)
             }
             .preferredColorScheme(themeManager.colorScheme)
-            .onChange(of: quickActionManager.requestedAction) { action in
+            .onChange(of: quickActionManager.requestedAction) { _, action in
                 guard let action else { return }
                 routeToTab(for: action, source: "onChange")
             }
@@ -317,15 +317,17 @@ final class NotificationDelegate: NSObject, UNUserNotificationCenterDelegate, Ob
     }
 
     /// 当应用在前台时收到通知
-    func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
         // 在前台显示通知
         completionHandler([.banner, .sound, .badge])
     }
 
     /// 当用户点击通知时
-    func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping () -> Void) {
+    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping () -> Void) {
         // 处理通知点击
-        handleNotificationTap(response.notification)
+        Task { @MainActor in
+            handleNotificationTap(response.notification)
+        }
         completionHandler()
     }
 

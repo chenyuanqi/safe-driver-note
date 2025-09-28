@@ -1,6 +1,6 @@
 import Foundation
 
-protocol LogRepository {
+@MainActor protocol LogRepository {
     func fetchAll() throws -> [LogEntry]
     func fetch(by type: LogType?) throws -> [LogEntry]
     func add(_ entry: LogEntry) throws
@@ -8,7 +8,7 @@ protocol LogRepository {
     func update(_ entry: LogEntry, mutate: (LogEntry) -> Void) throws
 }
 
-protocol ChecklistRepository {
+@MainActor protocol ChecklistRepository {
     func todayRecord() throws -> ChecklistRecord?
     @discardableResult func upsertToday(update: (inout ChecklistRecord) -> Void) throws -> ChecklistRecord
 
@@ -25,7 +25,7 @@ protocol ChecklistRepository {
     func deletePunch(_ punch: ChecklistPunch) throws
 }
 
-protocol KnowledgeRepository {
+@MainActor protocol KnowledgeRepository {
     func allCards() throws -> [KnowledgeCard]
     func todayCards(limit: Int) throws -> [KnowledgeCard]
     func knowledgePageCards(limit: Int) throws -> [KnowledgeCard]
@@ -33,7 +33,7 @@ protocol KnowledgeRepository {
     func upsert(cards: [KnowledgeCard]) throws
 }
 
-protocol DriveRouteRepository {
+@MainActor protocol DriveRouteRepository {
     func startRoute(startLocation: RouteLocation?) throws -> DriveRoute
     func getCurrentActiveRoute() throws -> DriveRoute?
     func endRoute(routeId: UUID, endLocation: RouteLocation?, waypoints: [RouteLocation]?) throws
@@ -43,7 +43,7 @@ protocol DriveRouteRepository {
     func updateRoute(_ route: DriveRoute, mutate: (DriveRoute) -> Void) throws
 }
 
-protocol UserProfileRepository {
+@MainActor protocol UserProfileRepository {
     func fetchUserProfile() throws -> UserProfile
     func saveUserProfile(_ profile: UserProfile) throws
     func updateUserProfile(userName: String, userAge: Int?, drivingYears: Int, vehicleType: String, avatarImagePath: String?) throws -> UserProfile

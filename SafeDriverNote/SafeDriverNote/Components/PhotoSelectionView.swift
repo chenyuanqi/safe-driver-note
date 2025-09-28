@@ -66,7 +66,7 @@ struct PhotoSelectionView: View {
                 identifiableImages = selectedImages.map { IdentifiableImage(image: $0) }
             }
         }
-        .onChange(of: selectedImages) { newImages in
+        .onChange(of: selectedImages) { _, newImages in
             // 当selectedImages从外部改变时（如从相册选择新图片）
             // 检查是否需要添加新图片
             if newImages.count > identifiableImages.count {

@@ -184,7 +184,7 @@ struct UserProfileView: View {
                 )
             }
         }
-        .onChange(of: showingCropView) { isPresented in
+        .onChange(of: showingCropView) { _, isPresented in
             if !isPresented && pendingImage != nil {
                 pendingImage = nil
             }
@@ -437,7 +437,7 @@ struct UserProfileView: View {
                     avatarPath = saveAvatarImage(uiImage)
                 }
 
-                let updatedProfile = try di.userProfileRepository.updateUserProfile(
+                _ = try di.userProfileRepository.updateUserProfile(
                     userName: userName,
                     userAge: ageValue,
                     drivingYears: drivingYearsValue,

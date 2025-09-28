@@ -146,7 +146,7 @@ class WeatherAPIService {
             // print("天气API状态码: \(httpResponse.statusCode)")
 
             if httpResponse.statusCode != 200 {
-                if let jsonString = String(data: data, encoding: .utf8) {
+                if let _ = String(data: data, encoding: .utf8) {
                     // print("天气API错误响应: \(jsonString)")
                 }
 
@@ -159,7 +159,7 @@ class WeatherAPIService {
             }
         }
 
-        if let jsonString = String(data: data, encoding: .utf8) {
+        if let _ = String(data: data, encoding: .utf8) {
             // print("天气API响应: \(jsonString)")
         }
 
@@ -201,7 +201,7 @@ class WeatherAPIService {
             // print("预报API状态码: \(httpResponse.statusCode)")
 
             if httpResponse.statusCode != 200 {
-                if let jsonString = String(data: data, encoding: .utf8) {
+                if let _ = String(data: data, encoding: .utf8) {
                     // print("预报API错误响应: \(jsonString)")
                 }
 
@@ -214,7 +214,7 @@ class WeatherAPIService {
             }
         }
 
-        if let jsonString = String(data: data, encoding: .utf8) {
+        if let _ = String(data: data, encoding: .utf8) {
             // print("预报API响应: \(jsonString.prefix(500))...") // 只打印前500字符避免过长
         }
 
@@ -278,7 +278,7 @@ class WeatherAPIService {
 
         return items.prefix(8).map { item in // 8个3小时间隔 = 24小时
             let date = Date(timeIntervalSince1970: TimeInterval(item.dt))
-            let hour = Calendar.current.component(.hour, from: date)
+            let _ = Calendar.current.component(.hour, from: date)
             let condition = mapWeatherCondition(item.weather.first?.main ?? "", description: item.weather.first?.description ?? "", isNight: item.sys.pod == "n")
 
             return HourlyWeatherData(

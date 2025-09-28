@@ -59,9 +59,8 @@ struct SafetyReminderView: View {
     }
 }
 
-#Preview {
+#Preview(traits: .sizeThatFitsLayout) {
     SafetyReminderView {
         print("Dismissed")
     }
-    .previewLayout(.sizeThatFits)
 }
