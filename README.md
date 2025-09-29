@@ -81,8 +81,21 @@ swiftlint lint --config .swiftlint.yml
 
 若后续添加 UI Tests，可在命令中增加 `-only-testing:` 或 `-parallel-testing-enabled YES` 优化时长。
 
+## 📚 项目文档
+
+完整的项目文档已统一迁移到 `docs/` 目录，包括：
+
+- **[📖 文档总览](docs/README.md)** - 所有文档的导航和索引
+- **[🚀 App Store 发布指南](docs/release/app-store-submission-guide.md)** - 完整的发布流程
+- **[🧪 TestFlight 测试指南](docs/release/testflight-guide.md)** - Beta 测试管理
+- **[🎨 设计系统](docs/design/)** - UI/UX 设计规范和资源
+- **[📱 营销材料](docs/marketing/)** - App Store 推广素材
+- **[⚖️ 法律文档](docs/legal/)** - 隐私政策等法律文件
+- **[🛠️ 技术支持](docs/support/)** - 用户支持文档
+
+详见 [`docs/mvp-implementation-plan.md`](docs/mvp-implementation-plan.md) 了解完整的开发计划。
+
 ## 后续待办（节选）
-详见 `docs/mvp-implementation-plan.md`。
 * 图片选择与缓存
 * 语音录制与转写服务
 * 单元 & UI 测试补齐

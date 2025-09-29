@@ -1,209 +1,382 @@
-# Safe Driver Note App Store 发布实操指南
+# 安全驾驶助手 - App Store 发布指南
 
-> 目标：将 iOS App **“安全驾驶日志 (Safe Driver Note)”** 提交并发布到苹果 App Store。本指南假设你使用 Xcode 15+、拥有付费开发者账号，并基于当前仓库 `main` 分支。
+## 项目概述
 
-## 0. 快速导航
-- [Step 1](#step-1-准备账号与工具)：确认账号权限与本地环境
-- [Step 2](#step-2-在-apple-developer-完成-app-id-与证书)：App ID / 证书 / Provisioning Profile
-- [Step 3](#step-3-完善-xcode-项目配置)：项目配置、版本号、能力开关
-- [Step 4](#step-4-资产与合规材料准备)：图标、截图、文案、隐私政策
-- [Step 5](#step-5-质量校验与测试回归)：自动化 + 手动测试路线
-- [Step 6](#step-6-生成-archive-并上传构建)：Archive + 上传构建
-- [Step 7](#step-7-在-app-store-connect-配置新版本)：App 信息、隐私、合规
-- [Step 8](#step-8-testflight-与预发布)：TestFlight 内测（可选）
-- [Step 9](#step-9-提交审核与版本发布)：提审 & 发布
-- [Step 10](#step-10-发布后维护)：发布后检查与版本迭代
+**安全驾驶助手（SafeDriverNote）** 是一款专注于驾驶安全记录和学习的iOS应用，旨在帮助驾驶员培养良好的驾驶习惯，记录驾驶经验，并通过数据分析提升驾驶技能。
 
----
-
-## Step 1. 准备账号与工具
-1. **Apple Developer Program**：确认主 Apple ID 已加入开发者计划并拥有“App Manager / Admin”权限。
-2. **App Store Connect 权限**：至少具备以下角色：`App Manager`、`Developer`、`Access to Cloud Managed Distribution Certificates`（如需）。
-3. **本地环境**：
-   - macOS 13.5+
-   - Xcode 15.2+（支持 iOS 17 SDK）
-   - 已登录 Xcode (`Xcode > Settings > Accounts`) 并下载所需的 iOS 模拟器/设备支持包。
-4. **第三方依赖**：本项目未使用 CocoaPods/Mint 等外部依赖，无需额外安装。
-5. **仓库状态**：
-   - `git status` 保持干净，确保基于最新主分支。
-   - 执行 `swiftlint lint --config .swiftlint.yml` 确认代码规范无阻塞。
-
-## Step 2. 在 Apple Developer 完成 App ID 与证书
-1. **创建 App ID**（若尚未存在）：
-   - 登录 [developer.apple.com](https://developer.apple.com/account/resources/identifiers/list)
-   - 新建 `App IDs > App`，`Bundle ID` 设为 `com.chenyuanqi.SafeDriverNote`（与 `SafeDriverNote.xcodeproj` 中配置一致）。
-   - 勾选能力：
-     - `Background Modes`（Location updates）
-     - `Push Notifications`（本项目仅用本地通知，可选；若保持未启用，请同步更新代码或描述）
-     - `iCloud`（若正式启用 iCloud 同步，需要 CloudKit；如暂不启用，请在发布版本中隐藏/下线该入口）
-2. **证书**：确保已有有效的 `iOS Distribution (App Store & Ad Hoc)` 证书。若无，使用“Certificates”入口创建并下载，双击导入钥匙串。
-3. **Provisioning Profile**：开启 `Automatic` 签名即可；如需手动：
-   - 在 `Profiles` 中创建 `App Store` 类型，绑定上述 App ID。
-   - 下载 `.mobileprovision` 并导入到 Xcode。
-
-> ⚠️ 如果计划在首个版本禁用 iCloud/后台定位，请同步修改代码和 Info 中的描述，避免审核认为“申请了能力却未使用”。
-
-## Step 3. 完善 Xcode 项目配置
-1. **打开项目**：`SafeDriverNote/SafeDriverNote.xcodeproj`
-2. **General > Identity**：
-   - `Display Name`：`安全驾驶日志`
-   - `Bundle Identifier`：`com.chenyuanqi.SafeDriverNote`
-   - `Version (MARKETING_VERSION)`：首发建议 `1.0`
-   - `Build (CURRENT_PROJECT_VERSION)`：从 `1` 开始，每次上传递增
-3. **Signing & Capabilities**：
-   - `Team`：切换到正式团队
-   - `Automatically manage signing`：保持勾选
-   - Capabilities：确保按照 Step 2 配置。若暂不提供 iCloud，同步移除 `iCloud` 相关 Capability，并在 `SettingsView` 中隐藏对应入口。
-4. **Info（Build Settings 中的 INFOPLIST_KEY_***）**：本项目已提供权限文案，请核对是否符合上线版本行为：
-   - 位置（前台/后台）
-   - 麦克风 / 语音识别
-   - 照片访问
-   - 背景模式（location）
-5. **App Icon**：
-   - 目前 `Assets.xcassets/AppIcon.appiconset` 仅含 1024 尺寸占位，请按照 `docs/AppIcon-Guide.md` 批量导出全尺寸 PNG 并填充所有槽位（包含 iPhone 60/120/180, iPad 76/152/167, App Store 1024, 通知 20/40/60 等）。
-6. **Launch Screen**：工程使用 `LaunchScreen.storyboard` 或 SwiftUI 生成？若使用默认，请确认视觉符合设计稿。
-7. **构建设置**：
-   - `iOS Deployment Target = 17.0`
-   - 如需支持 armv7/bitcode，无需额外操作（Xcode 14+ 默认关闭 bitcode）。
-
-## Step 4. 资产与合规材料准备
-1. **App 描述素材**：
-   - 参考 `README.md`、`docs/mvp-implementation-plan.md`、`design/prototypes.html` 整理应用核心价值、功能亮点。
-   - 建议准备中文主文案 + 英文翻译（方便后续多语言）。
-2. **关键词 & 副标题**：结合“驾驶安全”“日志”“检查清单”等高频词。
-3. **隐私政策**：
-   - App Store Connect 需要可访问的 URL。可在主站或临时 Notion/静态页托管，确保公开可访问。
-   - 明确说明数据仅存储本地（或 iCloud）且不会共享给第三方。
-4. **截图**：
-   - 要求：至少 6.7''（iPhone 15 Pro Max 1290×2796）和 5.5''（iPhone 8 Plus 1242×2208）各 3 张。
-   - 使用真机/模拟器录屏并截取画面，或依据 `design/prototypes` 还原界面后拍摄。
-   - 覆盖关键流程：`首页驾驶状态`、`日志编辑`、`行前/行后检查`、`知识卡`、`设置 & iCloud 同步`。
-5. **App Review 说明**：准备文本说明以下功能使用场景：
-   - 背景位置：用于记录行程，提醒驾驶安全。
-   - 麦克风/语音识别：快速语音录入驾驶日志。
-   - 照片：上传驾驶现场照片或用户头像。
-   - 本地通知：每日安全提醒。
-   - 若 iCloud 同步暂未开放，请说明该入口将隐藏或提示“即将上线”。
-6. **加密合规**：应用仅使用 Apple 提供的 HTTPS/系统加密，可在提审时选择“使用标准加密，符合出口豁免”。
-
-## Step 5. 质量校验与测试回归
-1. **自动化测试**：
-   - 运行：`xcodebuild test -scheme SafeDriverNote -destination 'platform=iOS Simulator,name=iPhone 15'`
-   - 若 UI Test 需禁用弱网等手段，可参考 `SafeDriverNoteUITests`。
-2. **手动测试清单**：
-   - 参考 `docs/testing` 底下的测试用例（例如 `06-系统权限测试.md`、`08-性能测试.md`）。
-   - 核对权限弹窗、后台定位稳定性、日志增删改、知识卡随机策略等。
-   - 在开启/关闭 iCloud、弱网场景下验证。
-3. **性能与崩溃**：
-   - 使用 Xcode Instruments（Time Profiler、Leaks）针对日志列表、连续定位过程做抽查。
-   - 确认音频录制、位置追踪在后台不会异常崩溃。
-4. **版本锁定**：测试通过后打 Git tag（例如 `v1.0.0-release-candidate`）以便追踪。
-
-## Step 6. 生成 Archive 并上传构建
-1. **清理并归档**：
-   - Product > Clean Build Folder
-   - 设备选择 `Any iOS Device (arm64)`
-   - Product > Archive
-2. **处理常见报错**：
-   - 签名失败 → 检查 Team/证书/Provisioning Profile
-   - 缺少位图 → 确认所有 App Icon 槽位都已填充
-   - 架构不匹配 → 确认使用 Release 配置
-3. **上传**：
-   - Archive 成功后进入 Organizer > Distribute App > App Store Connect > Upload
-   - 若使用 CI，可运行 `xcodebuild -scheme SafeDriverNote -configuration Release archive -archivePath build/SafeDriverNote.xcarchive`
-     再 `xcodebuild -exportArchive -archivePath ... -exportOptionsPlist ExportOptions.plist`
-   - CLI 上传需 App 专用密码 (`app-specific password`)
-4. **验证**：Organizer 会显示上传进度；App Store Connect 处理需要 10~30 分钟。
-
-## Step 7. 在 App Store Connect 配置新版本
-1. **创建 App 条目（首次）**：
-   - “我的 App”> “+” > “新建 App”
-   - 名称：`安全驾驶日志`
-   - 默认语言：`简体中文`
-   - Bundle ID：选择 `com.chenyuanqi.SafeDriverNote`
-   - SKU：自定义，例如 `safedrivernote-ios`
-   - 类别：建议主要 `导航` / 次要 `效率`（可根据目标用户群调整）
-2. **App 信息**：
-   - 副标题、关键词、支持网址、隐私政策 URL
-   - 年龄分级：一般为 `4+`（无不良内容）
-   - App 图标：上传 1024×1024 PNG（与 Xcode 里一致）
-3. **版本信息**：
-   - *描述*：突出核心卖点（驾驶日志、行前后清单、知识卡、语音输入、iCloud 同步）
-   - *新功能*：首版可写“首次发布”
-   - *截图*：按 Step 4 要求上传
-   - *App Clip*（如无则跳过）
-4. **App 隐私**：
-   - “App 隐私”>“开始申报”
-   - 数据类型建议：
-     | 数据类别 | 数据类型 | 用途 | 关联性 | 存储 | 备注 |
-     | --- | --- | --- | --- | --- | --- |
-     | 位置 | 精确位置 | App 功能 | 与用户关联 | 设备上 / 可选 iCloud | 驾驶轨迹、起终点 |
-     | 用户内容 | 照片或视频 | 用户生成内容 | 关联 | 设备上 | 驾驶现场/头像 |
-     | 用户内容 | 音频数据 | 用户生成内容 | 关联 | 设备上 | 语音日志 |
-     | 使用数据 | 产品交互 | App 功能 | 非关联 | 设备上 | 勾选记录、知识学习进度 |
-   - 若未采集分析数据，可标注“不收集”。
-5. **隐私政策 URL**：必填。
-6. **加密合规**：
-   - 问题 “Does your app use encryption?” → 选择 Yes（使用系统 HTTPS）
-   - 说明仅使用 Apple 提供标准加密并符合豁免（记得勾选“Eligible for export compliance exemption”）。
-7. **App Review 说明**：在“审核信息 > 备注”填写示例：
-   ```
-   - 位置权限用于记录驾驶路线与生成安全提醒。
-   - 后台定位只在用户主动开启“开始驾驶”后使用。
-   - 麦克风/语音识别用于语音速记驾驶日志，不会上传到服务器。
-   - iCloud 同步（若启用）仅用作用户在其 Apple ID 设备之间的数据同步。
-   - 无账号系统，审核可直接使用 App。
-   ```
-8. **联系信息**：确保“审核联系人”电话/邮箱可用。
-
-## Step 8. TestFlight 与预发布
-1. **内部测试**：上传构建后，进入 “TestFlight” 选中最新 Build，添加 `Internal Testers`。
-2. **外部测试**（可选）：
-   - 填写测试信息、营销文本、问卷
-   - 提交外测审核（1~3 天）
-3. **收集反馈**：利用 TestFlight 自动汇总的日志/崩溃，修复后重新递增 `Build`。
-
-## Step 9. 提交审核与版本发布
-1. **选择构建**：在 `版本或平台 > iOS App` 中，选择处理完成的 Build。
-2. **完成合规问卷**：
-   - `出口合规`、`内容权利`、`广告标识符 (IDFA)`（如果未使用广告，选择“否”）。
-3. **提交审核**：
-   - 状态变为 `Waiting for Review`。
-   - 审核通常 1~3 个工作日；若涉及后台定位，可能要求补充说明。及时在“审核备注”中回应。
-4. **审核被拒常见原因**（提前准备）：
-   - 背景定位用途不清晰 → 提供更具体的用户流程和截图
-   - iCloud 功能无法使用 → 请确保首版中要么下线入口，要么提供完整登录/同步体验
-   - 权限弹窗文案与用途不匹配 → 保持 Info.plist 描述与实际功能一致
-
-## Step 10. 发布后维护
-1. **发布**：审核通过后，可选择“手动发布”或“立即发布”。
-2. **跟踪**：
-   - App Store Connect > Analytics 观察崩溃率 / 留存
-   - 若发现严重 bug，立刻准备热修复版本（递增 Build & Version）。
-3. **仓库同步**：
-   - 将实际发布的 `Version`/`Build` 回写到 `project.pbxproj`
-   - 打标签 `v1.0.0` 并记录发布说明
-4. **客服支持**：
-   - 准备邮箱/表单收集用户反馈
-   - 定期巡检 App Store Review 回复
+### 核心功能
+- 📱 **首页仪表板**: 安全评分、连续天数追踪、今日完成度
+- 🚗 **智能驾驶记录**: GPS轨迹记录、自动定位、驾驶时长统计
+- 📝 **驾驶日志**: 成功/失误记录、场景分析、改进建议
+- ✅ **智能检查清单**: 行前行后检查、自定义检查项、打卡记录
+- 📚 **安全知识学习**: 每日推送、互动学习、进度追踪
+- 🎯 **数据统计分析**: 驾驶习惯分析、安全评分计算、成就系统
+- 🌤️ **实时天气信息**: 当前位置天气、驾驶建议
+- 🎙️ **语音记录功能**: 语音备忘录、语音转文字
 
 ---
 
-## 附录 A. 发布前检查清单
-- [ ] Apple Developer 账号有效，Xcode 登录
-- [ ] App ID / Capabilities 与上线功能一致
-- [ ] 版本号、Build 号已更新
-- [ ] App Icon 所有尺寸齐备
-- [ ] 关键权限申请与提示文案一致
-- [ ] 自动化测试通过，关键手动测试完成
-- [ ] 隐私政策 URL 可访问
-- [ ] App Store Connect 元数据、截图、App Review 说明填写完毕
-- [ ] 最新构建已上传并在 Processing/Ready to Submit 状态
+## 应用信息配置
 
-## 附录 B. 常用链接
-- Apple Developer Identifiers: https://developer.apple.com/account/resources/identifiers/list
-- App Store Connect: https://appstoreconnect.apple.com/
-- TestFlight 指南: https://developer.apple.com/testflight/
-- 出口合规 FAQ: https://developer.apple.com/documentation/security
+### 基本信息
+- **应用名称**: 安全驾驶助手
+- **Bundle ID**: `com.chenyuanqi.SafeDriverNote`
+- **分类**:
+  - 主分类: 导航
+  - 副分类: 生活方式
+- **年龄分级**: 4+
+- **支持设备**: iPhone, iPad
+- **最低iOS版本**: iOS 18.5+
 
-祝发布顺利！如需补充 CI/CD、自动化上架脚本或后续版本规划，可基于本指南扩展。
+### 应用图标要求
+- **1024x1024**: App Store展示图标
+- **180x180**: iPhone应用图标(@3x)
+- **120x120**: iPhone应用图标(@2x)
+- **152x152**: iPad应用图标(@2x)
+- **76x76**: iPad应用图标(@1x)
+
+---
+
+## 权限说明
+
+### 必需权限
+1. **位置权限 (NSLocationWhenInUseUsageDescription)**
+   - 用途: 记录驾驶路线、获取当前位置、提供基于位置的服务
+   - 说明文本: "安全驾驶助手需要访问您的位置来记录驾驶路线、提供当前位置信息和基于位置的驾驶建议。"
+
+2. **后台位置权限 (NSLocationAlwaysAndWhenInUseUsageDescription)**
+   - 用途: 在后台持续记录驾驶轨迹
+   - 说明文本: "为了在驾驶过程中持续记录您的行驶轨迹，我们需要在后台访问位置信息。这有助于提供完整的驾驶记录和安全分析。"
+
+3. **麦克风权限 (NSMicrophoneUsageDescription)**
+   - 用途: 语音记录和语音转文字功能
+   - 说明文text: "安全驾驶助手需要访问麦克风来支持语音记录功能，帮助您在驾驶过程中安全地记录重要信息。"
+
+4. **通知权限**
+   - 用途: 每日安全提醒、学习推送、驾驶状态通知
+   - 自动在应用内请求
+
+### 可选权限
+1. **iCloud同步**
+   - 用途: 数据云端备份和多设备同步
+   - 配置: CloudKit, CloudDocuments
+
+---
+
+## App Store 资料准备
+
+### 应用截图规格
+#### iPhone 截图 (必需)
+- **6.7英寸显示屏** (iPhone 15 Pro Max): 1290 x 2796 像素
+- **6.1英寸显示屏** (iPhone 15 Pro): 1179 x 2556 像素
+- **5.5英寸显示屏** (iPhone 8 Plus): 1242 x 2208 像素
+
+#### iPad 截图 (必需)
+- **12.9英寸显示屏** (iPad Pro): 2048 x 2732 像素
+- **11英寸显示屏** (iPad Pro): 1668 x 2388 像素
+
+### 推荐截图内容
+1. **首页仪表板** - 展示安全评分、连续天数等核心功能
+2. **驾驶记录界面** - 展示GPS轨迹和驾驶统计
+3. **日志记录功能** - 展示日志编辑和分类功能
+4. **检查清单** - 展示行前行后检查功能
+5. **知识学习页面** - 展示学习卡片和进度
+
+### 隐私政策URL
+
+#### 设置隐私政策托管
+App Store要求提供隐私政策URL，推荐使用GitHub Pages托管：
+
+1. **创建GitHub仓库**
+   - 仓库名：`safe-driver-note-privacy`
+   - 设置为Public
+
+2. **上传隐私政策**
+   - 将项目中的 `docs/legal/privacy-policy.md` 上传为 `README.md`
+   - 或使用HTML版本获得更好的展示效果
+
+3. **启用GitHub Pages**
+   - 在仓库设置中启用Pages功能
+   - 获取URL：`https://[用户名].github.io/safe-driver-note-privacy`
+
+4. **App Store Connect填写**
+   - 隐私政策URL：填写GitHub Pages链接
+   - 备用方案：Gitee Pages、Notion等（详见 `docs/legal/privacy-policy-hosting-guide.md`）
+
+#### 隐私政策关键点
+- ✅ 详细说明位置权限使用目的
+- ✅ 明确数据本地存储原则
+- ✅ 说明不收集个人身份信息
+- ✅ 解释第三方服务使用（天气、iCloud）
+- ✅ 提供用户数据控制权说明
+
+### 应用描述
+
+#### 简短描述 (30字符)
+安全驾驶记录与学习助手
+
+#### 完整描述
+```
+🚗 安全驾驶助手 - 您的专业驾驶伙伴
+
+安全驾驶助手是一款专为提升驾驶安全而设计的智能应用，通过科学的记录方式和个性化的学习内容，帮助每一位驾驶者培养良好的驾驶习惯。
+
+✨ 核心功能
+• 智能驾驶记录 - GPS轨迹自动记录，详细分析每次出行
+• 安全评分系统 - 基于驾驶数据的个性化评分和建议
+• 行前行后检查 - 标准化检查流程，确保行车安全
+• 知识学习中心 - 每日推送驾驶技巧和安全知识
+• 驾驶日志管理 - 记录驾驶经验，总结改进要点
+• 数据可视化 - 清晰展示驾驶习惯和进步轨迹
+
+🎯 专业特性
+• 连续天数追踪 - 激励持续的安全驾驶习惯
+• 天气集成 - 实时天气信息辅助驾驶决策
+• 语音记录 - 安全便捷的驾驶过程记录方式
+• iCloud同步 - 数据安全备份，多设备无缝同步
+• 隐私保护 - 所有数据本地存储，保护个人隐私
+
+🏆 适用人群
+• 新手驾驶员 - 系统性学习和记录驾驶经验
+• 职业司机 - 专业的驾驶管理和数据分析
+• 安全意识强的驾驶者 - 持续改进驾驶技能
+
+让我们一起为更安全的道路环境努力！
+```
+
+#### 关键词 (100字符)
+```
+驾驶,安全,记录,GPS,日志,学习,检查,追踪,分析,习惯,路线,导航,新手,教练,考试,违章,保险,天气
+```
+
+**关键词策略**:
+- **核心词**: 驾驶、安全、记录、GPS (高权重，直接相关)
+- **功能词**: 日志、学习、检查、追踪、分析 (功能描述)
+- **用户词**: 新手、教练、习惯 (目标用户)
+- **场景词**: 路线、导航、天气、违章 (使用场景)
+- **竞品词**: 考试、保险 (扩展覆盖)
+
+#### 更新说明模板
+```
+🎉 版本 1.0.0 更新内容:
+
+✨ 新功能
+• 全新首页仪表板设计
+• 智能驾驶轨迹记录
+• 个性化安全评分系统
+• 每日安全知识推送
+
+🔧 优化改进
+• 提升GPS定位精确度
+• 优化电池使用效率
+• 改进用户界面体验
+• 增强数据同步稳定性
+
+🐛 问题修复
+• 修复定位偶现异常问题
+• 解决数据统计不准确问题
+• 优化内存使用
+
+感谢您的支持与反馈！
+```
+
+---
+
+## 技术配置
+
+### Build Settings 检查清单
+
+#### Release配置
+- [ ] **Build Configuration**: Release
+- [ ] **Code Signing**: Distribution Certificate
+- [ ] **Provisioning Profile**: App Store Distribution Profile
+- [ ] **Bitcode**: Enabled (如需要)
+- [ ] **Strip Debug Symbols**: YES
+- [ ] **Make Debug Information Format**: DWARF
+- [ ] **Deployment Target**: iOS 18.5
+
+#### 权限配置检查
+- [ ] 位置权限说明文本已添加
+- [ ] 麦克风权限说明文本已添加
+- [ ] 后台模式已正确配置 (location)
+- [ ] iCloud容器已配置 (如使用)
+- [ ] 推送通知已配置 (如使用)
+
+### 代码审查要点
+
+#### 性能优化
+- [ ] 内存泄漏检查完成
+- [ ] 网络请求超时处理
+- [ ] 大数据集分页加载
+- [ ] 图片压缩和缓存机制
+- [ ] GPS服务电量优化
+
+#### 用户体验
+- [ ] 网络异常处理
+- [ ] 权限拒绝友好提示
+- [ ] 数据加载状态显示
+- [ ] 空状态页面设计
+- [ ] 错误信息本地化
+
+#### 安全性
+- [ ] 敏感数据加密存储
+- [ ] 网络传输安全(HTTPS)
+- [ ] 用户隐私数据保护
+- [ ] 防止SQL注入等攻击
+- [ ] 第三方SDK安全审计
+
+---
+
+## 提交流程
+
+### 1. 准备阶段
+1. **测试验证**
+   ```bash
+   # 运行完整测试套件
+   xcodebuild test -scheme SafeDriverNote -destination 'platform=iOS Simulator,name=iPhone 15 Pro'
+
+   # 静态分析
+   xcodebuild analyze -scheme SafeDriverNote
+   ```
+
+2. **Archive构建**
+   ```bash
+   # 清理构建目录
+   xcodebuild clean -scheme SafeDriverNote
+
+   # 创建Archive
+   xcodebuild archive -scheme SafeDriverNote -archivePath "SafeDriverNote.xcarchive"
+   ```
+
+3. **App Store包生成**
+   - 使用Xcode Organizer
+   - 选择正确的Provisioning Profile
+   - 生成App Store分发包
+
+### 2. App Store Connect配置
+
+#### 应用信息设置
+1. **基本信息**
+   - 应用名称: 安全驾驶助手
+   - 副标题: 专业的驾驶记录与学习工具
+   - 分类: 导航
+   - 内容分级: 4+
+
+2. **定价和可用性**
+   - 定价: 免费
+   - 可用地区: 中国大陆
+   - 发布日期: 审核通过后立即发布
+
+3. **应用隐私**
+   - **隐私政策URL**: 填写GitHub Pages链接
+   - **数据收集类型**:
+     - 位置数据: 收集但不链接到用户身份
+     - 使用数据: 收集用于应用功能
+     - 诊断数据: 可选收集用于改进应用
+   - **数据使用目的**: 应用功能、产品个性化、应用分析
+   - **第三方数据**: 来自天气服务的位置数据
+
+#### 版本信息
+1. **构建版本上传**
+   - 通过Xcode或Transporter上传ipa
+   - 等待处理完成(通常5-15分钟)
+
+2. **版本详情**
+   - 版本号: 1.0.0
+   - 构建版本: 与Xcode中保持一致
+   - 更新说明: 使用上面的模板
+
+3. **审核信息**
+   - 联系信息: 提供有效的邮箱和电话
+   - 测试账号: 如有登录功能需提供
+   - 审核备注: 特殊功能使用说明
+
+### 3. 提交审核
+1. **最终检查**
+   - [ ] 所有截图已上传
+   - [ ] 应用描述完整准确
+   - [ ] 权限说明清晰合理
+   - [ ] 测试已通过
+   - [ ] 法律文档已准备(如需要)
+
+2. **提交审核**
+   - 在App Store Connect中点击"提交审核"
+   - 确认所有信息无误
+   - 等待苹果审核(通常1-7天)
+
+---
+
+## 审核要点
+
+### 常见被拒原因及避免方法
+
+1. **权限使用不当**
+   - ✅ 确保权限说明文本清晰说明用途
+   - ✅ 只在必要时请求权限
+   - ✅ 提供权限拒绝时的备选方案
+
+2. **用户界面问题**
+   - ✅ 避免使用系统保留词汇
+   - ✅ 确保所有功能在审核版本中可用
+   - ✅ 提供清晰的导航和操作指引
+
+3. **性能问题**
+   - ✅ 避免崩溃和ANR
+   - ✅ 合理的启动时间
+   - ✅ 流畅的用户交互体验
+
+4. **内容安全**
+   - ✅ 避免误导性内容
+   - ✅ 确保用户生成内容的安全性
+   - ✅ 遵循当地法律法规
+
+### 审核加速建议
+1. **充分测试**: 在多种设备和iOS版本上测试
+2. **清晰文档**: 提供详细的功能说明和使用指南
+3. **及时响应**: 如收到审核团队询问，及时详细回复
+4. **版本稳定**: 避免在审核期间频繁更新版本
+
+---
+
+## 发布后维护
+
+### 监控指标
+- **下载量**: App Store Analytics
+- **崩溃率**: Xcode Organizer / 第三方工具
+- **用户评价**: App Store Connect
+- **性能指标**: Xcode Instruments
+
+### 更新策略
+- **关键bug修复**: 立即发布补丁版本
+- **功能更新**: 每月1-2次更新
+- **大版本更新**: 每季度一次重大功能更新
+
+### 用户反馈处理
+1. **App Store评论**: 定期查看和回复
+2. **支持邮箱**: 设置专门的用户支持邮箱
+3. **FAQ文档**: 维护常见问题解答
+4. **社区建设**: 建立用户交流群体
+
+---
+
+## 联系信息
+
+- **开发者**: 陈元奇
+- **技术支持**: [支持邮箱]
+- **官方网站**: [网站链接]
+- **用户反馈**: [反馈渠道]
+
+---
+
+## 版本历史
+
+### v1.0.0 (待发布)
+- 初始版本发布
+- 基础驾驶记录功能
+- 安全评分系统
+- 知识学习模块
+
+---
+
+*最后更新: 2024年9月*
+*文档版本: 1.0*
