@@ -131,12 +131,8 @@ struct HomeView: View {
             PermissionOnboardingView(onComplete: { preference in
                 showingPermissionOnboarding = false
                 handlePermissionRequests(preference: preference)
-            }, onLater: {
-                showingPermissionOnboarding = false
-                markPermissionOnboardingShown()
             })
             .presentationDetents([.large])
-            .presentationDragIndicator(.visible)
         }
         .onDisappear {
             // 移除通知观察者
@@ -1216,9 +1212,9 @@ private enum LocationPermissionPreference: String, CaseIterable, Identifiable {
 }
 
 private struct PermissionOnboardingView: View {
+    @Environment(\.dismiss) private var dismiss
     @State private var locationPreference: LocationPermissionPreference = .always
     let onComplete: (LocationPermissionPreference) -> Void
-    let onLater: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.xxxl) {
@@ -1235,7 +1231,7 @@ private struct PermissionOnboardingView: View {
             }
 
             VStack(alignment: .leading, spacing: Spacing.lg) {
-                PermissionRow(title: "位置", description: "记录行程路线并在后台持续定位，建议选择“始终允许”。")
+                PermissionRow(title: "位置", description: "记录行程路线并在后台持续定位，建议选择\"始终允许\"。")
 
                 VStack(alignment: .leading, spacing: Spacing.sm) {
                     Text("位置权限偏好")
@@ -1253,11 +1249,13 @@ private struct PermissionOnboardingView: View {
                 PermissionRow(title: "麦克风", description: "用于语音记事和语音转写功能。")
             }
 
+            Spacer()
+
             VStack(spacing: Spacing.md) {
                 Button {
                     onComplete(locationPreference)
                 } label: {
-                    Text("立即授权")
+                    Text("继续")
                         .font(.bodyLarge)
                         .fontWeight(.semibold)
                         .frame(maxWidth: .infinity)
@@ -1266,24 +1264,16 @@ private struct PermissionOnboardingView: View {
                         .foregroundColor(.white)
                         .cornerRadius(CornerRadius.lg)
                 }
-
-                Button {
-                    onLater()
-                } label: {
-                    Text("暂不处理")
-                        .font(.body)
-                        .foregroundColor(.brandSecondary600)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, Spacing.sm)
-                }
             }
 
-            Text("您可以随时在“设置 > 隐私与安全”中修改这些权限。")
+            Text("点击\"继续\"后将请求这些权限。您可以随时在\"设置 > 隐私与安全\"中修改。")
                 .font(.caption)
                 .foregroundColor(.brandSecondary500)
+                .multilineTextAlignment(.center)
         }
         .padding(Spacing.xxxl)
         .background(Color(.systemBackground))
+        .interactiveDismissDisabled()
     }
 }
 
