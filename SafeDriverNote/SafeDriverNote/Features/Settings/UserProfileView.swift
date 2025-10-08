@@ -134,38 +134,56 @@ struct UserProfileView: View {
                 )
                 .shadow(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
             }
+            .buttonStyle(PlainButtonStyle()) // 添加按钮样式以避免默认样式问题
 
             Text("点击更换头像")
                 .font(.bodySmall)
                 .foregroundColor(.brandSecondary500)
         }
-        .confirmationDialog("选择头像来源", isPresented: $showingActionSheet, titleVisibility: .visible) {
-            Button("从相册选择") {
+        // 修复 iPad 兼容性：使用 actionSheet（兼容 iPad）
+        .actionSheet(isPresented: $showingActionSheet) {
+            var buttons: [ActionSheet.Button] = []
+
+            // 从相册选择
+            buttons.append(.default(Text("从相册选择")) {
                 sourceType = .photoLibrary
                 showingImagePicker = true
-            }
+            })
 
+            // 拍照（如果可用）
             if UIImagePickerController.isSourceTypeAvailable(.camera) {
-                Button("拍照") {
+                buttons.append(.default(Text("拍照")) {
                     sourceType = .camera
                     showingImagePicker = true
-                }
+                })
             }
 
+            // 删除头像（如果有头像）
             if avatarImage != nil || selectedImage != nil {
-                Button("删除头像", role: .destructive) {
+                buttons.append(.destructive(Text("删除头像")) {
                     avatarImage = nil
                     selectedImage = nil
                     pendingImage = nil
                     avatarDeleted = true
-                }
+                })
             }
 
-            Button("取消", role: .cancel) {}
+            // 取消按钮
+            buttons.append(.cancel())
+
+            return ActionSheet(title: Text("选择头像来源"), buttons: buttons)
         }
         .sheet(isPresented: $showingImagePicker) {
             if sourceType == .camera {
-                CameraImagePicker(image: $pendingImage, showingCropView: $showingCropView)
+                // 双重检查相机可用性（iPad 兼容性）
+                if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                    CameraImagePicker(image: $pendingImage, showingCropView: $showingCropView)
+                } else {
+                    Text("相机不可用")
+                        .onAppear {
+                            showingImagePicker = false
+                        }
+                }
             } else {
                 ImagePicker(image: $pendingImage, showingCropView: $showingCropView)
             }
