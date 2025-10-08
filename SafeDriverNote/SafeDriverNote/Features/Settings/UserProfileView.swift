@@ -25,6 +25,8 @@ struct UserProfileView: View {
     @State private var errorMessage = ""
     @State private var showingActionSheet = false
     @State private var sourceType: UIImagePickerController.SourceType = .photoLibrary
+    @State private var originalAvatarPath: String? = nil // 记录原始头像路径
+    @State private var avatarDeleted = false // 标记用户是否删除了头像
 
     var body: some View {
         NavigationView {
@@ -150,11 +152,12 @@ struct UserProfileView: View {
                 }
             }
 
-            if avatarImage != nil {
+            if avatarImage != nil || selectedImage != nil {
                 Button("删除头像", role: .destructive) {
                     avatarImage = nil
                     selectedImage = nil
                     pendingImage = nil
+                    avatarDeleted = true
                 }
             }
 
@@ -177,6 +180,7 @@ struct UserProfileView: View {
                         selectedImage = croppedUIImage
                         avatarImage = Image(uiImage: croppedUIImage)
                         pendingImage = nil
+                        avatarDeleted = false // 选择新头像时重置删除标记
                     },
                     onCancel: {
                         pendingImage = nil
@@ -408,6 +412,8 @@ struct UserProfileView: View {
                     self.drivingYears = "\(profile.drivingYears)"
                     self.vehicleType = profile.vehicleType
                     self.userStats = stats
+                    self.originalAvatarPath = profile.avatarImagePath
+                    self.avatarDeleted = false
                     self.loadAvatarImage(from: profile.avatarImagePath)
                     self.isLoading = false
                 }
@@ -431,10 +437,18 @@ struct UserProfileView: View {
                 let ageValue = userAge.isEmpty ? nil : Int(userAge)
                 let drivingYearsValue = Int(drivingYears) ?? 0
 
-                // 保存头像图片
+                // 处理头像保存逻辑
                 var avatarPath: String? = nil
                 if let uiImage = selectedImage {
+                    // 用户选择了新头像，保存图片
                     avatarPath = saveAvatarImage(uiImage)
+                } else if avatarDeleted {
+                    // 用户删除了头像，清空头像路径并删除旧文件
+                    avatarPath = nil
+                    deleteOldAvatarFiles()
+                } else {
+                    // 用户没有修改头像，保持原来的路径
+                    avatarPath = originalAvatarPath
                 }
 
                 _ = try di.userProfileRepository.updateUserProfile(
@@ -538,6 +552,20 @@ struct UserProfileView: View {
                     self.pendingImage = nil
                 }
             }
+        }
+    }
+
+    private func deleteOldAvatarFiles() {
+        guard let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first else { return }
+
+        do {
+            let oldFiles = try FileManager.default.contentsOfDirectory(at: documentsPath, includingPropertiesForKeys: nil)
+                .filter { $0.lastPathComponent.hasPrefix("avatar_") && $0.pathExtension == "jpg" }
+            for oldFile in oldFiles {
+                try? FileManager.default.removeItem(at: oldFile)
+            }
+        } catch {
+            print("Failed to delete old avatar files: \(error)")
         }
     }
 }

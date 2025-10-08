@@ -534,9 +534,8 @@ struct UserProfileRepositorySwiftData: UserProfileRepository {
         profile.userAge = userAge
         profile.drivingYears = drivingYears
         profile.vehicleType = vehicleType
-        if let avatarImagePath = avatarImagePath {
-            profile.avatarImagePath = avatarImagePath
-        }
+        // 始终更新头像路径，包括设置为nil的情况（删除头像）
+        profile.avatarImagePath = avatarImagePath
         try saveUserProfile(profile)
         return profile
     }
