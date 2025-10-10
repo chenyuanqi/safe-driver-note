@@ -73,7 +73,7 @@ struct ChecklistHistoryView: View {
             HStack {
                 Text("最近打卡记录")
                     .font(.headline)
-                    .fontWeight(.semibold)
+                    .fontWeight(.medium)
                     .foregroundColor(.brandSecondary900)
                 
                 Spacer()
@@ -138,8 +138,12 @@ struct ChecklistHistoryView: View {
         HStack(alignment: .top, spacing: Spacing.md) {
             // 左侧：时间和图标
             VStack(alignment: .leading, spacing: Spacing.xs) {
-                Text(formatDateTime(punch.createdAt))
-                    .font(.bodySmall)
+                Text(formatDate(punch.createdAt))
+                    .font(.caption2)
+                    .foregroundColor(.brandSecondary500)
+
+                Text(formatTime(punch.createdAt))
+                    .font(.caption2)
                     .foregroundColor(.brandSecondary500)
 
                 Image(systemName: punch.mode == .pre ? "car.fill" : "parkingsign.circle.fill")
@@ -221,6 +225,20 @@ struct ChecklistHistoryView: View {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "zh_CN")
         formatter.dateFormat = "yyyy 年 M 月 d日 HH:mm"
+        return formatter.string(from: date)
+    }
+
+    private func formatDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "zh_CN")
+        formatter.dateFormat = "yyyy 年 M 月 d日"
+        return formatter.string(from: date)
+    }
+
+    private func formatTime(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "zh_CN")
+        formatter.dateFormat = "HH:mm"
         return formatter.string(from: date)
     }
 }
