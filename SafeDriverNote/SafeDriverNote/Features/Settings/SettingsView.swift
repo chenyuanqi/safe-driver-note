@@ -474,7 +474,6 @@ struct SettingsView: View {
             } else {
                 // 如果无法打开邮件应用，将邮箱地址复制到剪贴板
                 UIPasteboard.general.string = email
-                showingRatingAlert = true // 复用alert显示提示信息
             }
         }
     }

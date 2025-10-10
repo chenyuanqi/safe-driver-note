@@ -135,52 +135,60 @@ struct ChecklistHistoryView: View {
     }
     
     private func recentRecordRow(punch: ChecklistPunch) -> some View {
-        HStack(spacing: Spacing.md) {
+        HStack(alignment: .top, spacing: Spacing.md) {
+            // 左侧：时间和图标
             VStack(alignment: .leading, spacing: Spacing.xs) {
                 Text(formatDateTime(punch.createdAt))
                     .font(.bodySmall)
                     .foregroundColor(.brandSecondary500)
-                
+
                 Image(systemName: punch.mode == .pre ? "car.fill" : "parkingsign.circle.fill")
-                    .font(.title3)
+                    .font(.title)
                     .foregroundColor(punch.mode == .pre ? .brandInfo500 : .brandWarning500)
             }
-            
+            .frame(width: 70, alignment: .leading)
+
+            // 右侧：内容区域
             VStack(alignment: .leading, spacing: Spacing.xs) {
-                HStack {
-                    Text(punch.mode == .pre ? "行前检查" : "行后检查")
-                        .font(.bodyMedium)
-                        .fontWeight(.medium)
-                        .foregroundColor(.brandSecondary900)
-                    
-                    if punch.isQuickComplete {
-                        Image(systemName: "bolt.fill")
-                            .font(.caption)
-                            .foregroundColor(.brandWarning500)
+                // 标题和分数
+                HStack(alignment: .top) {
+                    HStack(spacing: Spacing.xs) {
+                        Text(punch.mode == .pre ? "行前检查" : "行后检查")
+                            .font(.bodyMedium)
+                            .fontWeight(.medium)
+                            .foregroundColor(.brandSecondary900)
+
+                        if punch.isQuickComplete {
+                            Image(systemName: "bolt.fill")
+                                .font(.caption)
+                                .foregroundColor(.brandWarning500)
+                        }
                     }
-                    
+
                     Spacer()
-                    
+
                     Text("\(punch.score)分")
-                        .font(.bodySmall)
+                        .font(.title3)
                         .fontWeight(.semibold)
                         .foregroundColor(.brandSuccess500)
                 }
-                
+
+                // 检查项列表
                 if !punch.checkedItemIds.isEmpty {
                     Text(titles(for: punch).joined(separator: "、"))
                         .font(.bodySmall)
                         .foregroundColor(.brandSecondary500)
                         .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                
-                // 显示位置信息
+
+                // 位置信息
                 if let locationNote = punch.locationNote, !locationNote.isEmpty {
                     HStack(spacing: Spacing.xs) {
                         Image(systemName: "location.fill")
                             .font(.caption2)
                             .foregroundColor(.brandInfo500)
-                        
+
                         Text(locationNote)
                             .font(.caption)
                             .foregroundColor(.brandSecondary400)
@@ -188,7 +196,8 @@ struct ChecklistHistoryView: View {
                     }
                 }
             }
-            
+
+            // 右侧箭头
             Image(systemName: "chevron.right")
                 .font(.caption)
                 .foregroundColor(.brandSecondary400)
