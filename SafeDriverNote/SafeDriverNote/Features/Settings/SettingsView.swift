@@ -12,7 +12,6 @@ struct SettingsView: View {
     @State private var showingiCloudSync = false
     @State private var showingClearCacheAlert = false
     @State private var showingCacheCleared = false
-    @State private var showingRatingAlert = false
     @State private var showingFeedbackOptions = false
     @EnvironmentObject private var themeManager: ThemeManager
     @EnvironmentObject private var di: AppDI
@@ -95,11 +94,6 @@ struct SettingsView: View {
         } message: {
             Text("临时文件已成功清理")
         }
-        .alert("为我们评分", isPresented: $showingRatingAlert) {
-            Button("确定") { }
-        } message: {
-            Text("应用还未发布到App Store，评分功能暂时无法使用。您可以通过意见反馈向我们提出建议！")
-        }
         .actionSheet(isPresented: $showingFeedbackOptions) {
             ActionSheet(
                 title: Text("意见反馈"),
@@ -109,8 +103,7 @@ struct SettingsView: View {
                         sendFeedbackEmail()
                     },
                     .default(Text("⭐ 应用评分")) {
-                        // 如果应用发布后，可以打开App Store评分页面
-                        showingRatingAlert = true
+                        openAppStoreRating()
                     },
                     .cancel(Text("取消"))
                 ]
@@ -331,12 +324,12 @@ struct SettingsView: View {
                 Divider().padding(.leading, 52)
 
                 Button(action: {
-                    showingRatingAlert = true
+                    openAppStoreRating()
                 }) {
                     settingsRow(
                         icon: "star",
                         title: "为我们评分",
-                        subtitle: "功能未开发",
+                        subtitle: "在App Store上给我们评分",
                         color: .brandWarning500
                     )
                 }
@@ -443,6 +436,15 @@ struct SettingsView: View {
         if let data = try? Data(contentsOf: fileURL),
            let uiImage = UIImage(data: data) {
             self.avatarImage = Image(uiImage: uiImage)
+        }
+    }
+
+    // MARK: - App Store Rating
+
+    private func openAppStoreRating() {
+        let appID = "6753129152"
+        if let url = URL(string: "https://apps.apple.com/app/id\(appID)?action=write-review") {
+            UIApplication.shared.open(url)
         }
     }
 
