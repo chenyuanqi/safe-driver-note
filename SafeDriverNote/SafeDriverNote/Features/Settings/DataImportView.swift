@@ -169,6 +169,7 @@ struct DataImportView: View {
                     summaryRow(icon: "square.stack.3d.up", title: "检查记录", value: "\(summary.checklistRecordCount) 天")
                     summaryRow(icon: "doc.badge.gearshape", title: "自定义检查项", value: "\(summary.checklistItemCount) 项")
                     summaryRow(icon: "book", title: "学习进度", value: "\(summary.knowledgeProgressCount) 条")
+                    summaryRow(icon: "car.circle", title: "开车守则", value: "\(summary.drivingRulesCount) 条")
                     summaryRow(icon: "person.crop.circle", title: "用户资料", value: summary.hasUserProfile ? "包含" : "无")
                 }
                 .padding(Spacing.lg)
@@ -218,6 +219,15 @@ struct DataImportView: View {
                         subtitle: "恢复知识卡片的掌握状态",
                         isOn: $importOptions.importKnowledge,
                         available: summary.knowledgeProgressCount > 0
+                    )
+
+                    Divider()
+
+                    importToggle(
+                        title: "开车守则",
+                        subtitle: "恢复您自定义的开车守则和安全原则",
+                        isOn: $importOptions.importDrivingRules,
+                        available: summary.drivingRulesCount > 0
                     )
 
                     Divider()
@@ -387,6 +397,7 @@ private struct ImportOptions {
     var importLogs: Bool = false
     var importChecklist: Bool = false
     var importKnowledge: Bool = false
+    var importDrivingRules: Bool = false
     var importUserProfile: Bool = false
 
     init() {}
@@ -399,11 +410,12 @@ private struct ImportOptions {
             || !(envelope.checklistPunches?.isEmpty ?? true)
         self.importChecklist = hasChecklist
         self.importKnowledge = !(envelope.knowledgeProgress?.isEmpty ?? true)
+        self.importDrivingRules = !(envelope.drivingRules?.isEmpty ?? true)
         self.importUserProfile = envelope.userProfile != nil
     }
 
     var hasSelection: Bool {
-        importRoutes || importLogs || importChecklist || importKnowledge || importUserProfile
+        importRoutes || importLogs || importChecklist || importKnowledge || importDrivingRules || importUserProfile
     }
 }
 
@@ -414,6 +426,7 @@ private struct BackupSummary {
     let checklistItemCount: Int
     let checklistPunchCount: Int
     let knowledgeProgressCount: Int
+    let drivingRulesCount: Int
     let hasUserProfile: Bool
     let exportedAt: Date?
 
@@ -424,6 +437,7 @@ private struct BackupSummary {
         self.checklistItemCount = envelope.checklistItems?.count ?? 0
         self.checklistPunchCount = envelope.checklistPunches?.count ?? 0
         self.knowledgeProgressCount = envelope.knowledgeProgress?.count ?? 0
+        self.drivingRulesCount = envelope.drivingRules?.count ?? 0
         self.hasUserProfile = envelope.userProfile != nil
         self.exportedAt = envelope.metadata.exportedAt
     }
@@ -487,6 +501,11 @@ private struct BackupImporter {
                     }
                 }
             }
+        }
+
+        if options.importDrivingRules {
+            try clearAll(of: DrivingRule.self, in: context)
+            envelope.drivingRules?.forEach { context.insert($0.toModel()) }
         }
 
         if options.importUserProfile {

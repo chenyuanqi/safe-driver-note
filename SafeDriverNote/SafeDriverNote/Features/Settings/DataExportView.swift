@@ -10,6 +10,7 @@ struct DataExportView: View {
     @State private var exportDrivingLogs = true
     @State private var exportChecklistRecords = true
     @State private var exportKnowledgeProgress = false
+    @State private var exportDrivingRules = true
     @State private var exportFormat: ExportFormat = .json
     @State private var isExporting = false
     @State private var showingExportComplete = false
@@ -23,6 +24,7 @@ struct DataExportView: View {
     @State private var logCount = 0
     @State private var checklistCount = 0
     @State private var knowledgeCount = 0
+    @State private var drivingRulesCount = 0
 
     enum ExportFormat: String, CaseIterable {
         case json = "JSON"
@@ -182,6 +184,14 @@ struct DataExportView: View {
                         subtitle: "安全知识的学习记录和标记状态",
                         isSelected: $exportKnowledgeProgress
                     )
+
+                    Divider()
+
+                    dataCheckboxRow(
+                        title: "开车守则",
+                        subtitle: "您自定义的开车守则和安全原则",
+                        isSelected: $exportDrivingRules
+                    )
                 }
                 .padding(Spacing.lg)
             }
@@ -262,6 +272,10 @@ struct DataExportView: View {
                         statRow(icon: "book", title: "学习进度", count: "\(knowledgeCount)个知识点")
                     }
 
+                    if exportDrivingRules {
+                        statRow(icon: "car.circle", title: "开车守则", count: "\(drivingRulesCount)条规则")
+                    }
+
                     if !hasSelectedData {
                         Text("请至少选择一项数据进行导出")
                             .font(.body)
@@ -303,7 +317,7 @@ struct DataExportView: View {
 
     // MARK: - 计算属性
     private var hasSelectedData: Bool {
-        exportDrivingRoutes || exportDrivingLogs || exportChecklistRecords || exportKnowledgeProgress
+        exportDrivingRoutes || exportDrivingLogs || exportChecklistRecords || exportKnowledgeProgress || exportDrivingRules
     }
 
     // MARK: - 辅助方法
@@ -359,12 +373,13 @@ struct DataExportView: View {
     private func loadDataCounts() {
         Task {
             do {
-                let counts = try await MainActor.run { () -> (Int, Int, Int, Int) in
+                let counts = try await MainActor.run { () -> (Int, Int, Int, Int, Int) in
                     let routes = try di.driveRouteRepository.fetchAllRoutes()
                     let logs = try di.logRepository.fetchAll()
                     let checklists = try di.checklistRepository.fetchAllPunches(mode: nil)
                     let knowledge = try di.knowledgeRepository.allCards()
-                    return (routes.count, logs.count, checklists.count, knowledge.count)
+                    let rules = try di.drivingRuleRepository.fetchAll()
+                    return (routes.count, logs.count, checklists.count, knowledge.count, rules.count)
                 }
 
                 await MainActor.run {
@@ -372,6 +387,7 @@ struct DataExportView: View {
                     self.logCount = counts.1
                     self.checklistCount = counts.2
                     self.knowledgeCount = counts.3
+                    self.drivingRulesCount = counts.4
                 }
             } catch {
                 await MainActor.run {
@@ -450,6 +466,11 @@ struct DataExportView: View {
 
                 let cards = try context.fetch(FetchDescriptor<KnowledgeCard>())
                 envelope.knowledgeCards = cards.map(KnowledgeCardBackup.init)
+            }
+
+            if exportDrivingRules {
+                let rules = try context.fetch(FetchDescriptor<DrivingRule>())
+                envelope.drivingRules = rules.map(DrivingRuleBackup.init)
             }
 
             let profiles = try context.fetch(FetchDescriptor<UserProfile>())

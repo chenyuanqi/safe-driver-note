@@ -15,6 +15,7 @@ struct BackupEnvelope: Codable {
     var knowledgeProgress: [KnowledgeProgressBackup]? = nil
     var knowledgeCards: [KnowledgeCardBackup]? = nil
     var userProfile: UserProfileBackup? = nil
+    var drivingRules: [DrivingRuleBackup]? = nil
 }
 
 struct DriveRouteBackup: Codable {
@@ -283,6 +284,35 @@ struct UserProfileBackup: Codable {
             drivingYears: drivingYears,
             vehicleType: vehicleType,
             avatarImagePath: avatarImagePath,
+            createdAt: createdAt,
+            updatedAt: updatedAt
+        )
+    }
+}
+
+struct DrivingRuleBackup: Codable {
+    let id: UUID
+    let content: String
+    let sortOrder: Int
+    let isCustom: Bool
+    let createdAt: Date
+    let updatedAt: Date
+
+    init(rule: DrivingRule) {
+        self.id = rule.id
+        self.content = rule.content
+        self.sortOrder = rule.sortOrder
+        self.isCustom = rule.isCustom
+        self.createdAt = rule.createdAt
+        self.updatedAt = rule.updatedAt
+    }
+
+    func toModel() -> DrivingRule {
+        DrivingRule(
+            id: id,
+            content: content,
+            sortOrder: sortOrder,
+            isCustom: isCustom,
             createdAt: createdAt,
             updatedAt: updatedAt
         )
