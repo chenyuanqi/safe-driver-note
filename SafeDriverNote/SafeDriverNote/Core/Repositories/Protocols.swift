@@ -49,3 +49,10 @@ import Foundation
     func updateUserProfile(userName: String, userAge: Int?, drivingYears: Int, vehicleType: String, avatarImagePath: String?) throws -> UserProfile
     func calculateUserStats() throws -> UserStats
 }
+
+@MainActor protocol DrivingRuleRepository {
+    func fetchAll() throws -> [DrivingRule]
+    func add(_ rule: DrivingRule) throws
+    func update(_ rule: DrivingRule, mutate: (DrivingRule) -> Void) throws
+    func delete(_ rule: DrivingRule) throws
+}

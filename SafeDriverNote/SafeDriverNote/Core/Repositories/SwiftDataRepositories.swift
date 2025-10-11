@@ -730,3 +730,32 @@ enum ChecklistConstants {
         "记账 - 充电、加油、停车等费用"
     ]
 }
+
+// MARK: - DrivingRuleRepository Implementation
+@MainActor
+struct DrivingRuleRepositorySwiftData: DrivingRuleRepository {
+    func fetchAll() throws -> [DrivingRule] {
+        let ctx = try context()
+        let rules = try ctx.fetch(FetchDescriptor<DrivingRule>())
+        return rules.sorted { $0.sortOrder < $1.sortOrder }
+    }
+
+    func add(_ rule: DrivingRule) throws {
+        let ctx = try context()
+        ctx.insert(rule)
+        try ctx.save()
+    }
+
+    func update(_ rule: DrivingRule, mutate: (DrivingRule) -> Void) throws {
+        let ctx = try context()
+        mutate(rule)
+        rule.updatedAt = Date()
+        try ctx.save()
+    }
+
+    func delete(_ rule: DrivingRule) throws {
+        let ctx = try context()
+        ctx.delete(rule)
+        try ctx.save()
+    }
+}

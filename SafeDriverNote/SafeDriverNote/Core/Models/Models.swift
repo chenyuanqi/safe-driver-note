@@ -173,6 +173,25 @@ struct ChecklistItemState: Codable, Hashable {
     }
 }
 
+// MARK: - Driving Rules
+@Model final class DrivingRule {
+    @Attribute(.unique) var id: UUID
+    var content: String
+    var sortOrder: Int
+    var isCustom: Bool // 区分系统默认和用户自定义
+    var createdAt: Date
+    var updatedAt: Date
+
+    init(id: UUID = UUID(), content: String, sortOrder: Int = 0, isCustom: Bool = true, createdAt: Date = Date(), updatedAt: Date = Date()) {
+        self.id = id
+        self.content = content
+        self.sortOrder = sortOrder
+        self.isCustom = isCustom
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+    }
+}
+
 // MARK: - Daily Checkin Summary
 struct ChecklistPunchSummary: Codable {
     let id: UUID

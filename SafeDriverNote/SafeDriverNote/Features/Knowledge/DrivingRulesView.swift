@@ -2,12 +2,16 @@ import SwiftUI
 
 struct DrivingRulesView: View {
     let onDismiss: () -> Void
-    
-    private let rules = [
+
+    @State private var rules: [DrivingRule] = []
+    @State private var showingManagement = false
+    private let repository = AppDI.shared.drivingRuleRepository
+
+    private let defaultRules = [
         "慢出稳，练出精，思出透！敬畏生命，安全驾驶！",
         "开车前绕车一周，检查自己车况（车牌、车身和周围有没有问题？）+自身精神情况（穿着舒适，视野清晰）",
         "保持车距，专注前方，快速扫描周围环境(2s)",
-        "三逢（盲区+道路+自身）四要（减速+备刹+眼神+精神），逢变化必减速注意",
+        "三逢（盲区+道路+自身）四要（减速+备刷+眼神+精神），逢变化必减速注意",
         "不加速，脚一定放在刹车上",
         "眼不到手不动！",
         "让速不让道！",
@@ -45,11 +49,22 @@ struct DrivingRulesView: View {
                     VStack(alignment: .leading, spacing: Spacing.xxl) {
                         // 标题
                         VStack(alignment: .leading, spacing: Spacing.md) {
-                            Text("开车守则")
-                                .font(.title1)
-                                .fontWeight(.bold)
-                                .foregroundColor(.brandSecondary900)
-                            
+                            HStack(alignment: .center) {
+                                Text("开车守则")
+                                    .font(.title1)
+                                    .fontWeight(.bold)
+                                    .foregroundColor(.brandSecondary900)
+
+                                Button(action: {
+                                    showingManagement = true
+                                }) {
+                                    Image(systemName: "pencil.circle.fill")
+                                        .font(.title2)
+                                        .foregroundColor(.brandPrimary500)
+                                }
+                                .buttonStyle(PlainButtonStyle())
+                            }
+
                             // 装饰性分隔线
                             Rectangle()
                                 .fill(Color.brandPrimary500)
@@ -66,8 +81,8 @@ struct DrivingRulesView: View {
                                         .fontWeight(.semibold)
                                         .foregroundColor(.brandPrimary600)
                                         .frame(minWidth: 20, alignment: .leading)
-                                    
-                                    Text(rules[index])
+
+                                    Text(rules[index].content)
                                         .font(.bodyLarge)
                                         .foregroundColor(.brandSecondary900)
                                         .lineSpacing(6)
@@ -111,10 +126,73 @@ struct DrivingRulesView: View {
                         .cornerRadius(CornerRadius.lg)
                 }
                 .padding(.bottom, Spacing.xl)
-                
+
                 Spacer(minLength: 0)
             }
             .padding(.horizontal, Spacing.pagePadding)
+        }
+        .onAppear {
+            loadRules()
+        }
+        .sheet(isPresented: $showingManagement) {
+            DrivingRulesManagementModal(
+                isPresented: $showingManagement,
+                rules: rules,
+                onSave: handleManagementSave
+            )
+        }
+    }
+
+    // MARK: - Helper Methods
+
+    private func loadRules() {
+        do {
+            let loadedRules = try repository.fetchAll()
+            if loadedRules.isEmpty {
+                // 首次加载，使用默认规则
+                initializeDefaultRules()
+            } else {
+                rules = loadedRules
+            }
+        } catch {
+            print("Failed to load driving rules: \(error)")
+            // 加载失败，使用默认规则
+            initializeDefaultRules()
+        }
+    }
+
+    private func initializeDefaultRules() {
+        do {
+            for (index, ruleContent) in defaultRules.enumerated() {
+                let rule = DrivingRule(
+                    content: ruleContent,
+                    sortOrder: index,
+                    isCustom: false
+                )
+                try repository.add(rule)
+                rules.append(rule)
+            }
+        } catch {
+            print("Failed to initialize default rules: \(error)")
+        }
+    }
+
+    private func handleManagementSave(_ updatedRules: [DrivingRule]) {
+        do {
+            // 删除所有现有规则
+            for rule in rules {
+                try repository.delete(rule)
+            }
+
+            // 保存更新后的规则
+            for rule in updatedRules {
+                try repository.add(rule)
+            }
+
+            // 更新本地状态
+            rules = updatedRules
+        } catch {
+            print("Failed to save driving rules: \(error)")
         }
     }
 }

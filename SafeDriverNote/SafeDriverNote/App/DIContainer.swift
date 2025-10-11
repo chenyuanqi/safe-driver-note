@@ -11,6 +11,7 @@ final class AppDI: ObservableObject {
     var knowledgeRepository: KnowledgeRepository { KnowledgeRepositorySwiftData() }
     var driveRouteRepository: DriveRouteRepository { DriveRouteRepositorySwiftData() }
     var userProfileRepository: UserProfileRepository { UserProfileRepositorySwiftData() }
+    var drivingRuleRepository: DrivingRuleRepository { DrivingRuleRepositorySwiftData() }
     var tagSuggestionService: TagSuggestionService { TagSuggestionService.shared }
     var knowledgeSyncService: KnowledgeSyncService { KnowledgeSyncService(repository: knowledgeRepository) }
     var locationService: LocationService { LocationService.shared }
