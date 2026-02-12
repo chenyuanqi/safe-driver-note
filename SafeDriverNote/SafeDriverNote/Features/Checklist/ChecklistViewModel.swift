@@ -149,17 +149,51 @@ final class ChecklistViewModel: ObservableObject {
     
     /// Save items for a specific mode
     func saveItems(_ items: [ChecklistItem], for mode: Mode) {
-        // First delete existing items for this mode
         let existingItems = mode == .pre ? itemsPre : itemsPost
+
+        // 创建现有项的ID集合
+        let existingIds = Set(existingItems.map { $0.id })
+        let newIds = Set(items.map { $0.id })
+
+        // 1. 删除不在新列表中的项
         for item in existingItems {
-            try? repository.deleteItem(item)
+            if !newIds.contains(item.id) {
+                try? repository.deleteItem(item)
+            }
         }
-        
-        // Then add new items
-        for item in items {
-            try? repository.addItem(item)
+
+        // 2. 更新或添加项
+        for newItem in items {
+            if existingIds.contains(newItem.id) {
+                // 更新现有项
+                if let existingItem = existingItems.first(where: { $0.id == newItem.id }) {
+                    try? repository.updateItem(existingItem) { item in
+                        item.title = newItem.title
+                        item.itemDescription = newItem.itemDescription
+                        item.priority = newItem.priority
+                        item.isPinned = newItem.isPinned
+                        item.sortOrder = newItem.sortOrder
+                        item.updatedAt = Date()
+                    }
+                }
+            } else {
+                // 添加新项（创建新的ChecklistItem对象以确保SwiftData正确处理）
+                let itemToAdd = ChecklistItem(
+                    id: newItem.id,
+                    title: newItem.title,
+                    itemDescription: newItem.itemDescription,
+                    mode: newItem.mode,
+                    priority: newItem.priority,
+                    isPinned: newItem.isPinned,
+                    sortOrder: newItem.sortOrder,
+                    isCustom: newItem.isCustom,
+                    createdAt: newItem.createdAt,
+                    updatedAt: Date()
+                )
+                try? repository.addItem(itemToAdd)
+            }
         }
-        
+
         reloadItems()
     }
     
