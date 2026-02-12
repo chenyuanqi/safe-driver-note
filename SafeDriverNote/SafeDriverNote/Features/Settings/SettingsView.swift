@@ -461,18 +461,19 @@ struct SettingsView: View {
     // MARK: - App Store Rating
 
     private func openAppStoreRating() {
-        // 方法1: 使用 SKStoreReviewController（推荐，Apple官方API）
-        // 这个方法在应用上架后会显示评分弹窗，在开发阶段不会做任何事
-        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
-            SKStoreReviewController.requestReview(in: windowScene)
-        }
-
-        // 方法2: 如果需要直接跳转到App Store评分页面（作为备选）
+        // 方法1: 直接跳转到App Store评分页面
         // 注意：应用必须已经在App Store上架，否则链接会无效
-        /*
         let appID = "6753129152"
         if let url = URL(string: "https://apps.apple.com/app/id\(appID)?action=write-review") {
             UIApplication.shared.open(url)
+        }
+
+        // 方法2: 使用 SKStoreReviewController（Apple官方API，作为备选）
+        // 这个方法在应用上架后会显示评分弹窗，在开发阶段不会做任何事
+        // 如果上面的直接跳转失败，可以尝试使用这个方法
+        /*
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene {
+            SKStoreReviewController.requestReview(in: windowScene)
         }
         */
     }
