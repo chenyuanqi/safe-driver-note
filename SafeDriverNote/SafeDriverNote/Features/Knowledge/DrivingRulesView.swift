@@ -11,7 +11,7 @@ struct DrivingRulesView: View {
         "慢出稳，练出精，思出透！敬畏生命，安全驾驶！",
         "开车前绕车一周，检查自己车况（车牌、车身和周围有没有问题？）+自身精神情况（穿着舒适，视野清晰）",
         "保持车距，专注前方，快速扫描周围环境(2s)",
-        "三逢（盲区+道路+自身）四要（减速+备刷+眼神+精神），逢变化必减速注意",
+        "三逢（盲区+道路+自身）四要（减速+备刹+眼神+精神），逢变化必减速注意",
         "不加速，脚一定放在刹车上",
         "眼不到手不动！",
         "让速不让道！",
@@ -28,7 +28,7 @@ struct DrivingRulesView: View {
         "左转之后尽量先保持在原车道，确认没问题再换到其他车道",
         "高速行驶不要猛打方向盘(慢打)，不要急刹车(点刹)",
         "永远给自己留一条后路，防止急刹后被追尾",
-        "下车，帮忙提醒查看前后是否有交通参与者",
+        "下车前，提醒乘客查看前后是否有交通参与者",
         "打转向灯、鸣笛，是为了告知其他交通参与者",
         "特殊环境提前做好准备，比如雨天提前清理油膜",
         "打哈欠、眼皮沉重、走神+情绪不好，必须靠边休息恢复"
@@ -179,18 +179,44 @@ struct DrivingRulesView: View {
 
     private func handleManagementSave(_ updatedRules: [DrivingRule]) {
         do {
-            // 删除所有现有规则
+            // 创建现有规则的ID集合
+            let existingIds = Set(rules.map { $0.id })
+            let newIds = Set(updatedRules.map { $0.id })
+
+            // 1. 删除不在新列表中的规则
             for rule in rules {
-                try repository.delete(rule)
+                if !newIds.contains(rule.id) {
+                    try repository.delete(rule)
+                }
             }
 
-            // 保存更新后的规则
-            for rule in updatedRules {
-                try repository.add(rule)
+            // 2. 更新或添加规则
+            for newRule in updatedRules {
+                if existingIds.contains(newRule.id) {
+                    // 更新现有规则
+                    if let existingRule = rules.first(where: { $0.id == newRule.id }) {
+                        try repository.update(existingRule) { rule in
+                            rule.content = newRule.content
+                            rule.sortOrder = newRule.sortOrder
+                            rule.updatedAt = Date()
+                        }
+                    }
+                } else {
+                    // 添加新规则（创建新的DrivingRule对象以确保SwiftData正确处理）
+                    let ruleToAdd = DrivingRule(
+                        id: newRule.id,
+                        content: newRule.content,
+                        sortOrder: newRule.sortOrder,
+                        isCustom: newRule.isCustom,
+                        createdAt: newRule.createdAt,
+                        updatedAt: Date()
+                    )
+                    try repository.add(ruleToAdd)
+                }
             }
 
-            // 更新本地状态
-            rules = updatedRules
+            // 3. 重新加载规则以确保数据同步
+            loadRules()
         } catch {
             print("Failed to save driving rules: \(error)")
         }
