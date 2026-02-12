@@ -14,6 +14,7 @@ struct SettingsView: View {
     @State private var showingClearCacheAlert = false
     @State private var showingCacheCleared = false
     @State private var showingFeedbackOptions = false
+    @State private var showingRestoreDefaults = false
     @EnvironmentObject private var themeManager: ThemeManager
     @EnvironmentObject private var di: AppDI
 
@@ -77,6 +78,10 @@ struct SettingsView: View {
         }
         .sheet(isPresented: $showingiCloudSync) {
             iCloudSyncView()
+                .environmentObject(di)
+        }
+        .sheet(isPresented: $showingRestoreDefaults) {
+            RestoreDefaultsView()
                 .environmentObject(di)
         }
         .alert("清除缓存", isPresented: $showingClearCacheAlert) {
@@ -272,6 +277,19 @@ struct SettingsView: View {
                 //         color: .brandSecondary600
                 //     )
                 // }
+
+                Divider().padding(.leading, 52)
+
+                Button(action: {
+                    showingRestoreDefaults = true
+                }) {
+                    settingsRow(
+                        icon: "arrow.counterclockwise.circle",
+                        title: "恢复默认数据",
+                        subtitle: "恢复系统默认的清单和守则",
+                        color: .brandDanger500
+                    )
+                }
 
                 Divider().padding(.leading, 52)
 
