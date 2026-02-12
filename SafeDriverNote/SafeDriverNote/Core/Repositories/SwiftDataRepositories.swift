@@ -382,6 +382,75 @@ struct KnowledgeRepositorySwiftData: KnowledgeRepository {
         }
         try ctx.save()
     }
+
+    /// 随机抽取一张卡片，用于知识页的无限抽取
+    func randomCard() throws -> KnowledgeCard? {
+        let ctx = try context()
+        let allCards = try allCards()
+
+        guard !allCards.isEmpty else { return nil }
+
+        // 获取知识页已显示的卡片记录
+        let knowledgePagePrefix = "knowledge_page_"
+        let knowledgePageShown = try ctx.fetch(FetchDescriptor<KnowledgeRecentlyShown>())
+            .filter { $0.sessionId.hasPrefix(knowledgePagePrefix) }
+
+        // 获取最近7天内在知识页显示过的卡片
+        let oneWeekAgo = Calendar.current.date(byAdding: .day, value: -7, to: Date()) ?? Date()
+        let recentlyShownInKnowledgePage = knowledgePageShown
+            .filter { $0.shownDate >= oneWeekAgo }
+        let recentlyShownCardIds = Set(recentlyShownInKnowledgePage.map { $0.cardId })
+
+        // 筛选可用卡片（排除最近7天在知识页显示过的）
+        var availableCards = allCards.filter { card in
+            !recentlyShownCardIds.contains(card.id)
+        }
+
+        // 如果可用卡片太少，放宽条件：排除最近3天的
+        if availableCards.count < 3 {
+            let threeDaysAgo = Calendar.current.date(byAdding: .day, value: -3, to: Date()) ?? Date()
+            let recentlyShownInThreeDays = knowledgePageShown
+                .filter { $0.shownDate >= threeDaysAgo }
+            let recentCardIds = Set(recentlyShownInThreeDays.map { $0.cardId })
+
+            availableCards = allCards.filter { card in
+                !recentCardIds.contains(card.id)
+            }
+        }
+
+        // 如果仍然不足，使用所有卡片
+        if availableCards.isEmpty {
+            availableCards = allCards
+        }
+
+        // 随机选择一张
+        let randomIndex = Int.random(in: 0..<availableCards.count)
+        let selectedCard = availableCards[randomIndex]
+
+        // 记录这次显示（使用当前的知识页会话）
+        let latestKnowledgePageSession = knowledgePageShown
+            .sorted { $0.shownDate > $1.shownDate }
+            .first?.sessionId
+
+        let sessionId = latestKnowledgePageSession ?? "knowledge_page_" + UUID().uuidString
+
+        let record = KnowledgeRecentlyShown(
+            cardId: selectedCard.id,
+            shownDate: Date(),
+            sessionId: sessionId
+        )
+        ctx.insert(record)
+
+        // 清理旧的知识页记录（保留最近30天）
+        let thirtyDaysAgo = Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
+        let oldKnowledgePageRecords = knowledgePageShown.filter { $0.shownDate < thirtyDaysAgo }
+        for record in oldKnowledgePageRecords {
+            ctx.delete(record)
+        }
+
+        try ctx.save()
+        return selectedCard
+    }
     func upsert(cards: [KnowledgeCard]) throws {
         let ctx = try context()
         // 读取已有，构建索引

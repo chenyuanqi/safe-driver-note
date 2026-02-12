@@ -12,6 +12,18 @@ class TodayLearningService: ObservableObject {
     @Published private(set) var laterViewedCardIds: Set<String> = [] // 追踪"稍后看"的卡片
     @Published private(set) var todayTaskLearnedCardIds: Set<String> = [] // 追踪今日学习任务中已学习的卡片
 
+    /// 获取未掌握的卡片（过滤掉已掌握的）
+    var unlearnedCards: [KnowledgeCard] {
+        todayCards.filter { card in
+            !todayTaskLearnedCardIds.contains(card.id)
+        }
+    }
+
+    /// 检查是否全部卡片都已掌握
+    var isAllCardsFullyLearned: Bool {
+        !todayCards.isEmpty && unlearnedCards.isEmpty
+    }
+
     private let knowledgeRepository = AppDI.shared.knowledgeRepository
     private var lastRefreshDate: Date?
 

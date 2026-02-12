@@ -33,9 +33,9 @@ struct TodayLearningModalView: View {
                 headerSection
 
                 // 卡片内容区域
-                if !todayLearningService.todayCards.isEmpty {
-                    if currentCardIndex < todayLearningService.todayCards.count {
-                        let card = todayLearningService.todayCards[currentCardIndex]
+                if !todayLearningService.unlearnedCards.isEmpty {
+                    if currentCardIndex < todayLearningService.unlearnedCards.count {
+                        let card = todayLearningService.unlearnedCards[currentCardIndex]
 
                         VStack(spacing: Spacing.md) {
                             // 卡片视图
@@ -197,7 +197,8 @@ struct TodayLearningModalView: View {
                     .fontWeight(.semibold)
                     .foregroundColor(.brandSecondary900)
 
-                Text("已掌握 \(todayLearningService.learnedCount)/3 个知识点")
+                let totalCount = todayLearningService.unlearnedCards.count
+                Text("已掌握 \(todayLearningService.learnedCount)/\(totalCount + todayLearningService.learnedCount) 个知识点")
                     .font(.bodySmall)
                     .foregroundColor(.brandSecondary600)
             }
@@ -211,8 +212,8 @@ struct TodayLearningModalView: View {
     // MARK: - Progress Indicator
     private var progressIndicator: some View {
         HStack(spacing: 8) {
-            ForEach(0..<todayLearningService.todayCards.count, id: \.self) { index in
-                let card = todayLearningService.todayCards[index]
+            ForEach(0..<todayLearningService.unlearnedCards.count, id: \.self) { index in
+                let card = todayLearningService.unlearnedCards[index]
                 Circle()
                     .fill(getCardStatusColor(card: card, index: index))
                     .frame(width: 12, height: 12)
@@ -444,7 +445,7 @@ struct TodayLearningModalView: View {
     }
 
     private func moveToNextCard() {
-        if currentCardIndex < todayLearningService.todayCards.count - 1 {
+        if currentCardIndex < todayLearningService.unlearnedCards.count - 1 {
             currentCardIndex += 1
         } else {
             // 到达最后一张卡片时，回到第一张重新开始

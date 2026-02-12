@@ -44,6 +44,7 @@ struct HomeView: View {
     // 添加今日学习弹框相关属性
     @State private var showingTodayLearningModal = false
     @State private var selectedTodayCardTitle: String? = nil
+    @State private var showingAllLearned = false
     
     // 添加自动轮播定时器
     @State private var carouselTimer: Timer?
@@ -262,6 +263,11 @@ struct HomeView: View {
             .presentationDetents([.large, .fraction(0.9)])
             .presentationDragIndicator(.visible)
             .presentationCornerRadius(20)
+        }
+        .alert("已掌握所有内容", isPresented: $showingAllLearned) {
+            Button("确定") { }
+        } message: {
+            Text("已经掌握了，不需要重复点击学习")
         }
         .sheet(isPresented: $showingQuickChecklist) {
             NavigationStack {
@@ -779,14 +785,15 @@ struct HomeView: View {
 	                .font(.title3)
 	                .fontWeight(.semibold)
 	                .foregroundColor(.brandSecondary900)
-	            
+
 	            Spacer()
-	            
-	            Text("\(todayLearningService.learnedCount)/3")
+
+	            let totalCount = todayLearningService.unlearnedCards.count + todayLearningService.learnedCount
+	            Text("\(todayLearningService.learnedCount)/\(totalCount)")
 	                .font(.bodySmall)
 	                .foregroundColor(.brandSecondary500)
 	        }
-	        
+
 	        // 始终显示学习卡片，不显示完成状态
 	        learningCardsView
 	    }
@@ -795,42 +802,66 @@ struct HomeView: View {
 	// MARK: - Learning Cards View (学习中状态)
 	private var learningCardsView: some View {
 	    VStack(spacing: Spacing.md) {
-	        // 使用ZStack和手动控制页面切换，避免手势冲突
-	        ZStack {
-	            ForEach(0..<todayLearningService.todayCards.count, id: \.self) { index in
-	                let card = todayLearningService.todayCards[index]
-	                knowledgeCardView(card, index: index)
-	                    .opacity(index == selectedKnowledgeIndex ? 1.0 : 0.0)
-	                    .zIndex(index == selectedKnowledgeIndex ? 1.0 : 0.0)
-	                    .allowsHitTesting(index == selectedKnowledgeIndex) // 只允许当前显示的卡片接收点击
-	            }
-	        }
-	        .frame(height: 200)
-	        .onAppear {
-	            // 启动自动轮播定时器
-	            startAutoCarousel()
-	        }
-	        .onDisappear {
-	            // 视图消失时停止定时器
-	            stopAutoCarousel()
-	        }
+	        // 检查是否全部掌握
+	        if todayLearningService.isAllCardsFullyLearned {
+	            VStack(spacing: Spacing.lg) {
+	                Image(systemName: "checkmark.circle.fill")
+	                    .font(.system(size: 48))
+	                    .foregroundColor(.brandSuccess500)
 
-	        // 手动添加页面指示器并居中显示
-	        HStack(spacing: 8) {
-	            ForEach(0..<todayLearningService.todayCards.count, id: \.self) { index in
-	                Circle()
-	                    .fill(index == selectedKnowledgeIndex ? Color.brandPrimary500 : Color.brandSecondary300)
-	                    .frame(width: 8, height: 8)
-	                    .onTapGesture {
-	                        withAnimation {
-	                            selectedKnowledgeIndex = index
-	                            // 用户手动切换时重置定时器
-	                            resetAutoCarousel()
-	                        }
-	                    }
+	                VStack(spacing: Spacing.sm) {
+	                    Text("今日学习已完成")
+	                        .font(.bodyLarge)
+	                        .fontWeight(.semibold)
+	                        .foregroundColor(.brandSecondary900)
+
+	                    Text("已掌握所有内容")
+	                        .font(.bodySmall)
+	                        .foregroundColor(.brandSecondary500)
+	                }
 	            }
+	            .frame(maxWidth: .infinity)
+	            .frame(height: 200)
+	            .background(Color.cardBackground)
+	            .cornerRadius(CornerRadius.lg)
+	        } else {
+	            // 使用ZStack和手动控制页面切换，避免手势冲突
+	            ZStack {
+	                ForEach(0..<todayLearningService.unlearnedCards.count, id: \.self) { index in
+	                    let card = todayLearningService.unlearnedCards[index]
+	                    knowledgeCardView(card, index: index)
+	                        .opacity(index == selectedKnowledgeIndex ? 1.0 : 0.0)
+	                        .zIndex(index == selectedKnowledgeIndex ? 1.0 : 0.0)
+	                        .allowsHitTesting(index == selectedKnowledgeIndex) // 只允许当前显示的卡片接收点击
+	                }
+	            }
+	            .frame(height: 200)
+	            .onAppear {
+	                // 启动自动轮播定时器
+	                startAutoCarousel()
+	            }
+	            .onDisappear {
+	                // 视图消失时停止定时器
+	                stopAutoCarousel()
+	            }
+
+	            // 手动添加页面指示器并居中显示
+	            HStack(spacing: 8) {
+	                ForEach(0..<todayLearningService.unlearnedCards.count, id: \.self) { index in
+	                    Circle()
+	                        .fill(index == selectedKnowledgeIndex ? Color.brandPrimary500 : Color.brandSecondary300)
+	                        .frame(width: 8, height: 8)
+	                        .onTapGesture {
+	                            withAnimation {
+	                                selectedKnowledgeIndex = index
+	                                // 用户手动切换时重置定时器
+	                                resetAutoCarousel()
+	                            }
+	                        }
+	                }
+	            }
+	            .frame(maxWidth: .infinity)
 	        }
-	        .frame(maxWidth: .infinity)
 	    }
 	}
 
@@ -841,11 +872,18 @@ struct HomeView: View {
 	        // 点击卡片时显示今日学习弹框，并传递当前卡片标题
 	        print("===== 今日学习卡片点击 =====")
 	        print("点击的卡片标题: \(card.title)")
-	        print("设置 showingTodayLearningModal = true")
-	        selectedTodayCardTitle = card.title
-	        showingTodayLearningModal = true
-	        print("当前状态: showingTodayLearningModal = \(showingTodayLearningModal)")
-	        print("当前状态: showingKnowledgeView = \(showingKnowledgeView)")
+
+	        // 检查是否全部卡片都已掌握
+	        if todayLearningService.isAllCardsFullyLearned {
+	            print("全部卡片已掌握")
+	            showingAllLearned = true
+	        } else {
+	            print("设置 showingTodayLearningModal = true")
+	            selectedTodayCardTitle = card.title
+	            showingTodayLearningModal = true
+	            print("当前状态: showingTodayLearningModal = \(showingTodayLearningModal)")
+	            print("当前状态: showingKnowledgeView = \(showingKnowledgeView)")
+	        }
 	        print("===========================")
 	    }) {
 	        Card(shadow: true) {
@@ -897,7 +935,7 @@ struct HomeView: View {
 	                } else if value.translation.width < -50 {
 	                    // 左滑，切换到下一张卡片
 	                    withAnimation {
-	                        selectedKnowledgeIndex = min(todayLearningService.todayCards.count - 1, selectedKnowledgeIndex + 1)
+	                        selectedKnowledgeIndex = min(todayLearningService.unlearnedCards.count - 1, selectedKnowledgeIndex + 1)
 	                        // 用户手动切换时重置定时器
 	                        resetAutoCarousel()
 	                    }
@@ -1086,7 +1124,10 @@ struct HomeView: View {
         carouselTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { _ in
             DispatchQueue.main.async {
                 withAnimation {
-                    selectedKnowledgeIndex = (selectedKnowledgeIndex + 1) % todayLearningService.todayCards.count
+                    let cardCount = todayLearningService.unlearnedCards.count
+                    if cardCount > 0 {
+                        selectedKnowledgeIndex = (selectedKnowledgeIndex + 1) % cardCount
+                    }
                 }
             }
         }

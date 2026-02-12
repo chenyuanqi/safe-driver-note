@@ -60,11 +60,8 @@ final class KnowledgeViewModel: ObservableObject {
         learnedCountInCurrentSet += 1
         UserDefaults.standard.set(learnedCountInCurrentSet, forKey: knowledgePageLearnedCountKey)
 
-        // 检查是否完成了3张，如果是则可以重新抽取
-        if learnedCountInCurrentSet >= 3 {
-            // 可以重新抽取新卡片
-            refreshKnowledgePageCards()
-        }
+        // 删除卡片后自动抽取一张新的来补充（无限抽取）
+        loadNextCard()
 
         // 发送通知，告知首页更新学习进度
         NotificationCenter.default.post(name: .knowledgeCardMarked, object: nil)
@@ -72,6 +69,16 @@ final class KnowledgeViewModel: ObservableObject {
 
     func snooze(card: KnowledgeCard) {
         today.removeAll { $0.id == card.id }
+
+        // 删除卡片后自动抽取一张新的来补充（无限抽取）
+        loadNextCard()
+    }
+
+    /// 抽取一张新的卡片添加到列表
+    private func loadNextCard() {
+        if let newCard = try? repository.randomCard() {
+            today.append(newCard)
+        }
     }
 
     // 知识页专用的重新抽取方法
@@ -84,9 +91,9 @@ final class KnowledgeViewModel: ObservableObject {
         loadKnowledgePageCards()
     }
 
-    // 检查是否可以重新抽取（学习了3张卡片）
-    var canRefreshCards: Bool {
-        return learnedCountInCurrentSet >= 3
+    // 检查是否有卡片可显示（用于确定是否显示空状态）
+    var hasCards: Bool {
+        return !today.isEmpty
     }
 
     // 加载当前组卡片的学习进度

@@ -29,6 +29,7 @@ import Foundation
     func allCards() throws -> [KnowledgeCard]
     func todayCards(limit: Int) throws -> [KnowledgeCard]
     func knowledgePageCards(limit: Int) throws -> [KnowledgeCard]
+    func randomCard() throws -> KnowledgeCard?
     func mark(cardId: String) throws
     func upsert(cards: [KnowledgeCard]) throws
 }

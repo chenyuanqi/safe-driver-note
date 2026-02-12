@@ -44,72 +44,72 @@ struct KnowledgeTodayView: View {
                                     drivingRulesSection
 
                                     // 学习卡片区域
-                                    if currentCardIndex < vm.today.count {
-                                        let card = vm.today[currentCardIndex]
-                                        GeometryReader { geo in
-                                            let cardHeight = geo.size.height * 0.7
-                                            VStack(spacing: Spacing.lg) {
-                                                ZStack {
-                                                    // 主卡片
-                                                    cardFullView(card)
-                                                        .frame(height: cardHeight)
-                                                        .offset(x: dragOffset)
-                                                        .rotationEffect(.degrees(cardRotation))
-                                                        .opacity(cardOpacity)
-                                                        .scaleEffect(isDismissing ? 0.8 : 1.0)
-                                                        .gesture(
-                                                            DragGesture(minimumDistance: 20)
-                                                                .onChanged { value in
-                                                                    withAnimation(.interactiveSpring()) {
-                                                                        dragOffset = value.translation.width
-                                                                        cardRotation = Double(dragOffset / 15)
-                                                                    }
-                                                                }
-                                                                .onEnded { value in
-                                                                    let dx = value.translation.width
-                                                                    if dx > 120 { // 右滑：掌握
-                                                                        dismissCard(isRightSwipe: true, action: {
-                                                                            vm.mark(card: card)
-                                                                            // 移到下一张卡片
-                                                                            if currentCardIndex < vm.today.count - 1 {
-                                                                                currentCardIndex += 1
-                                                                            }
-                                                                        })
-                                                                    } else if dx < -120 { // 左滑：稍后
-                                                                        dismissCard(isRightSwipe: false, action: {
-                                                                            // 稍后查看：移除当前卡片
-                                                                            vm.snooze(card: card)
-                                                                            // 移到下一张卡片
-                                                                            if currentCardIndex < vm.today.count - 1 {
-                                                                                currentCardIndex += 1
-                                                                            } else {
-                                                                                // 如果是最后一张，回到第一张
-                                                                                currentCardIndex = 0
-                                                                            }
-                                                                        })
-                                                                    } else {
-                                                                        // 回弹
-                                                                        withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
-                                                                            dragOffset = 0
-                                                                            cardRotation = 0
+                                    if vm.hasCards {
+                                        if currentCardIndex < vm.today.count {
+                                            let card = vm.today[currentCardIndex]
+                                            GeometryReader { geo in
+                                                let cardHeight = geo.size.height * 0.7
+                                                VStack(spacing: Spacing.lg) {
+                                                    ZStack {
+                                                        // 主卡片
+                                                        cardFullView(card)
+                                                            .frame(height: cardHeight)
+                                                            .offset(x: dragOffset)
+                                                            .rotationEffect(.degrees(cardRotation))
+                                                            .opacity(cardOpacity)
+                                                            .scaleEffect(isDismissing ? 0.8 : 1.0)
+                                                            .gesture(
+                                                                DragGesture(minimumDistance: 20)
+                                                                    .onChanged { value in
+                                                                        withAnimation(.interactiveSpring()) {
+                                                                            dragOffset = value.translation.width
+                                                                            cardRotation = Double(dragOffset / 15)
                                                                         }
                                                                     }
-                                                                }
-                                                        )
+                                                                    .onEnded { value in
+                                                                        let dx = value.translation.width
+                                                                        if dx > 120 { // 右滑：掌握
+                                                                            dismissCard(isRightSwipe: true, action: {
+                                                                                vm.mark(card: card)
+                                                                                // 卡片已自动删除并补充新卡片，保持索引不变
+                                                                                adjustCardIndex()
+                                                                            })
+                                                                        } else if dx < -120 { // 左滑：稍后
+                                                                            dismissCard(isRightSwipe: false, action: {
+                                                                                vm.snooze(card: card)
+                                                                                // 卡片已自动删除并补充新卡片，保持索引不变
+                                                                                adjustCardIndex()
+                                                                            })
+                                                                        } else {
+                                                                            // 回弹
+                                                                            withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
+                                                                                dragOffset = 0
+                                                                                cardRotation = 0
+                                                                            }
+                                                                        }
+                                                                    }
+                                                            )
 
-                                                    // 烟花文字效果
-                                                    if showingFirework {
-                                                        FireworkTextView(text: fireworkText, color: fireworkColor)
+                                                        // 烟花文字效果
+                                                        if showingFirework {
+                                                            FireworkTextView(text: fireworkText, color: fireworkColor)
+                                                        }
                                                     }
-                                                }
 
-                                                // 提示文字
-                                                Text("左滑稍后，右滑掌握")
-                                                    .font(.bodySmall)
-                                                    .foregroundColor(.brandSecondary500)
-                                                    .padding(.bottom, Spacing.lg)
+                                                    // 提示文字
+                                                    Text("左滑稍后，右滑掌握")
+                                                        .font(.bodySmall)
+                                                        .foregroundColor(.brandSecondary500)
+                                                        .padding(.bottom, Spacing.lg)
+                                                }
+                                                .padding(.horizontal, Spacing.pagePadding)
                                             }
-                                            .padding(.horizontal, Spacing.pagePadding)
+                                        } else {
+                                            // 当索引超出范围时，重置为0显示下一张
+                                            EmptyView()
+                                                .onAppear {
+                                                    currentCardIndex = 0
+                                                }
                                         }
                                     } else {
                                         emptyState
@@ -197,6 +197,18 @@ struct KnowledgeTodayView: View {
             cardOpacity = 1.0
             isDismissing = false
             showingFirework = false
+        }
+    }
+
+    /// 调整卡片索引，确保始终指向有效的卡片
+    /// 因为mark()和snooze()会删除卡片但同时补充新卡片，所以保持索引不变
+    private func adjustCardIndex() {
+        // 卡片已被删除，但新卡片已补充，保持当前索引继续显示
+        // 如果新卡片数量为0（不太可能，但作为防护），重置为0
+        if vm.today.isEmpty {
+            currentCardIndex = 0
+        } else if currentCardIndex >= vm.today.count {
+            currentCardIndex = vm.today.count - 1
         }
     }
 
@@ -309,21 +321,21 @@ struct KnowledgeTodayView: View {
     private var emptyState: some View {
         VStack(spacing: Spacing.xl) {
             Spacer()
-            
+
             Image(systemName: "book.closed")
                 .font(.system(size: 48))
                 .foregroundColor(.brandSecondary300)
-            
-            Text("今日已全部掌握 🎉")
+
+            Text("暂无更多卡片 🎓")
                 .font(.title3)
                 .fontWeight(.semibold)
                 .foregroundColor(.brandSecondary900)
-            
-            Text("明日再来学习新知识！")
+
+            Text("已学习了很多知识，再去复习一下吧！")
                 .font(.body)
                 .foregroundColor(.brandSecondary500)
-            
-            Button("重新抽取") {
+
+            Button("清空记录重新学习") {
                 vm.refreshKnowledgePageCards()
                 currentCardIndex = 0
             }
@@ -334,7 +346,7 @@ struct KnowledgeTodayView: View {
             .padding(.vertical, Spacing.lg)
             .background(Color.brandPrimary100)
             .cornerRadius(CornerRadius.lg)
-            
+
             Spacer()
         }
         .padding(Spacing.pagePadding)
