@@ -27,28 +27,19 @@ struct LogEditorView: View {
     @State private var showingQuickInput: Bool = false
     @State private var quickInputText: String = ""
 
+    // 输入模式：快速输入 vs 详细表单
+    @State private var inputMode: InputMode = .quick
+
     let entry: LogEntry?
     let onSave: (LogType, String, String, String, String?, String?, String, [UIImage], String?, String?) -> Void
 
     var body: some View {
         NavigationStack {
-            Form {
-                typePickerSection
-                locationSection
-                detailSection
-                if type == .mistake { analysisSection }
-                tagsSection
-                Group {
-                    attachmentSection
-                }
+            if inputMode == .quick {
+                quickInputView
+            } else {
+                detailedFormView
             }
-            .navigationTitle(entry == nil ? "新建日志" : "编辑日志")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) { Button("保存") { save() }.disabled(!formValid) }
-                ToolbarItem(placement: .primaryAction) { Button("快速输入") { showingQuickInput = true } }
-            }
-            .onAppear(perform: prefillIfNeeded)
         }
         .sheet(isPresented: $showingQuickInput) { quickInputSheet }
         .sheet(isPresented: $showingPhotoPicker) {
@@ -63,7 +54,8 @@ struct LogEditorView: View {
     }
 
     private var formValid: Bool {
-        !detail.trimmed.isEmpty && !locationNote.trimmed.isEmpty && !scene.trimmed.isEmpty && (type == .success || !cause.trimmed.isEmpty)
+        // P0优化：只要求填写详情即可
+        !detail.trimmed.isEmpty
     }
 
     private func save() {
@@ -81,7 +73,13 @@ struct LogEditorView: View {
     }
 
     private func prefillIfNeeded() {
-        guard let e = entry else { return }
+        guard let e = entry else {
+            // 新建日志时，默认使用快速输入模式
+            inputMode = .quick
+            return
+        }
+        // 编辑已有日志时，使用详细表单模式
+        inputMode = .detailed
         type = e.type
         detail = e.detail
         locationNote = e.locationNote
@@ -101,6 +99,172 @@ struct LogEditorView: View {
         if text.wrappedValue.isEmpty {
             Text(placeholderText).foregroundStyle(.secondary).padding(.top, 8).padding(.leading, 5)
         }
+    }
+
+    // MARK: - Input Modes
+
+    private enum InputMode {
+        case quick
+        case detailed
+    }
+
+    // MARK: - Quick Input View
+
+    @ViewBuilder private var quickInputView: some View {
+        VStack(alignment: .leading, spacing: Spacing.lg) {
+            // 场景模板
+            scenarioTemplatesSection
+
+            // 快速输入区域
+            VStack(alignment: .leading, spacing: Spacing.sm) {
+                Text("快速记录")
+                    .font(.headline)
+
+                Text("随便写下今天的行车记录，我们会自动提取要点")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                TextEditor(text: $detail)
+                    .frame(minHeight: 180)
+                    .overlay(alignment: .topLeading) {
+                        if detail.isEmpty {
+                            Text("例如：今天周末早上没什么车，很顺利就到公司；在快速路看到集群慢车，不要轻易脱离车流速度……")
+                                .foregroundStyle(.secondary)
+                                .padding(.top, 8)
+                                .padding(.leading, 5)
+                        }
+                    }
+                    .padding(Spacing.sm)
+                    .background(Color(.systemGray6))
+                    .cornerRadius(CornerRadius.md)
+            }
+            .padding(.horizontal)
+
+            Spacer()
+        }
+        .padding(.top)
+        .navigationTitle("新建日志")
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("取消") { dismiss() }
+            }
+            ToolbarItem(placement: .confirmationAction) {
+                Button("保存") {
+                    // 自动解析快速输入
+                    if !detail.isEmpty {
+                        let parsed = QuickParser.parse(text: detail)
+                        type = parsed.type
+                        scene = parsed.scene ?? ""
+                        locationNote = parsed.location ?? ""
+                        if !parsed.tags.isEmpty {
+                            tags = parsed.tags.joined(separator: ", ")
+                        }
+                    }
+                    save()
+                }
+                .disabled(!formValid)
+            }
+            ToolbarItem(placement: .primaryAction) {
+                Button("详细表单") {
+                    inputMode = .detailed
+                }
+            }
+        }
+        .onAppear {
+            // 新建日志时自动获取位置
+            if entry == nil && locationNote.isEmpty {
+                autoFillLocation()
+            }
+        }
+    }
+
+    // MARK: - Detailed Form View
+
+    @ViewBuilder private var detailedFormView: some View {
+        Form {
+            typePickerSection
+            locationSection
+            detailSection
+            if type == .mistake { analysisSection }
+            tagsSection
+            Group {
+                attachmentSection
+            }
+        }
+        .navigationTitle(entry == nil ? "新建日志" : "编辑日志")
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("取消") { dismiss() }
+            }
+            ToolbarItem(placement: .confirmationAction) {
+                Button("保存") { save() }.disabled(!formValid)
+            }
+            if entry == nil {
+                ToolbarItem(placement: .primaryAction) {
+                    Button("快速输入") {
+                        inputMode = .quick
+                    }
+                }
+            }
+        }
+        .onAppear {
+            // 新建日志时自动获取位置
+            if entry == nil && locationNote.isEmpty {
+                autoFillLocation()
+            }
+        }
+    }
+
+    // MARK: - Scenario Templates
+
+    @ViewBuilder private var scenarioTemplatesSection: some View {
+        VStack(alignment: .leading, spacing: Spacing.sm) {
+            Text("常见场景")
+                .font(.headline)
+                .padding(.horizontal)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: Spacing.sm) {
+                    ForEach(ScenarioTemplate.allTemplates, id: \.title) { template in
+                        Button(action: {
+                            applyTemplate(template)
+                        }) {
+                            VStack(alignment: .leading, spacing: Spacing.xs) {
+                                HStack {
+                                    Image(systemName: template.icon)
+                                        .font(.title3)
+                                    Spacer()
+                                }
+                                Text(template.title)
+                                    .font(.bodySmall)
+                                    .fontWeight(.medium)
+                                Text(template.subtitle)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(2)
+                            }
+                            .frame(width: 140, height: 90)
+                            .padding(Spacing.sm)
+                            .background(Color(.systemBackground))
+                            .cornerRadius(CornerRadius.md)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: CornerRadius.md)
+                                    .stroke(Color(.systemGray4), lineWidth: 1)
+                            )
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                    }
+                }
+                .padding(.horizontal)
+            }
+        }
+    }
+
+    private func applyTemplate(_ template: ScenarioTemplate) {
+        detail = template.content
+        scene = template.scene
+        type = template.type
+        tags = template.tags.joined(separator: ", ")
     }
 
     // MARK: - Subviews
@@ -471,18 +635,18 @@ private extension String {
 extension LogEditorView {
     private func autoFillLocation() {
         guard !isGettingLocation else { return }
-        
+
         isGettingLocation = true
-        
+
         Task {
             // 首先检查权限
             if !locationService.hasLocationPermission {
                 locationService.requestLocationPermission()
             }
-            
+
             // 获取位置描述
             let locationDescription = await locationService.getCurrentLocationDescription()
-            
+
             await MainActor.run {
                 self.isGettingLocation = false
                 if locationDescription != "未知位置" {
@@ -491,4 +655,73 @@ extension LogEditorView {
             }
         }
     }
+}
+
+// MARK: - Scenario Templates
+
+private struct ScenarioTemplate {
+    let title: String
+    let subtitle: String
+    let icon: String
+    let content: String
+    let scene: String
+    let type: LogType
+    let tags: [String]
+
+    static let allTemplates: [ScenarioTemplate] = [
+        ScenarioTemplate(
+            title: "高速驾驶",
+            subtitle: "高速公路行车记录",
+            icon: "road.lanes",
+            content: "今天在高速上行驶，车流量适中。注意保持车距，观察后视镜，变道时提前打灯。",
+            scene: "高速",
+            type: .success,
+            tags: ["高速", "车距", "变道", "打灯"]
+        ),
+        ScenarioTemplate(
+            title: "倒车入库",
+            subtitle: "停车场倒车记录",
+            icon: "arrow.uturn.backward",
+            content: "在停车场倒车入库，注意观察后视镜和倒车影像，控制好车速和方向。",
+            scene: "倒车入位",
+            type: .success,
+            tags: ["倒车", "停车", "后视镜", "车位"]
+        ),
+        ScenarioTemplate(
+            title: "变道并线",
+            subtitle: "城市道路变道",
+            icon: "arrow.left.arrow.right",
+            content: "在城市道路变道，提前打转向灯，观察后视镜和盲区，确认安全后变道。",
+            scene: "变道",
+            type: .success,
+            tags: ["变道", "并线", "打灯", "盲区", "后视镜"]
+        ),
+        ScenarioTemplate(
+            title: "跟车距离",
+            subtitle: "拥堵路段跟车",
+            icon: "car.2",
+            content: "在拥堵路段跟车，保持安全距离，避免急刹车，注意前车动态。",
+            scene: "跟车",
+            type: .success,
+            tags: ["跟车", "车距", "拥堵", "安全距离"]
+        ),
+        ScenarioTemplate(
+            title: "夜间驾驶",
+            subtitle: "夜间行车记录",
+            icon: "moon.stars",
+            content: "夜间驾驶，注意灯光使用，远近光切换，观察路况，降低车速。",
+            scene: "夜间驾驶",
+            type: .success,
+            tags: ["夜间", "灯光", "观察", "车速"]
+        ),
+        ScenarioTemplate(
+            title: "失误记录",
+            subtitle: "记录驾驶失误",
+            icon: "exclamationmark.triangle",
+            content: "今天出现了一个失误，需要反思改进。",
+            scene: "",
+            type: .mistake,
+            tags: ["失误", "反思"]
+        )
+    ]
 }
