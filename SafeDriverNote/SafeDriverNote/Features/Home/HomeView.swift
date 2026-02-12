@@ -647,6 +647,9 @@ struct HomeView: View {
         .sheet(isPresented: $showingQuickPunchModal) {
             QuickPunchModal(
                 isPresented: $showingQuickPunchModal,
+                todayPreCount: vm.todayPreCount,
+                todayPostCount: vm.todayPostCount,
+                todayLearningService: todayLearningService,
                 onPunchComplete: {
                     handleQuickPunch()
                 }
@@ -660,6 +663,20 @@ struct HomeView: View {
 	}
 	
 	// MARK: - Quick Actions Section
+	private var isAllTasksCompleted: Bool {
+		// 检查今日学习是否全部掌握
+		let learningCompleted = todayLearningService.isAllCardsFullyLearned
+
+		// 检查行前检查是否已打卡
+		let preCompleted = vm.todayPreCount > 0
+
+		// 检查行后检查是否已打卡
+		let postCompleted = vm.todayPostCount > 0
+
+		// 只有当三项都完成时，才返回true
+		return learningCompleted && preCompleted && postCompleted
+	}
+
 	private var quickActionsSection: some View {
 		VStack(alignment: .leading, spacing: Spacing.lg) {
 			Text("快速操作")
@@ -754,6 +771,8 @@ struct HomeView: View {
 					}
 				}
 				.buttonStyle(PlainButtonStyle())
+			.disabled(isAllTasksCompleted)
+			.opacity(isAllTasksCompleted ? 0.5 : 1.0)
 			}
 		}
 	}
@@ -1069,6 +1088,8 @@ struct HomeView: View {
 					activityItemContent(activity)
 				}
 				.buttonStyle(PlainButtonStyle())
+			.disabled(isAllTasksCompleted)
+			.opacity(isAllTasksCompleted ? 0.5 : 1.0)
 			} else if activity.activityType == .driveRoute, let routeId = activity.relatedId {
 				// 驾驶记录点击跳转到详情页
 				if let route = vm.recentRoutes.first(where: { $0.id == routeId }) {
@@ -1076,6 +1097,8 @@ struct HomeView: View {
 						activityItemContent(activity)
 					}
 					.buttonStyle(PlainButtonStyle())
+			.disabled(isAllTasksCompleted)
+			.opacity(isAllTasksCompleted ? 0.5 : 1.0)
 				} else {
 					activityItemContent(activity)
 				}
@@ -1295,8 +1318,27 @@ struct HomeView: View {
 // MARK: - Quick Punch Modal
 private struct QuickPunchModal: View {
     @Binding var isPresented: Bool
+    let todayPreCount: Int
+    let todayPostCount: Int
+    let todayLearningService: TodayLearningService
     let onPunchComplete: () -> Void
     @Environment(\.colorScheme) private var colorScheme
+
+    var isLearningCompleted: Bool {
+        todayLearningService.isAllCardsFullyLearned
+    }
+
+    var isPreChecklistCompleted: Bool {
+        todayPreCount > 0
+    }
+
+    var isPostChecklistCompleted: Bool {
+        todayPostCount > 0
+    }
+
+    var isAllCompleted: Bool {
+        isLearningCompleted && isPreChecklistCompleted && isPostChecklistCompleted
+    }
 
     var body: some View {
         NavigationView {
@@ -1305,92 +1347,109 @@ private struct QuickPunchModal: View {
                 VStack(spacing: Spacing.md) {
                     Image(systemName: "bolt.circle.fill")
                         .font(.system(size: 60))
-                        .foregroundColor(.brandSuccess500)
+                        .foregroundColor(isAllCompleted ? .brandSecondary400 : .brandSuccess500)
 
                     Text("一键打卡")
                         .font(.title2)
                         .fontWeight(.bold)
                         .foregroundColor(.brandSecondary900)
 
-                    Text("一键完成今日学习、行前检查和行后检查")
-                        .font(.bodyMedium)
-                        .foregroundColor(.brandSecondary600)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, Spacing.xl)
+                    if isAllCompleted {
+                        Text("今日任务已全部完成！")
+                            .font(.bodyMedium)
+                            .foregroundColor(.brandSuccess500)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, Spacing.xl)
+                    } else {
+                        Text("一键完成今日未完成的任务")
+                            .font(.bodyMedium)
+                            .foregroundColor(.brandSecondary600)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, Spacing.xl)
+                    }
                 }
                 .padding(.top, Spacing.xxxl)
 
                 // 任务列表
                 VStack(alignment: .leading, spacing: Spacing.md) {
+                    // 今日学习
                     HStack(spacing: Spacing.md) {
                         Image(systemName: "book.fill")
                             .font(.title3)
-                            .foregroundColor(.brandPrimary500)
-                        Text("今日学习（3个知识点）")
+                            .foregroundColor(isLearningCompleted ? .brandSecondary400 : .brandPrimary500)
+                        Text("今日学习（\(todayLearningService.unlearnedCards.count)个未掌握）")
                             .font(.body)
-                            .foregroundColor(.brandSecondary900)
+                            .foregroundColor(isLearningCompleted ? .brandSecondary500 : .brandSecondary900)
                         Spacer()
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundColor(.brandSuccess500)
+                        Image(systemName: isLearningCompleted ? "checkmark.circle.fill" : "circle")
+                            .foregroundColor(isLearningCompleted ? .brandSuccess500 : .brandSecondary300)
                     }
                     .padding(Spacing.md)
-                    .background(Color.brandPrimary50)
+                    .background(isLearningCompleted ? Color.brandSecondary100 : Color.brandPrimary50)
                     .cornerRadius(CornerRadius.md)
+                    .opacity(isLearningCompleted ? 0.6 : 1.0)
 
+                    // 行前检查
                     HStack(spacing: Spacing.md) {
                         Image(systemName: "car.fill")
                             .font(.title3)
-                            .foregroundColor(.brandInfo500)
+                            .foregroundColor(isPreChecklistCompleted ? .brandSecondary400 : .brandInfo500)
                         Text("行前检查")
                             .font(.body)
-                            .foregroundColor(.brandSecondary900)
+                            .foregroundColor(isPreChecklistCompleted ? .brandSecondary500 : .brandSecondary900)
                         Spacer()
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundColor(.brandSuccess500)
+                        Image(systemName: isPreChecklistCompleted ? "checkmark.circle.fill" : "circle")
+                            .foregroundColor(isPreChecklistCompleted ? .brandSuccess500 : .brandSecondary300)
                     }
                     .padding(Spacing.md)
-                    .background(Color.brandInfo100)
+                    .background(isPreChecklistCompleted ? Color.brandSecondary100 : Color.brandInfo100)
                     .cornerRadius(CornerRadius.md)
+                    .opacity(isPreChecklistCompleted ? 0.6 : 1.0)
 
+                    // 行后检查
                     HStack(spacing: Spacing.md) {
                         Image(systemName: "parkingsign.circle.fill")
                             .font(.title3)
-                            .foregroundColor(.brandWarning500)
+                            .foregroundColor(isPostChecklistCompleted ? .brandSecondary400 : .brandWarning500)
                         Text("行后检查")
                             .font(.body)
-                            .foregroundColor(.brandSecondary900)
+                            .foregroundColor(isPostChecklistCompleted ? .brandSecondary500 : .brandSecondary900)
                         Spacer()
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundColor(.brandSuccess500)
+                        Image(systemName: isPostChecklistCompleted ? "checkmark.circle.fill" : "circle")
+                            .foregroundColor(isPostChecklistCompleted ? .brandSuccess500 : .brandSecondary300)
                     }
                     .padding(Spacing.md)
-                    .background(Color.brandWarning100)
+                    .background(isPostChecklistCompleted ? Color.brandSecondary100 : Color.brandWarning100)
                     .cornerRadius(CornerRadius.md)
+                    .opacity(isPostChecklistCompleted ? 0.6 : 1.0)
                 }
                 .padding(.horizontal, Spacing.xl)
 
                 // 确认按钮
                 Button(action: {
-                    onPunchComplete()
-                    isPresented = false
+                    if !isAllCompleted {
+                        onPunchComplete()
+                        isPresented = false
+                    }
                 }) {
                     HStack(spacing: Spacing.md) {
-                        Image(systemName: "bolt.fill")
+                        Image(systemName: isAllCompleted ? "checkmark.circle.fill" : "bolt.fill")
                             .font(.title3)
                             .foregroundColor(.white)
 
-                        Text("立即完成")
+                        Text(isAllCompleted ? "已完成打卡" : "立即完成")
                             .font(.bodyLarge)
                             .fontWeight(.semibold)
                             .foregroundColor(.white)
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, Spacing.lg)
-                    .background(Color.brandSuccess500)
+                    .background(isAllCompleted ? Color.brandSecondary400 : Color.brandSuccess500)
                     .cornerRadius(CornerRadius.lg)
                 }
                 .buttonStyle(PlainButtonStyle())
                 .padding(.horizontal, Spacing.xl)
+                .disabled(isAllCompleted)
 
                 Spacer()
             }
