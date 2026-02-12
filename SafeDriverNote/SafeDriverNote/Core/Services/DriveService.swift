@@ -125,17 +125,41 @@ class DriveService: ObservableObject {
         printDebugInfo()
 
         do {
-            // 使用最近一次已知位置作为终点（获取实际地址而不是坐标）
+            // 先立即保存当前路径点，避免数据丢失
+            if let route = currentRoute, !currentWaypoints.isEmpty {
+                try? repository.updateRoute(route) { r in
+                    r.waypoints = self.currentWaypoints
+                }
+                print("结束前保存路径点：\(currentWaypoints.count)个")
+            }
+
+            // 使用超时机制获取终点位置，避免长时间等待
             var endLocation: RouteLocation? = nil
             if let loc = locationService.currentLocation {
                 let lat = loc.coordinate.latitude
                 let lon = loc.coordinate.longitude
-                // 获取实际地址描述而不是坐标字符串
-                let address = await locationService.getLocationDescription(from: loc)
+
+                // 使用 Task 和超时机制获取地址，避免阻塞
+                let addressTask = Task {
+                    await locationService.getLocationDescription(from: loc)
+                }
+
+                // 等待最多3秒获取地址
+                let address: String
+                do {
+                    address = try await withTimeout(seconds: 3.0) {
+                        await addressTask.value
+                    }
+                } catch {
+                    // 超时或失败，使用坐标作为地址
+                    print("获取地址超时，使用坐标: \(error)")
+                    address = String(format: "%.6f, %.6f", lat, lon)
+                }
+
                 endLocation = RouteLocation(latitude: lat, longitude: lon, address: address)
             }
 
-            // 结束路线记录，并传递收集到的路径点
+            // 结束路线记录（路径点已经在上面保存过了，这里主要是更新状态）
             try repository.endRoute(routeId: routeId, endLocation: endLocation, waypoints: currentWaypoints)
 
             // 更新状态
@@ -155,6 +179,26 @@ class DriveService: ObservableObject {
         }
     }
 
+    /// 超时辅助函数
+    private func withTimeout<T>(seconds: TimeInterval, operation: @escaping () async throws -> T) async throws -> T {
+        try await withThrowingTaskGroup(of: T.self) { group in
+            group.addTask {
+                try await operation()
+            }
+
+            group.addTask {
+                try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+                throw TimeoutError()
+            }
+
+            let result = try await group.next()!
+            group.cancelAll()
+            return result
+        }
+    }
+
+    private struct TimeoutError: Error {}
+
     /// 结束驾驶（手动终点覆盖）
     func endDriving(with endLocationOverride: RouteLocation) async {
         guard isDriving, let routeId = currentRoute?.id else { return }
@@ -165,6 +209,14 @@ class DriveService: ObservableObject {
         printDebugInfo()
 
         do {
+            // 先立即保存当前路径点，避免数据丢失
+            if let route = currentRoute, !currentWaypoints.isEmpty {
+                try? repository.updateRoute(route) { r in
+                    r.waypoints = self.currentWaypoints
+                }
+                print("结束前保存路径点：\(currentWaypoints.count)个")
+            }
+
             try repository.endRoute(routeId: routeId, endLocation: endLocationOverride, waypoints: currentWaypoints)
             self.currentRoute = nil
             self.isDriving = false
