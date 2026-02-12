@@ -83,11 +83,58 @@ struct TodayLearningModalView: View {
                             .frame(maxHeight: .infinity)
                             .padding(.horizontal, Spacing.lg)
 
+                            // 底部操作按钮
+                            HStack(spacing: Spacing.md) {
+                                // 稍后学习按钮
+                                Button(action: {
+                                    dismissCard(direction: .left, action: {
+                                        todayLearningService.markCardAsLaterViewed(card)
+                                        moveToNextCard()
+                                    })
+                                }) {
+                                    HStack(spacing: Spacing.sm) {
+                                        Image(systemName: "clock")
+                                            .font(.bodyMedium)
+                                        Text("稍后学习")
+                                            .font(.bodyMedium)
+                                            .fontWeight(.semibold)
+                                    }
+                                    .foregroundColor(.brandWarning600)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, Spacing.md)
+                                    .background(Color.brandWarning100)
+                                    .cornerRadius(CornerRadius.lg)
+                                }
+
+                                // 已掌握按钮
+                                Button(action: {
+                                    dismissCard(direction: .right, action: {
+                                        todayLearningService.markCardAsLearned(card)
+                                        moveToNextCard()
+                                    })
+                                }) {
+                                    HStack(spacing: Spacing.sm) {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .font(.bodyMedium)
+                                        Text("已掌握")
+                                            .font(.bodyMedium)
+                                            .fontWeight(.semibold)
+                                    }
+                                    .foregroundColor(.white)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, Spacing.md)
+                                    .background(Color.brandSuccess500)
+                                    .cornerRadius(CornerRadius.lg)
+                                }
+                            }
+                            .padding(.horizontal, Spacing.lg)
+                            .padding(.bottom, Spacing.md)
+
                             // 提示文字
-                            Text("左滑稍后，右滑掌握")
-                                .font(.bodySmall)
+                            Text("左滑稍后，右滑掌握 或 点击下方按钮")
+                                .font(.caption)
                                 .foregroundColor(.brandSecondary500)
-                                .padding(.top, Spacing.md)
+                                .padding(.bottom, Spacing.md)
                         }
                     } else {
                         // 全部完成状态
