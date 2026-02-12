@@ -181,6 +181,9 @@ struct SafeDriverNoteApp: App {
 
             case .active:
                 print("App进入活跃状态")
+                // 清除通知红点
+                await clearNotificationBadges()
+
                 // 恢复驾驶状态
                 if driveService.isDriving {
                     // 重新启动位置跟踪（如果需要）
@@ -332,6 +335,11 @@ final class NotificationDelegate: NSObject, UNUserNotificationCenterDelegate, Ob
     }
 
     private func handleNotificationTap(_ notification: UNNotification) {
+        // 清除通知红点
+        Task {
+            await NotificationService.shared.clearBadges()
+        }
+
         // 根据通知标识符设置详情内容
         switch notification.request.identifier {
         case "daily_knowledge_reminder":
