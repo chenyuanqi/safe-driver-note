@@ -63,6 +63,8 @@ struct HomeView: View {
     @State private var knowledgeShouldShowDrivingRules = false
     @State private var showEndConfirmation = false
     @State private var showingWeatherDetail = false
+    @State private var showingQuickPunchModal = false
+    @State private var showingQuickPunchSuccess = false
 
 
     var body: some View {
@@ -636,6 +638,19 @@ struct HomeView: View {
         .sheet(isPresented: $showingWeatherDetail) {
             WeatherDetailView()
         }
+        .sheet(isPresented: $showingQuickPunchModal) {
+            QuickPunchModal(
+                isPresented: $showingQuickPunchModal,
+                onPunchComplete: { mode in
+                    handleQuickPunch(mode: mode)
+                }
+            )
+        }
+        .alert("打卡成功", isPresented: $showingQuickPunchSuccess) {
+            Button("确定") { }
+        } message: {
+            Text("已成功记录本次打卡！")
+        }
 	}
 	
 	// MARK: - Quick Actions Section
@@ -702,30 +717,32 @@ struct HomeView: View {
 							Image(systemName: "checkmark.seal")
 								.font(.title3)
 								.foregroundColor(.brandInfo500)
-							
+
 							Text("行前检查")
 								.font(.bodyLarge)
 								.foregroundColor(.brandInfo500)
 								.fontWeight(.medium)
-							
+
 							Spacer()
 						}
 					}
 				}
 				.buttonStyle(PlainButtonStyle())
-				
-				NavigationLink(destination: VoiceNoteView()) {
-					Card(backgroundColor: Color.brandWarning500.opacity(0.12), shadow: false) {
+
+				Button(action: {
+					showingQuickPunchModal = true
+				}) {
+					Card(backgroundColor: Color.brandSuccess500.opacity(0.12), shadow: false) {
 						HStack(spacing: Spacing.md) {
-							Image(systemName: "mic")
+							Image(systemName: "bolt.circle.fill")
 								.font(.title3)
-								.foregroundColor(.brandWarning500)
-							
-							Text("语音记录")
+								.foregroundColor(.brandSuccess500)
+
+							Text("一键打卡")
 								.font(.bodyLarge)
-								.foregroundColor(.brandWarning500)
+								.foregroundColor(.brandSuccess500)
 								.fontWeight(.medium)
-							
+
 							Spacer()
 						}
 					}
@@ -1173,12 +1190,152 @@ struct HomeView: View {
 
         // 更新当前位置
         await updateCurrentLocation()
-        
+
         // 更新天气数据
         await vm.refreshWeatherData()
 
         // 添加轻微延迟以提供更好的用户体验
         try? await Task.sleep(nanoseconds: 500_000_000) // 0.5秒
+    }
+
+    // MARK: - Quick Punch Handler
+    private func handleQuickPunch(mode: ChecklistViewModel.Mode) {
+        let repository = AppDI.shared.checklistRepository
+
+        // 获取当前模式的所有检查项
+        guard let items = try? repository.fetchItems(mode: mode == .pre ? .pre : .post) else {
+            return
+        }
+
+        // 创建一个快速打卡记录，标记所有项为已完成
+        let checkedItemIds = items.map { $0.id }
+        let score = items.count * 10 // 简单的计分逻辑
+
+        do {
+            try repository.addPunch(
+                mode: mode == .pre ? .pre : .post,
+                checkedItemIds: checkedItemIds,
+                isQuickComplete: true,
+                score: score,
+                locationNote: currentLocationDescription != "获取位置中..." ? currentLocationDescription : nil
+            )
+
+            // 显示成功提示
+            showingQuickPunchSuccess = true
+        } catch {
+            print("快速打卡失败: \(error)")
+        }
+    }
+}
+
+// MARK: - Quick Punch Modal
+private struct QuickPunchModal: View {
+    @Binding var isPresented: Bool
+    let onPunchComplete: (ChecklistViewModel.Mode) -> Void
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        NavigationView {
+            VStack(spacing: Spacing.xxxl) {
+                // 标题和说明
+                VStack(spacing: Spacing.md) {
+                    Image(systemName: "bolt.circle.fill")
+                        .font(.system(size: 60))
+                        .foregroundColor(.brandSuccess500)
+
+                    Text("一键打卡")
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .foregroundColor(.brandSecondary900)
+
+                    Text("快速完成检查清单打卡，无需逐项勾选")
+                        .font(.bodyMedium)
+                        .foregroundColor(.brandSecondary600)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, Spacing.xl)
+                }
+                .padding(.top, Spacing.xxxl)
+
+                // 选择按钮
+                VStack(spacing: Spacing.lg) {
+                    Button(action: {
+                        onPunchComplete(.pre)
+                        isPresented = false
+                    }) {
+                        HStack(spacing: Spacing.md) {
+                            Image(systemName: "car.fill")
+                                .font(.title2)
+                                .foregroundColor(.white)
+
+                            VStack(alignment: .leading, spacing: Spacing.xs) {
+                                Text("行前打卡")
+                                    .font(.bodyLarge)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.white)
+
+                                Text("开车前快速完成检查")
+                                    .font(.bodySmall)
+                                    .foregroundColor(.white.opacity(0.8))
+                            }
+
+                            Spacer()
+
+                            Image(systemName: "chevron.right")
+                                .font(.body)
+                                .foregroundColor(.white.opacity(0.8))
+                        }
+                        .padding(Spacing.lg)
+                        .background(Color.brandInfo500)
+                        .cornerRadius(CornerRadius.lg)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+
+                    Button(action: {
+                        onPunchComplete(.post)
+                        isPresented = false
+                    }) {
+                        HStack(spacing: Spacing.md) {
+                            Image(systemName: "parkingsign.circle.fill")
+                                .font(.title2)
+                                .foregroundColor(.white)
+
+                            VStack(alignment: .leading, spacing: Spacing.xs) {
+                                Text("行后打卡")
+                                    .font(.bodyLarge)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.white)
+
+                                Text("停车后快速完成检查")
+                                    .font(.bodySmall)
+                                    .foregroundColor(.white.opacity(0.8))
+                            }
+
+                            Spacer()
+
+                            Image(systemName: "chevron.right")
+                                .font(.body)
+                                .foregroundColor(.white.opacity(0.8))
+                        }
+                        .padding(Spacing.lg)
+                        .background(Color.brandSuccess500)
+                        .cornerRadius(CornerRadius.lg)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                }
+                .padding(.horizontal, Spacing.xl)
+
+                Spacer()
+            }
+            .background(colorScheme == .dark ? Color.brandSecondary900 : Color.brandSecondary50)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("取消") {
+                        isPresented = false
+                    }
+                }
+            }
+        }
     }
 }
 
