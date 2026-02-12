@@ -170,6 +170,8 @@ struct RestoreDefaultsView: View {
 
                 await MainActor.run {
                     showingSuccessAlert = true
+                    // 发送通知，让清单页面刷新数据
+                    NotificationCenter.default.post(name: .checklistDataRestored, object: nil)
                 }
             } catch {
                 print("恢复失败: \(error)")

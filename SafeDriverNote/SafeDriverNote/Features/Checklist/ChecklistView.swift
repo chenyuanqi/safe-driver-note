@@ -150,6 +150,11 @@ struct ChecklistView: View {
             }
             showingPunch = true
         }
+        .onReceive(NotificationCenter.default.publisher(for: .checklistDataRestored)) { _ in
+            Task {
+                await refreshChecklistData()
+            }
+        }
         .alert("确认删除", isPresented: $showingDeleteAlert) {
             Button("取消", role: .cancel) { }
             Button("删除", role: .destructive) {

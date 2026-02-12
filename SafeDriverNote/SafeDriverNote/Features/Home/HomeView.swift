@@ -1308,7 +1308,7 @@ private struct QuickPunchModal: View {
                             .foregroundColor(.brandSuccess500)
                     }
                     .padding(Spacing.md)
-                    .background(Color.brandInfo50)
+                    .background(Color.brandInfo100)
                     .cornerRadius(CornerRadius.md)
 
                     HStack(spacing: Spacing.md) {
@@ -1323,7 +1323,7 @@ private struct QuickPunchModal: View {
                             .foregroundColor(.brandSuccess500)
                     }
                     .padding(Spacing.md)
-                    .background(Color.brandWarning50)
+                    .background(Color.brandWarning100)
                     .cornerRadius(CornerRadius.md)
                 }
                 .padding(.horizontal, Spacing.xl)
