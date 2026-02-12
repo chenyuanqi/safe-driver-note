@@ -641,15 +641,15 @@ struct HomeView: View {
         .sheet(isPresented: $showingQuickPunchModal) {
             QuickPunchModal(
                 isPresented: $showingQuickPunchModal,
-                onPunchComplete: { mode in
-                    handleQuickPunch(mode: mode)
+                onPunchComplete: {
+                    handleQuickPunch()
                 }
             )
         }
         .alert("打卡成功", isPresented: $showingQuickPunchSuccess) {
             Button("确定") { }
         } message: {
-            Text("已成功记录本次打卡！")
+            Text("已成功完成今日学习、行前检查和行后检查！")
         }
 	}
 	
@@ -1199,39 +1199,62 @@ struct HomeView: View {
     }
 
     // MARK: - Quick Punch Handler
-    private func handleQuickPunch(mode: ChecklistViewModel.Mode) {
+    private func handleQuickPunch() {
         let repository = AppDI.shared.checklistRepository
 
-        // 获取当前模式的所有检查项
-        guard let items = try? repository.fetchItems(mode: mode == .pre ? .pre : .post) else {
-            return
+        // 1. 完成今日学习（标记所有3张卡片为已学习）
+        for card in todayLearningService.todayCards {
+            todayLearningService.markCardAsLearned(card)
         }
 
-        // 创建一个快速打卡记录，标记所有项为已完成
-        let checkedItemIds = items.map { $0.id }
-        let score = items.count * 10 // 简单的计分逻辑
+        // 2. 完成行前检查
+        if let preItems = try? repository.fetchItems(mode: .pre) {
+            let preCheckedItemIds = preItems.map { $0.id }
+            let preScore = preItems.count * 10
 
-        do {
-            try repository.addPunch(
-                mode: mode == .pre ? .pre : .post,
-                checkedItemIds: checkedItemIds,
-                isQuickComplete: true,
-                score: score,
-                locationNote: currentLocationDescription != "获取位置中..." ? currentLocationDescription : nil
-            )
-
-            // 显示成功提示
-            showingQuickPunchSuccess = true
-        } catch {
-            print("快速打卡失败: \(error)")
+            do {
+                try repository.addPunch(
+                    mode: .pre,
+                    checkedItemIds: preCheckedItemIds,
+                    isQuickComplete: true,
+                    score: preScore,
+                    locationNote: currentLocationDescription != "获取位置中..." ? currentLocationDescription : nil
+                )
+            } catch {
+                print("行前检查打卡失败: \(error)")
+            }
         }
+
+        // 3. 完成行后检查
+        if let postItems = try? repository.fetchItems(mode: .post) {
+            let postCheckedItemIds = postItems.map { $0.id }
+            let postScore = postItems.count * 10
+
+            do {
+                try repository.addPunch(
+                    mode: .post,
+                    checkedItemIds: postCheckedItemIds,
+                    isQuickComplete: true,
+                    score: postScore,
+                    locationNote: currentLocationDescription != "获取位置中..." ? currentLocationDescription : nil
+                )
+            } catch {
+                print("行后检查打卡失败: \(error)")
+            }
+        }
+
+        // 重新加载数据以更新UI
+        vm.reload()
+
+        // 显示成功提示
+        showingQuickPunchSuccess = true
     }
 }
 
 // MARK: - Quick Punch Modal
 private struct QuickPunchModal: View {
     @Binding var isPresented: Bool
-    let onPunchComplete: (ChecklistViewModel.Mode) -> Void
+    let onPunchComplete: () -> Void
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
@@ -1248,7 +1271,7 @@ private struct QuickPunchModal: View {
                         .fontWeight(.bold)
                         .foregroundColor(.brandSecondary900)
 
-                    Text("快速完成检查清单打卡，无需逐项勾选")
+                    Text("一键完成今日学习、行前检查和行后检查")
                         .font(.bodyMedium)
                         .foregroundColor(.brandSecondary600)
                         .multilineTextAlignment(.center)
@@ -1256,72 +1279,76 @@ private struct QuickPunchModal: View {
                 }
                 .padding(.top, Spacing.xxxl)
 
-                // 选择按钮
-                VStack(spacing: Spacing.lg) {
-                    Button(action: {
-                        onPunchComplete(.pre)
-                        isPresented = false
-                    }) {
-                        HStack(spacing: Spacing.md) {
-                            Image(systemName: "car.fill")
-                                .font(.title2)
-                                .foregroundColor(.white)
-
-                            VStack(alignment: .leading, spacing: Spacing.xs) {
-                                Text("行前打卡")
-                                    .font(.bodyLarge)
-                                    .fontWeight(.semibold)
-                                    .foregroundColor(.white)
-
-                                Text("开车前快速完成检查")
-                                    .font(.bodySmall)
-                                    .foregroundColor(.white.opacity(0.8))
-                            }
-
-                            Spacer()
-
-                            Image(systemName: "chevron.right")
-                                .font(.body)
-                                .foregroundColor(.white.opacity(0.8))
-                        }
-                        .padding(Spacing.lg)
-                        .background(Color.brandInfo500)
-                        .cornerRadius(CornerRadius.lg)
+                // 任务列表
+                VStack(alignment: .leading, spacing: Spacing.md) {
+                    HStack(spacing: Spacing.md) {
+                        Image(systemName: "book.fill")
+                            .font(.title3)
+                            .foregroundColor(.brandPrimary500)
+                        Text("今日学习（3个知识点）")
+                            .font(.body)
+                            .foregroundColor(.brandSecondary900)
+                        Spacer()
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(.brandSuccess500)
                     }
-                    .buttonStyle(PlainButtonStyle())
+                    .padding(Spacing.md)
+                    .background(Color.brandPrimary50)
+                    .cornerRadius(CornerRadius.md)
 
-                    Button(action: {
-                        onPunchComplete(.post)
-                        isPresented = false
-                    }) {
-                        HStack(spacing: Spacing.md) {
-                            Image(systemName: "parkingsign.circle.fill")
-                                .font(.title2)
-                                .foregroundColor(.white)
-
-                            VStack(alignment: .leading, spacing: Spacing.xs) {
-                                Text("行后打卡")
-                                    .font(.bodyLarge)
-                                    .fontWeight(.semibold)
-                                    .foregroundColor(.white)
-
-                                Text("停车后快速完成检查")
-                                    .font(.bodySmall)
-                                    .foregroundColor(.white.opacity(0.8))
-                            }
-
-                            Spacer()
-
-                            Image(systemName: "chevron.right")
-                                .font(.body)
-                                .foregroundColor(.white.opacity(0.8))
-                        }
-                        .padding(Spacing.lg)
-                        .background(Color.brandSuccess500)
-                        .cornerRadius(CornerRadius.lg)
+                    HStack(spacing: Spacing.md) {
+                        Image(systemName: "car.fill")
+                            .font(.title3)
+                            .foregroundColor(.brandInfo500)
+                        Text("行前检查")
+                            .font(.body)
+                            .foregroundColor(.brandSecondary900)
+                        Spacer()
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(.brandSuccess500)
                     }
-                    .buttonStyle(PlainButtonStyle())
+                    .padding(Spacing.md)
+                    .background(Color.brandInfo50)
+                    .cornerRadius(CornerRadius.md)
+
+                    HStack(spacing: Spacing.md) {
+                        Image(systemName: "parkingsign.circle.fill")
+                            .font(.title3)
+                            .foregroundColor(.brandWarning500)
+                        Text("行后检查")
+                            .font(.body)
+                            .foregroundColor(.brandSecondary900)
+                        Spacer()
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(.brandSuccess500)
+                    }
+                    .padding(Spacing.md)
+                    .background(Color.brandWarning50)
+                    .cornerRadius(CornerRadius.md)
                 }
+                .padding(.horizontal, Spacing.xl)
+
+                // 确认按钮
+                Button(action: {
+                    onPunchComplete()
+                    isPresented = false
+                }) {
+                    HStack(spacing: Spacing.md) {
+                        Image(systemName: "bolt.fill")
+                            .font(.title3)
+                            .foregroundColor(.white)
+
+                        Text("立即完成")
+                            .font(.bodyLarge)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.white)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, Spacing.lg)
+                    .background(Color.brandSuccess500)
+                    .cornerRadius(CornerRadius.lg)
+                }
+                .buttonStyle(PlainButtonStyle())
                 .padding(.horizontal, Spacing.xl)
 
                 Spacer()
