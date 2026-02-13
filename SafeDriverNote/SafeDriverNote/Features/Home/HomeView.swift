@@ -1088,8 +1088,6 @@ struct HomeView: View {
 					activityItemContent(activity)
 				}
 				.buttonStyle(PlainButtonStyle())
-			.disabled(isAllTasksCompleted)
-			.opacity(isAllTasksCompleted ? 0.5 : 1.0)
 			} else if activity.activityType == .driveRoute, let routeId = activity.relatedId {
 				// 驾驶记录点击跳转到详情页
 				if let route = vm.recentRoutes.first(where: { $0.id == routeId }) {
@@ -1097,8 +1095,6 @@ struct HomeView: View {
 						activityItemContent(activity)
 					}
 					.buttonStyle(PlainButtonStyle())
-			.disabled(isAllTasksCompleted)
-			.opacity(isAllTasksCompleted ? 0.5 : 1.0)
 				} else {
 					activityItemContent(activity)
 				}
